@@ -1,37 +1,24 @@
 # Ethereum Accounts Manager for macOS
 
-Welcome to the Ethereum Accounts Manager for macOS! This project aims to provide a user-friendly interface for managing Ethereum accounts directly on your Mac. With this tool, you can create, manage, and interact with your Ethereum accounts seamlessly.
-
-## Table of Contents
-
-- [Features](#features)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
+Ethereum Accounts Manager for macOS is a user-friendly application designed to simplify the management of Ethereum accounts directly from a Mac. With this tool, you can effortlessly create, manage, and interact with your Ethereum accounts securely.
 
 ## Features
 
-- **Account Creation:** Easily create new Ethereum accounts.
-- **Account Management:** View and manage your Ethereum accounts.
-- **Transaction Management:** Send and receive Ethereum transactions.
-- **Secure Storage:** Securely store your private keys.
-- **User-Friendly Interface:** Intuitive and easy-to-use macOS application.
-
-## Requirements
-
-- macOS 10.14 or later
-- Node.js (for development)
-- Ethereum client (e.g., Geth or Infura)
+- **Account Creation:** Easily generate new Ethereum accounts.
+- **Account Management:** View and manage multiple Ethereum accounts.
+- **Transaction Management:** Send and receive Ether.
+- **Secure Storage:** Private keys are securely stored using macOS Keychain.
+- **User-Friendly Interface:** Modern, intuitive UI designed for macOS.
 
 ## Installation
 
-### Download
+### Prerequisites
 
-You can download the latest release from the [Releases](https://github.com/zemse/gm/releases) page.
+- macOS 10.14 or later
+- Rust (for development)
+- Ethereum client (e.g., Geth or Infura)
 
-### Build from Source
+### Steps
 
 1. Clone the repository:
     ```sh
@@ -41,17 +28,12 @@ You can download the latest release from the [Releases](https://github.com/zemse
 
 2. Install dependencies:
     ```sh
-    npm install
+    cargo build
     ```
 
-3. Build the application:
+3. Run the application:
     ```sh
-    npm run build
-    ```
-
-4. Run the application:
-    ```sh
-    npm start
+    cargo run
     ```
 
 ## Usage
@@ -81,7 +63,7 @@ You can download the latest release from the [Releases](https://github.com/zemse
 
 ## Contributing
 
-We welcome contributions to the Ethereum Accounts Manager for macOS! To contribute:
+We welcome contributions! To contribute:
 
 1. Fork the repository.
 2. Create a new branch (`git checkout -b feature-branch`).
@@ -94,7 +76,3 @@ Please ensure your code follows our [Code of Conduct](CODE_OF_CONDUCT.md) and [C
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-Thank you for using the Ethereum Accounts Manager for macOS! If you have any questions or feedback, feel free to open an issue on GitHub or contact us directly.
