@@ -5,3 +5,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
+figlet-rs = "0.1"
+inquire = "0.7"
+strum = "0.26"
+strum_macros = "0.26"
