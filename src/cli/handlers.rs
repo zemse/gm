@@ -1,6 +1,6 @@
 use super::Handle;
 use clap::{Parser, Subcommand};
-use inquire::Select;
+use inquire::{Select, Text};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 
@@ -40,6 +40,9 @@ enum Commands {
         #[command(subcommand)]
         action: Option<TransactionActions>,
     },
+
+    #[command(alias = "sm")]
+    SignMessage { message: String },
 }
 
 impl_inquire_selection!(Commands);
@@ -52,6 +55,17 @@ impl Handle for Commands {
             }
             Commands::Transaction { action } => {
                 TransactionActions::handle_optn(action);
+            }
+            Commands::SignMessage { message } => {
+                let message = if message.is_empty() {
+                    Text::new("Enter the message to sign:")
+                        .prompt()
+                        .expect("must enter message to sign")
+                } else {
+                    message.clone()
+                };
+
+                gm::sign_message::sign_message(message);
             }
         }
     }
@@ -78,12 +92,10 @@ impl Handle for AccountActions {
             AccountActions::List => {
                 println!("Listing all accounts...");
                 gm::account::list_of_wallets();
-                // Implement listing logic
             }
             AccountActions::Create => {
                 println!("Creating a new account...");
                 gm::account::create_privatekey_wallet();
-                // Implement account creation logic
             }
         }
     }
