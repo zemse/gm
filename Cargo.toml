@@ -3,9 +3,22 @@ name = "gm"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "gm"  # This sets the library name (can be different from the package name)
+path = "src/lib.rs"  # The default is src/lib.rs, but you can change it if needed
+
+[[bin]]
+name = "gm"  # This sets the binary name (default is package name)
+path = "src/main.rs"  
+
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
 figlet-rs = "0.1"
 inquire = "0.7"
 strum = "0.26"
 strum_macros = "0.26"
+alloy = { version = "0.11", features = ["full"] }
+rand = "0.8"
+core-foundation = "0.10"
+core-foundation-sys = "0.8.6"
+security-framework = "3.2"

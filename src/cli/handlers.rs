@@ -74,10 +74,12 @@ impl Handle for AccountActions {
         match self {
             AccountActions::List => {
                 println!("Listing all accounts...");
+                gm::account::list_of_wallets();
                 // Implement listing logic
             }
             AccountActions::Create => {
                 println!("Creating a new account...");
+                gm::account::create_privatekey_wallet();
                 // Implement account creation logic
             }
         }
