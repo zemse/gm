@@ -69,15 +69,19 @@ pub fn list_of_wallets() {
         .ok();
 
     if let Some(address) = address {
+        let mut config = Config::load();
+        config.current_account = address;
+        config.save();
+
         // not necessary to do it right now, we can store this address in the state and later load it when we want to make a tranasaction
-        let result =
-            keychain().find_generic_password(&address_to_service(&address), &address.to_string());
-        if let Ok((pswd, _item)) = result {
-            let key = SigningKey::from_slice(pswd.as_ref())
-                .expect("must create a valid signing key from keychain password");
-            let signer = PrivateKeySigner::from(key);
-            println!("Address: {:?}", signer.address());
-        }
+        // let result =
+        //     keychain().find_generic_password(&address_to_service(&address), &address.to_string());
+        // if let Ok((pswd, _item)) = result {
+        //     let key = SigningKey::from_slice(pswd.as_ref())
+        //         .expect("must create a valid signing key from keychain password");
+        //     let signer = PrivateKeySigner::from(key);
+        //     println!("Address: {:?}", signer.address());
+        // }
     }
 }
 
@@ -91,6 +95,8 @@ use core_foundation::{
     dictionary::CFDictionary,
     string::CFString,
 };
+
+use crate::config::Config;
 fn simplify_dict(dict: &CFDictionary) -> HashMap<String, String> {
     unsafe {
         let mut retmap = HashMap::new();

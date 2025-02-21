@@ -1,9 +1,8 @@
+use super::Handle;
 use clap::{Parser, Subcommand};
 use inquire::Select;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-
-use super::Handle;
 
 /// Top level CLI struct
 #[derive(Parser)]
@@ -16,6 +15,10 @@ pub struct Cli {
 
 impl Cli {
     pub fn handle(&self) {
+        if self.command.is_none() {
+            gm::gm::gm();
+        }
+
         Commands::handle_optn(&self.command);
     }
 }
