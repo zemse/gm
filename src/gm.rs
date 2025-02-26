@@ -1,6 +1,6 @@
-use figlet_rs::FIGfont;
+use crate::disk::{Config, DiskInterface};
 
-use crate::config::Config;
+use figlet_rs::FIGfont;
 
 pub fn gm() {
     gm_art();

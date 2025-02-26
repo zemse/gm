@@ -1,6 +1,9 @@
-use alloy::{hex, signers::SignerSync};
+use crate::{
+    account::load_wallet,
+    disk::{Config, DiskInterface},
+};
 
-use crate::{account::load_wallet, config::Config};
+use alloy::{hex, signers::SignerSync};
 
 pub fn sign_message(msg: String) {
     let config = Config::load();

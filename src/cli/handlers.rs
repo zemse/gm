@@ -1,6 +1,7 @@
 use super::Handle;
+use crate::address_book;
 use clap::{Parser, Subcommand};
-use inquire::{Select, Text};
+use inquire::Text;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 
@@ -16,10 +17,10 @@ pub struct Cli {
 impl Cli {
     pub fn handle(&self) {
         if self.command.is_none() {
-            gm::gm::gm();
+            crate::gm::gm();
         }
 
-        Commands::handle_optn(&self.command);
+        Commands::handle_optn_inquire(&self.command, ());
     }
 }
 
@@ -35,6 +36,12 @@ enum Commands {
         action: Option<AccountActions>,
     },
 
+    #[command(alias = "ab")]
+    AddressBook {
+        #[command(subcommand)]
+        action: Option<address_book::AddressBookActions>,
+    },
+
     #[command(alias = "tx")]
     Transaction {
         #[command(subcommand)]
@@ -48,13 +55,16 @@ enum Commands {
 impl_inquire_selection!(Commands);
 
 impl Handle for Commands {
-    fn handle(&self) {
+    fn handle(&self, _carry_on: ()) {
         match self {
             Commands::Account { action } => {
-                AccountActions::handle_optn(action);
+                AccountActions::handle_optn_inquire(action, ());
+            }
+            Commands::AddressBook { action } => {
+                address_book::AddressBookActions::handle_optn_inquire(action, ())
             }
             Commands::Transaction { action } => {
-                TransactionActions::handle_optn(action);
+                TransactionActions::handle_optn_inquire(action, ());
             }
             Commands::SignMessage { message } => {
                 let message = if message.is_empty() {
@@ -65,16 +75,12 @@ impl Handle for Commands {
                     message.clone()
                 };
 
-                gm::sign_message::sign_message(message);
+                crate::sign_message::sign_message(message);
             }
         }
     }
 }
 
-/// Account subcommands
-///
-/// List - `gm acc ls`
-/// Create - `gm acc new`
 #[derive(Subcommand, Display, EnumIter)]
 enum AccountActions {
     #[command(alias = "new")]
@@ -87,15 +93,15 @@ enum AccountActions {
 impl_inquire_selection!(AccountActions);
 
 impl Handle for AccountActions {
-    fn handle(&self) {
+    fn handle(&self, _carry_on: ()) {
         match self {
             AccountActions::List => {
                 println!("Listing all accounts...");
-                gm::account::list_of_wallets();
+                crate::account::list_of_wallets();
             }
             AccountActions::Create => {
                 println!("Creating a new account...");
-                gm::account::create_privatekey_wallet();
+                crate::account::create_privatekey_wallet();
             }
         }
     }
@@ -117,7 +123,7 @@ enum TransactionActions {
 impl_inquire_selection!(TransactionActions);
 
 impl Handle for TransactionActions {
-    fn handle(&self) {
+    fn handle(&self, _carry_on: ()) {
         match self {
             TransactionActions::List => {
                 println!("Listing all transactions...");

@@ -1,8 +1,17 @@
 use std::{collections::HashMap, str::FromStr};
 
+use crate::disk::{Config, DiskInterface};
+
 use alloy::{
     primitives::{bytes::BytesMut, keccak256, Address, Bytes, U256},
     signers::{k256::ecdsa::SigningKey, local::PrivateKeySigner},
+};
+use core_foundation::{
+    base::{CFCopyDescription, CFGetTypeID, TCFType},
+    data::CFData,
+    date::CFDate,
+    dictionary::CFDictionary,
+    string::CFString,
 };
 use inquire::{Password, Select};
 use rand::{rngs::OsRng, RngCore};
@@ -124,16 +133,6 @@ pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
         })
 }
 
-// TODO move this to upstream
-use core_foundation::{
-    base::{CFCopyDescription, CFGetTypeID, TCFType},
-    data::CFData,
-    date::CFDate,
-    dictionary::CFDictionary,
-    string::CFString,
-};
-
-use crate::config::Config;
 fn simplify_dict(dict: &CFDictionary) -> HashMap<String, String> {
     unsafe {
         let mut retmap = HashMap::new();
