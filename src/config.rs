@@ -3,7 +3,7 @@
 // account address book
 
 use alloy::primitives::Address;
-use directories::ProjectDirs;
+use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
@@ -16,9 +16,8 @@ pub struct Config {
 impl Config {
     /// Get the path to the config file
     fn config_path() -> PathBuf {
-        let project_dirs =
-            ProjectDirs::from("xyz", "zemse", "gm").expect("Could not determine config directory");
-        project_dirs.config_dir().join("config.toml") // Store as TOML
+        let dirs = BaseDirs::new().expect("Failed to get base directories");
+        dirs.home_dir().join(".gm").join("config.toml")
     }
 
     /// Load settings from a file
