@@ -77,11 +77,11 @@ impl Handle for Commands {
 /// Create - `gm acc new`
 #[derive(Subcommand, Display, EnumIter)]
 enum AccountActions {
-    #[command(alias = "ls")]
-    List,
-
     #[command(alias = "new")]
     Create,
+
+    #[command(alias = "ls")]
+    List,
 }
 
 impl_inquire_selection!(AccountActions);

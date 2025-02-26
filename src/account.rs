@@ -1,11 +1,11 @@
 use std::{collections::HashMap, str::FromStr};
 
 use alloy::{
-    primitives::Address,
+    primitives::{bytes::BytesMut, keccak256, Address, Bytes, U256},
     signers::{k256::ecdsa::SigningKey, local::PrivateKeySigner},
 };
-use inquire::Select;
-use rand::rngs::OsRng;
+use inquire::{Password, Select};
+use rand::{rngs::OsRng, RngCore};
 use security_framework::{
     base::Error,
     item::{ItemClass, ItemSearchOptions, SearchResult},
@@ -22,20 +22,58 @@ fn address_to_service(address: &Address) -> String {
 
 /// Create a new private key wallet and store it in the keychain
 pub fn create_privatekey_wallet() -> Address {
-    let key = SigningKey::random(&mut OsRng);
-    let private_key = key.to_bytes();
-    let signer = PrivateKeySigner::from(key);
+    // TODO include random string to strengthen the key and then hash it all
+    // TODO store mnemonic phrase
+    // TODO this user input, if we can show some kind of progress bar with security, it can incentivise
+    // people to enter more words in this.
+
+    // Take some user input to improve the private key
+    let user_input = Password::new(
+        "Enter things you see around you or type any random text and then press enter:",
+    )
+    .without_confirmation()
+    .prompt();
+
+    // generate the private key
+    let private_key = if let Ok(mut user_input) = user_input {
+        if user_input.len() % 2 != 0 {
+            user_input.push('t');
+        }
+        let user_input = Bytes::copy_from_slice(user_input.as_bytes());
+
+        loop {
+            let mut random_value = [0u8; 32];
+            OsRng.fill_bytes(&mut random_value);
+            let random_value = U256::from_be_bytes(random_value);
+
+            let mut concat = BytesMut::with_capacity(32 + user_input.len());
+            concat.extend_from_slice(&random_value.to_be_bytes::<32>());
+            concat.extend_from_slice(&user_input);
+            let result = keccak256(concat);
+
+            let result = SigningKey::from_slice(result.as_slice());
+            if let Ok(key) = result {
+                break key;
+            }
+        }
+    } else {
+        SigningKey::random(&mut OsRng)
+    };
+
+    let private_key_bytes = private_key.to_bytes();
+    let signer = PrivateKeySigner::from(private_key);
     let address = signer.address();
 
     keychain()
         .add_generic_password(
             &address_to_service(&address),
             &address.to_string(),
-            private_key.as_slice(),
+            private_key_bytes.as_slice(),
         )
         .unwrap();
 
     println!("Wallet created with address: {}", address);
+    println!("The private key is stored securely in your keychain.");
 
     address
 }
