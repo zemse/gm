@@ -162,6 +162,7 @@ impl Handle<AddressBookViewCarryOn> for AddressBookViewActions {
                     .or_else(|| {
                         Some(
                             Text::new("Enter new name")
+                                .with_initial_value(&entry.name)
                                 .prompt()
                                 .expect("must input new name"),
                         )
@@ -179,6 +180,8 @@ impl Handle<AddressBookViewCarryOn> for AddressBookViewActions {
                         address: entry.address,
                     },
                 );
+
+                println!("Entry updated in address book");
             }
             AddressBookViewActions::ChangeAddress {
                 id,
@@ -198,6 +201,7 @@ impl Handle<AddressBookViewCarryOn> for AddressBookViewActions {
                     .or_else(|| {
                         Some(
                             Text::new("Enter new address")
+                                .with_initial_value(&entry.address.to_string())
                                 .prompt()
                                 .expect("must input new address")
                                 .parse()
@@ -215,6 +219,8 @@ impl Handle<AddressBookViewCarryOn> for AddressBookViewActions {
                         address: new_address,
                     },
                 );
+
+                println!("Entry updated in address book");
             }
             AddressBookViewActions::Delete { id, address, name } => {
                 let (id, _) = AddressBook::load()
@@ -226,6 +232,8 @@ impl Handle<AddressBookViewCarryOn> for AddressBookViewActions {
                     .expect("entry not found");
 
                 AddressBook::load().remove(id);
+
+                println!("Entry deleted from address book");
             }
         }
     }

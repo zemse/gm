@@ -36,9 +36,6 @@ where
             fs::create_dir_all(parent).ok(); // Ensure config directory exists
         }
 
-        println!("Saving {:?}", self);
-        println!("Saving {:?}", serde_json::to_string(self));
-
         let content = toml::to_string_pretty(self).expect("Failed to serialize");
         fs::write(path, content).expect("Failed to write file");
     }
