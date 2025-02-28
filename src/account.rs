@@ -124,6 +124,7 @@ pub fn list_of_wallets() {
 }
 
 pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
+    println!("Unlocking wallet {:?}", address);
     keychain()
         .find_generic_password(&address_to_service(&address), &address.to_string())
         .map(|(pswd, _item)| {

@@ -1,0 +1,287 @@
+use std::{fmt::Display, future::IntoFuture};
+
+use crate::{
+    account::load_wallet,
+    cli::{Handle, Inquire},
+    disk::{Config, DiskInterface},
+};
+
+use alloy::{
+    consensus::{SignableTransaction, TxEip1559, TxEnvelope},
+    hex,
+    network::TxSignerSync,
+    primitives::{bytes::BytesMut, Address, TxKind, U256},
+    providers::{Provider, ProviderBuilder},
+    rlp::Encodable,
+};
+use clap::{ArgAction, Subcommand};
+use inquire::Text;
+use strum::IntoEnumIterator;
+use strum_macros::{Display, EnumIter};
+use tokio::runtime::Runtime;
+
+/// Transaction subcommands
+///
+/// List - `gm tx ls`
+/// Create - `gm tx new`
+#[derive(Subcommand, Display, EnumIter)]
+pub enum TransactionActions {
+    #[command(alias = "new")]
+    Create {
+        #[arg(long, short)]
+        network: Option<String>,
+
+        #[arg(long, short)]
+        to: Option<Address>,
+
+        #[arg(long, short)]
+        value: Option<U256>,
+
+        #[arg(long, short, action = ArgAction::SetTrue)]
+        confirm: Option<bool>,
+    },
+
+    #[command(alias = "ls")]
+    List,
+}
+
+impl_inquire_selection!(TransactionActions, ());
+
+impl Handle for TransactionActions {
+    fn handle(&self, _carry_on: ()) {
+        match self {
+            TransactionActions::Create {
+                network,
+                to,
+                value,
+                confirm,
+            } => {
+                let result = if confirm.unwrap_or_default() {
+                    TransactionCreateCarryOn {
+                        network: network.clone(),
+                        to: *to,
+                        value: *value,
+                    }
+                } else {
+                    TransactionCreateActionsVec::inquire(&TransactionCreateCarryOn {
+                        network: network.clone(),
+                        to: *to,
+                        value: *value,
+                    })
+                    .expect("tx create args must be provided happen")
+                    .into_obj()
+                };
+
+                // Implement transaction creation logic
+                println!("Creating transaction with args: {:?}", result);
+
+                let rpc_url =
+                    "https://eth-sepolia.g.alchemy.com/v2/T0Fv_dXv5Kepb_KIa69-JR_JDxXdABxG"
+                        .parse()
+                        .expect("rpc url issue");
+                let provider = ProviderBuilder::new().on_http(rpc_url);
+
+                let mut tx = TxEip1559::default();
+
+                if let Some(to) = result.to {
+                    tx.to = TxKind::Call(to);
+                } else {
+                    tx.to = TxKind::Create;
+                }
+
+                if let Some(value) = result.value {
+                    tx.value = value;
+                }
+
+                let config = Config::load();
+                let result = provider.get_transaction_count(config.current_account);
+
+                // Create a Tokio runtime
+                let rt = Runtime::new().expect("runtime failed");
+
+                // // Block on the async function
+                let nonce = rt.block_on(result.into_future()).expect("result");
+                tx.nonce = nonce;
+
+                tx.chain_id = 11155111;
+                tx.gas_limit = 21_000;
+                tx.max_priority_fee_per_gas = 2_000_000_000;
+                tx.max_fee_per_gas = 80_000_000_000;
+
+                let signer = load_wallet(config.current_account).expect("wallet issue");
+
+                let result = signer
+                    .sign_transaction_sync(&mut tx)
+                    .expect("signing error");
+
+                println!("unsigned tx {:?}", tx);
+                let signed = tx.into_signed(result);
+                let mut out = BytesMut::new();
+                signed.rlp_encode(&mut out);
+
+                println!("out {:?}", hex::encode(&out));
+
+                let mut out = BytesMut::new();
+                let tx_typed = TxEnvelope::Eip1559(signed);
+                tx_typed.encode(&mut out);
+
+                println!("out {:?}", hex::encode(&out));
+                let out = &out[2..];
+
+                println!("out {:?}", hex::encode(out));
+                // println!("out {:?}", hex::encode(&out));
+
+                // .rlp_encode(&mut out);
+
+                let result = rt
+                    .block_on(provider.send_raw_transaction(out).into_future())
+                    .expect("submit failure");
+                println!("pending tx: {:?} {:?}", result.tx_hash(), result);
+
+                let receipt = rt.block_on(result.get_receipt()).expect("wait failed");
+
+                println!("confirmed {:?}", receipt)
+            }
+            TransactionActions::List => {
+                println!("Listing all transactions...");
+                // Implement listing logic
+            }
+        }
+    }
+}
+
+#[derive(Subcommand, EnumIter, Clone)]
+pub enum TransactionCreateActions {
+    #[command(alias = "net")]
+    Network { network: Option<String> },
+
+    #[command(alias = "to")]
+    To { to: Option<Address> },
+
+    #[command(alias = "val")]
+    Value { value: Option<U256> },
+
+    #[command(alias = "submit")]
+    Confirm,
+}
+
+impl Display for TransactionCreateActions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TransactionCreateActions::Network { network } => {
+                write!(f, "Network: {}", network.as_deref().unwrap_or("<empty>"))
+            }
+            TransactionCreateActions::To { to } => {
+                write!(
+                    f,
+                    "To: {}",
+                    to.as_ref()
+                        .map(|a| a.to_string())
+                        .unwrap_or("<empty>".to_string())
+                )
+            }
+            TransactionCreateActions::Value { value } => {
+                write!(f, "Value: {}", value.unwrap_or(U256::ZERO))
+            }
+            TransactionCreateActions::Confirm => write!(f, "Confirm"),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct TransactionCreateActionsVec(Vec<TransactionCreateActions>);
+
+#[derive(Debug)]
+pub struct TransactionCreateCarryOn {
+    pub network: Option<String>,
+    pub to: Option<Address>,
+    pub value: Option<U256>,
+}
+
+impl From<&TransactionCreateCarryOn> for TransactionCreateActionsVec {
+    fn from(value: &TransactionCreateCarryOn) -> Self {
+        let mut options = vec![
+            TransactionCreateActions::Network { network: None },
+            TransactionCreateActions::To { to: None },
+            TransactionCreateActions::Value { value: None },
+            TransactionCreateActions::Confirm,
+        ];
+
+        if let Some(network) = &value.network {
+            options[0] = TransactionCreateActions::Network {
+                network: Some(network.clone()),
+            };
+        }
+        if let Some(to) = value.to {
+            options[1] = TransactionCreateActions::To { to: Some(to) };
+        }
+        if let Some(value) = value.value {
+            options[2] = TransactionCreateActions::Value { value: Some(value) };
+        }
+
+        TransactionCreateActionsVec(options)
+    }
+}
+
+impl TransactionCreateActionsVec {
+    fn into_obj(self) -> TransactionCreateCarryOn {
+        let mut network = None;
+        let mut to = None;
+        let mut value = None;
+
+        for action in self.0 {
+            match action {
+                TransactionCreateActions::Network { network: n } => network = n,
+                TransactionCreateActions::To { to: t } => to = t,
+                TransactionCreateActions::Value { value: v } => value = v,
+                _ => {}
+            }
+        }
+
+        TransactionCreateCarryOn { network, to, value }
+    }
+}
+
+impl Inquire<TransactionCreateCarryOn> for TransactionCreateActionsVec {
+    fn inquire(carry_on: &TransactionCreateCarryOn) -> Option<TransactionCreateActionsVec> {
+        let mut options = TransactionCreateActionsVec::from(carry_on);
+
+        loop {
+            let selected = inquire::Select::new("Edit tx parameter:", options.0.clone())
+                .with_formatter(&|a| format!("{a}"))
+                .prompt()
+                .ok()?;
+            match selected {
+                TransactionCreateActions::Network { network } => {
+                    let network = Text::new("Enter network:")
+                        .with_initial_value(&network.unwrap_or_default())
+                        .prompt()
+                        .ok();
+
+                    options.0[0] = TransactionCreateActions::Network { network }
+                }
+                TransactionCreateActions::To { to } => {
+                    let to = Text::new("Enter address:")
+                        .with_initial_value(&to.unwrap_or_default().to_string())
+                        .prompt()
+                        .ok()
+                        .and_then(|a| a.parse().ok());
+
+                    options.0[1] = TransactionCreateActions::To { to }
+                }
+                TransactionCreateActions::Value { value } => {
+                    let value = Text::new("Enter value:")
+                        .with_initial_value(&value.unwrap_or_default().to_string())
+                        .prompt()
+                        .ok()
+                        .and_then(|v| v.parse().ok());
+
+                    options.0[2] = TransactionCreateActions::Value { value }
+                }
+                TransactionCreateActions::Confirm => break,
+            }
+        }
+
+        Some(options)
+    }
+}

@@ -1,5 +1,5 @@
 use super::Handle;
-use crate::address_book;
+use crate::{address_book, transaction::TransactionActions};
 use clap::{Parser, Subcommand};
 use inquire::Text;
 use strum::IntoEnumIterator;
@@ -52,7 +52,7 @@ enum Commands {
     SignMessage { message: String },
 }
 
-impl_inquire_selection!(Commands);
+impl_inquire_selection!(Commands, ());
 
 impl Handle for Commands {
     fn handle(&self, _carry_on: ()) {
@@ -90,7 +90,7 @@ enum AccountActions {
     List,
 }
 
-impl_inquire_selection!(AccountActions);
+impl_inquire_selection!(AccountActions, ());
 
 impl Handle for AccountActions {
     fn handle(&self, _carry_on: ()) {
@@ -102,36 +102,6 @@ impl Handle for AccountActions {
             AccountActions::Create => {
                 println!("Creating a new account...");
                 crate::account::create_privatekey_wallet();
-            }
-        }
-    }
-}
-
-/// Transaction subcommands
-///
-/// List - `gm tx ls`
-/// Create - `gm tx new`
-#[derive(Subcommand, Display, EnumIter)]
-enum TransactionActions {
-    #[command(alias = "ls")]
-    List,
-
-    #[command(alias = "new")]
-    Create,
-}
-
-impl_inquire_selection!(TransactionActions);
-
-impl Handle for TransactionActions {
-    fn handle(&self, _carry_on: ()) {
-        match self {
-            TransactionActions::List => {
-                println!("Listing all transactions...");
-                // Implement listing logic
-            }
-            TransactionActions::Create => {
-                println!("Creating a new transaction...");
-                // Implement transaction creation logic
             }
         }
     }

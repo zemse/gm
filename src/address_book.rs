@@ -43,7 +43,7 @@ impl Display for AddressBookActions {
 }
 
 impl Inquire for AddressBookActions {
-    fn inquire() -> Option<AddressBookActions> {
+    fn inquire(_: &()) -> Option<AddressBookActions> {
         let options = vec![AddressBookActions::Create {
             address: None,
             name: None,
@@ -138,7 +138,7 @@ pub struct AddressBookViewCarryOn {
     name: Option<String>,
 }
 
-impl_inquire_selection!(AddressBookViewActions);
+impl_inquire_selection!(AddressBookViewActions, AddressBookViewCarryOn);
 
 impl Handle<AddressBookViewCarryOn> for AddressBookViewActions {
     fn handle(&self, carry_on: AddressBookViewCarryOn) {

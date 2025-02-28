@@ -20,7 +20,7 @@ strum = "0.26"
 strum_macros = "0.26"
 
 # Ethereum
-alloy = { version = "0.11", features = ["full"] }
+alloy = { version = "0.11", features = ["full", "rlp"] }
 rand = "0.8"
 
 # macOS
@@ -33,3 +33,6 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8" 
 directories = "5.0"
+
+# misc
+tokio = { version = "1.43.0", features = ["rt-multi-thread"] }

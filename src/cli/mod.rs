@@ -1,16 +1,16 @@
-pub trait Inquire
+pub trait Inquire<DefaultValue = ()>
 where
     Self: Sized,
 {
-    fn inquire() -> Option<Self>;
+    fn inquire(default: &DefaultValue) -> Option<Self>;
 }
 
 /// Macro to implement `Inquire` for enums that derive `EnumIter`
 #[macro_export]
 macro_rules! impl_inquire_selection {
-    ($enum_name:ident) => {
-        impl $crate::cli::Inquire for $enum_name {
-            fn inquire() -> Option<$enum_name> {
+    ($enum_name:ident, $carry_on_name:tt) => {
+        impl $crate::cli::Inquire<$carry_on_name> for $enum_name {
+            fn inquire(_: &$carry_on_name) -> Option<$enum_name> {
                 let options: Vec<$enum_name> = $enum_name::iter().collect();
 
                 inquire::Select::new("Choose subcommand:", options)
@@ -24,7 +24,7 @@ macro_rules! impl_inquire_selection {
 
 pub trait Handle<CarryOn = ()>
 where
-    Self: Sized + Inquire,
+    Self: Sized + Inquire<CarryOn>,
 {
     fn handle(&self, carry_on: CarryOn);
 
@@ -33,7 +33,7 @@ where
         if let Some(action) = action {
             action.handle(carry_on);
         } else {
-            let result = Self::inquire();
+            let result = Self::inquire(&carry_on);
             if let Some(action) = result {
                 action.handle(carry_on);
             }
