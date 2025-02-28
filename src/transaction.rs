@@ -80,7 +80,6 @@ impl Handle for TransactionActions {
                         .parse()
                         .expect("rpc url issue");
                 let provider = ProviderBuilder::new().on_http(rpc_url);
-
                 let mut tx = TxEip1559::default();
 
                 if let Some(to) = result.to {
@@ -105,8 +104,12 @@ impl Handle for TransactionActions {
 
                 tx.chain_id = 11155111;
                 tx.gas_limit = 21_000;
-                tx.max_priority_fee_per_gas = 2_000_000_000;
-                tx.max_fee_per_gas = 80_000_000_000;
+
+                let fee_estimation = rt
+                    .block_on(provider.estimate_eip1559_fees(None).into_future())
+                    .expect("estimate fees failed");
+                tx.max_priority_fee_per_gas = fee_estimation.max_priority_fee_per_gas;
+                tx.max_fee_per_gas = insert_gm_mark(fee_estimation.max_fee_per_gas);
 
                 let signer = load_wallet(config.current_account).expect("wallet issue");
 
@@ -147,6 +150,15 @@ impl Handle for TransactionActions {
                 // Implement listing logic
             }
         }
+    }
+}
+
+fn insert_gm_mark(gas_price: u128) -> u128 {
+    let last_4_digits = gas_price % 10000;
+    if last_4_digits != 0 {
+        gas_price - last_4_digits + 9393
+    } else {
+        gas_price + 9393
     }
 }
 
