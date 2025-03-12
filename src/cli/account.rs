@@ -1,6 +1,10 @@
 use std::{collections::HashMap, str::FromStr};
 
-use crate::disk::{Config, DiskInterface, InsecurePrivateKeyStore};
+use crate::{
+    disk::{Config, DiskInterface, InsecurePrivateKeyStore},
+    impl_inquire_selection,
+    traits::Handle,
+};
 
 use alloy::{
     primitives::{bytes::BytesMut, keccak256, Address, Bytes, U256},
@@ -9,6 +13,7 @@ use alloy::{
         local::PrivateKeySigner,
     },
 };
+use clap::{command, Subcommand};
 use core_foundation::{
     base::{CFCopyDescription, CFGetTypeID, TCFType},
     data::CFData,
@@ -23,6 +28,34 @@ use security_framework::{
     item::{ItemClass, ItemSearchOptions, SearchResult},
     os::macos::keychain::SecKeychain,
 };
+use strum::IntoEnumIterator;
+use strum_macros::{Display, EnumIter};
+
+#[derive(Subcommand, Display, EnumIter)]
+pub enum AccountActions {
+    #[command(alias = "new")]
+    Create,
+
+    #[command(alias = "ls")]
+    List,
+}
+
+impl_inquire_selection!(AccountActions, ());
+
+impl Handle for AccountActions {
+    fn handle(&self, _carry_on: ()) {
+        match self {
+            AccountActions::List => {
+                println!("Listing all accounts...");
+                list_of_wallets();
+            }
+            AccountActions::Create => {
+                println!("Creating a new account...");
+                create_privatekey_wallet();
+            }
+        }
+    }
+}
 
 fn keychain() -> SecKeychain {
     SecKeychain::default().expect("SecKeychain::default() - accessing default keychain failed")

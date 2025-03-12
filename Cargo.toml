@@ -1,15 +1,11 @@
 [package]
-name = "gm"
+name = "gm_cli"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "gm"  # This sets the library name (can be different from the package name)
+name = "gm_cli"  # This sets the library name (can be different from the package name)
 path = "src/lib.rs"  # The default is src/lib.rs, but you can change it if needed
-
-[[bin]]
-name = "gm"  # This sets the binary name (default is package name)
-path = "src/main.rs"  
 
 [dependencies]
 # CLI

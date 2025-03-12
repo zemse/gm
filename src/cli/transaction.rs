@@ -1,9 +1,10 @@
 use std::{fmt::Display, future::IntoFuture};
 
+use super::account::load_wallet;
 use crate::{
-    account::load_wallet,
-    cli::{Handle, Inquire},
     disk::{Config, DiskInterface},
+    impl_inquire_selection,
+    traits::{Handle, Inquire},
 };
 
 use alloy::{

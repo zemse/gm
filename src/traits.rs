@@ -9,7 +9,7 @@ where
 #[macro_export]
 macro_rules! impl_inquire_selection {
     ($enum_name:ident, $carry_on_name:tt) => {
-        impl $crate::cli::Inquire<$carry_on_name> for $enum_name {
+        impl $crate::traits::Inquire<$carry_on_name> for $enum_name {
             fn inquire(_: &$carry_on_name) -> Option<$enum_name> {
                 let options: Vec<$enum_name> = $enum_name::iter().collect();
 
@@ -40,6 +40,3 @@ where
         };
     }
 }
-
-mod handlers;
-pub use handlers::Cli;

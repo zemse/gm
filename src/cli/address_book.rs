@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
 use crate::{
-    cli::{Handle, Inquire},
     disk::{AddressBook, AddressBookEntry, DiskInterface},
     impl_inquire_selection,
+    traits::{Handle, Inquire},
 };
 
 use alloy::{hex::FromHex, primitives::Address};

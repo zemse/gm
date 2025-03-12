@@ -1,7 +1,5 @@
-use crate::{
-    account::load_wallet,
-    disk::{Config, DiskInterface},
-};
+use super::account::load_wallet;
+use crate::disk::{Config, DiskInterface};
 
 use alloy::{hex, signers::SignerSync};
 

@@ -1,9 +1,21 @@
-use super::Handle;
-use crate::{address_book, transaction::TransactionActions};
+pub mod account;
+pub mod address_book;
+pub mod sign_message;
+pub mod transaction;
+
+use crate::{
+    disk::{Config, DiskInterface},
+    impl_inquire_selection,
+    traits::Handle,
+};
+
+use account::AccountActions;
 use clap::{Parser, Subcommand};
+use figlet_rs::FIGfont;
 use inquire::Text;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
+use transaction::TransactionActions;
 
 /// Top level CLI struct
 #[derive(Parser)]
@@ -17,7 +29,11 @@ pub struct Cli {
 impl Cli {
     pub fn handle(&self) {
         if self.command.is_none() {
-            crate::gm::gm();
+            gm_art();
+            println!("Welcome to GM CLI tool!");
+
+            let config = Config::load();
+            println!("Current account: {:?}\n", config.current_account);
         }
 
         Commands::handle_optn_inquire(&self.command, ());
@@ -75,34 +91,22 @@ impl Handle for Commands {
                     message.clone()
                 };
 
-                crate::sign_message::sign_message(message);
+                sign_message::sign_message(message);
             }
         }
     }
 }
 
-#[derive(Subcommand, Display, EnumIter)]
-enum AccountActions {
-    #[command(alias = "new")]
-    Create,
+fn gm_art() {
+    // Load the standard font
+    let standard_font = FIGfont::standard().unwrap();
 
-    #[command(alias = "ls")]
-    List,
-}
+    // Convert text "GM" into ASCII art
+    let figure = standard_font.convert("gm");
 
-impl_inquire_selection!(AccountActions, ());
-
-impl Handle for AccountActions {
-    fn handle(&self, _carry_on: ()) {
-        match self {
-            AccountActions::List => {
-                println!("Listing all accounts...");
-                crate::account::list_of_wallets();
-            }
-            AccountActions::Create => {
-                println!("Creating a new account...");
-                crate::account::create_privatekey_wallet();
-            }
-        }
+    // Print the result
+    match figure {
+        Some(art) => println!("{}", art),
+        None => println!("Failed to generate ASCII text."),
     }
 }
