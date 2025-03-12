@@ -1,10 +1,13 @@
 use std::{collections::HashMap, str::FromStr};
 
-use crate::disk::{Config, DiskInterface};
+use crate::disk::{Config, DiskInterface, InsecurePrivateKeyStore};
 
 use alloy::{
     primitives::{bytes::BytesMut, keccak256, Address, Bytes, U256},
-    signers::{k256::ecdsa::SigningKey, local::PrivateKeySigner},
+    signers::{
+        k256::{ecdsa::SigningKey, FieldBytes},
+        local::PrivateKeySigner,
+    },
 };
 use core_foundation::{
     base::{CFCopyDescription, CFGetTypeID, TCFType},
@@ -29,8 +32,7 @@ fn address_to_service(address: &Address) -> String {
     format!("gm:{address}")
 }
 
-/// Create a new private key wallet and store it in the keychain
-pub fn create_privatekey_wallet() -> Address {
+fn gen_wallet() -> (FieldBytes, PrivateKeySigner, Address) {
     // TODO include random string to strengthen the key and then hash it all
     // TODO store mnemonic phrase
     // TODO this user input, if we can show some kind of progress bar with security, it can incentivise
@@ -73,6 +75,13 @@ pub fn create_privatekey_wallet() -> Address {
     let signer = PrivateKeySigner::from(private_key);
     let address = signer.address();
 
+    (private_key_bytes, signer, address)
+}
+
+/// Create a new private key wallet and store it in the keychain
+pub fn create_privatekey_wallet_macos() -> Address {
+    let (private_key_bytes, _signer, address) = gen_wallet();
+
     keychain()
         .add_generic_password(
             &address_to_service(&address),
@@ -87,7 +96,7 @@ pub fn create_privatekey_wallet() -> Address {
     address
 }
 
-pub fn list_of_wallets() {
+pub fn list_of_wallets_macos() {
     let mut search = ItemSearchOptions::default();
     search.class(ItemClass::generic_password());
     search.limit(100);
@@ -123,7 +132,7 @@ pub fn list_of_wallets() {
     }
 }
 
-pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
+pub fn load_wallet_macos(address: Address) -> Result<PrivateKeySigner, Error> {
     println!("Unlocking wallet {:?}", address);
     keychain()
         .find_generic_password(&address_to_service(&address), &address.to_string())
@@ -132,6 +141,69 @@ pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
                 .expect("must create a valid signing key from keychain password");
             PrivateKeySigner::from(key)
         })
+}
+
+pub fn create_privatekey_wallet_linux_insecure() -> Address {
+    let (private_key_bytes, _signer, address) = gen_wallet();
+
+    let mut store = InsecurePrivateKeyStore::load();
+    store.add(address, private_key_bytes);
+    store.save();
+
+    println!("Wallet created with address: {}", address);
+    println!("The private key is stored insecurely in your filesystem.");
+
+    address
+}
+
+pub fn list_of_wallets_linux_insecure() {
+    let store = InsecurePrivateKeyStore::load();
+    let accounts = store.list();
+
+    let address = Select::new("Choose account to load:", accounts)
+        .with_formatter(&|a| format!("{a}"))
+        .prompt()
+        .ok();
+
+    if let Some(address) = address {
+        let mut config = Config::load();
+        config.current_account = *address;
+        config.save();
+    }
+}
+
+pub fn load_wallet_linux_insecure(address: Address) -> Result<PrivateKeySigner, Error> {
+    println!("Unlocking wallet {:?}", address);
+    let store = InsecurePrivateKeyStore::load();
+    let key = store
+        .find_by_address(&address)
+        .expect("must find key in store");
+    let key = SigningKey::from_slice(key.as_slice())
+        .expect("must create a valid signing key from keychain password");
+    Ok(PrivateKeySigner::from(key))
+}
+
+pub fn create_privatekey_wallet() -> Address {
+    #[cfg(target_os = "macos")]
+    let address = create_privatekey_wallet_macos();
+    #[cfg(target_os = "linux")]
+    let address = create_privatekey_wallet_linux_insecure();
+    address
+}
+
+pub fn list_of_wallets() {
+    #[cfg(target_os = "macos")]
+    list_of_wallets_macos();
+    #[cfg(target_os = "linux")]
+    list_of_wallets_linux_insecure();
+}
+
+pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
+    #[cfg(target_os = "macos")]
+    let key = load_wallet_macos(address);
+    #[cfg(target_os = "linux")]
+    let key = load_wallet_linux_insecure(address);
+    key
 }
 
 fn simplify_dict(dict: &CFDictionary) -> HashMap<String, String> {
