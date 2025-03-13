@@ -1,3 +1,4 @@
+#[cfg(target_os = "macos")]
 use std::{collections::HashMap, str::FromStr};
 
 use crate::{
@@ -15,6 +16,7 @@ use alloy::{
     },
 };
 use clap::{command, Subcommand};
+#[cfg(target_os = "macos")]
 use core_foundation::{
     base::{CFCopyDescription, CFGetTypeID, TCFType},
     data::CFData,
@@ -24,6 +26,7 @@ use core_foundation::{
 };
 use inquire::{Password, Select};
 use rand::{rngs::OsRng, RngCore};
+#[cfg(target_os = "macos")]
 use security_framework::{
     item::{ItemClass, ItemSearchOptions, SearchResult},
     os::macos::keychain::SecKeychain,
@@ -57,10 +60,12 @@ impl Handle for AccountActions {
     }
 }
 
+#[cfg(target_os = "macos")]
 fn keychain() -> SecKeychain {
     SecKeychain::default().expect("SecKeychain::default() - accessing default keychain failed")
 }
 
+#[cfg(target_os = "macos")]
 fn address_to_service(address: &Address) -> String {
     format!("gm:{address}")
 }
@@ -112,6 +117,7 @@ fn gen_wallet() -> (FieldBytes, PrivateKeySigner, Address) {
 }
 
 /// Create a new private key wallet and store it in the keychain
+#[cfg(target_os = "macos")]
 pub fn create_privatekey_wallet_macos() -> Address {
     let (private_key_bytes, _signer, address) = gen_wallet();
 
@@ -129,6 +135,7 @@ pub fn create_privatekey_wallet_macos() -> Address {
     address
 }
 
+#[cfg(target_os = "macos")]
 pub fn list_of_wallets_macos() {
     let mut search = ItemSearchOptions::default();
     search.class(ItemClass::generic_password());
@@ -165,6 +172,7 @@ pub fn list_of_wallets_macos() {
     }
 }
 
+#[cfg(target_os = "macos")]
 pub fn load_wallet_macos(address: Address) -> Result<PrivateKeySigner, Error> {
     println!("Unlocking wallet {:?}", address);
     Ok(keychain()
@@ -237,6 +245,7 @@ pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
     key
 }
 
+#[cfg(target_os = "macos")]
 fn simplify_dict(dict: &CFDictionary) -> HashMap<String, String> {
     unsafe {
         let mut retmap = HashMap::new();
