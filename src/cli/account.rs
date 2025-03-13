@@ -74,19 +74,22 @@ fn gen_wallet() -> (FieldBytes, PrivateKeySigner, Address) {
     // people to enter more words in this.
 
     // Take some user input to improve the private key
-    let user_input = Password::new(
+    let mut user_input = Password::new(
         "Enter things you see around you or type any random text and then press enter:",
     )
     .without_confirmation()
-    .prompt();
+    .prompt()
+    .unwrap();
 
     // generate the private key
-    let private_key = if let Ok(mut user_input) = user_input {
+    let private_key = if user_input.is_empty() {
+        SigningKey::random(&mut OsRng)
+    } else {
         if user_input.len() % 2 != 0 {
-            user_input.push('t');
+            user_input.push(' '); // add a space to make it even
         }
-        let user_input = Bytes::copy_from_slice(user_input.as_bytes());
 
+        let user_input = Bytes::copy_from_slice(user_input.as_bytes());
         loop {
             let mut random_value = [0u8; 32];
             OsRng.fill_bytes(&mut random_value);
@@ -102,8 +105,6 @@ fn gen_wallet() -> (FieldBytes, PrivateKeySigner, Address) {
                 break key;
             }
         }
-    } else {
-        SigningKey::random(&mut OsRng)
     };
 
     let private_key_bytes = private_key.to_bytes();
