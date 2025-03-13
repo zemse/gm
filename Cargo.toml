@@ -7,6 +7,10 @@ edition = "2021"
 name = "gm_cli"  # This sets the library name (can be different from the package name)
 path = "src/lib.rs"  # The default is src/lib.rs, but you can change it if needed
 
+[[bin]]
+name = "gm"
+path = "src/bin/gm.rs"
+
 [dependencies]
 # CLI
 clap = { version = "4.0", features = ["derive"] }

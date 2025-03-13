@@ -2,6 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use crate::{
     disk::{Config, DiskInterface, InsecurePrivateKeyStore},
+    error::Error,
     impl_inquire_selection,
     traits::Handle,
 };
@@ -24,7 +25,6 @@ use core_foundation::{
 use inquire::{Password, Select};
 use rand::{rngs::OsRng, RngCore};
 use security_framework::{
-    base::Error,
     item::{ItemClass, ItemSearchOptions, SearchResult},
     os::macos::keychain::SecKeychain,
 };
@@ -167,13 +167,13 @@ pub fn list_of_wallets_macos() {
 
 pub fn load_wallet_macos(address: Address) -> Result<PrivateKeySigner, Error> {
     println!("Unlocking wallet {:?}", address);
-    keychain()
+    Ok(keychain()
         .find_generic_password(&address_to_service(&address), &address.to_string())
         .map(|(pswd, _item)| {
             let key = SigningKey::from_slice(pswd.as_ref())
                 .expect("must create a valid signing key from keychain password");
             PrivateKeySigner::from(key)
-        })
+        })?)
 }
 
 pub fn create_privatekey_wallet_linux_insecure() -> Address {
@@ -211,9 +211,7 @@ pub fn load_wallet_linux_insecure(address: Address) -> Result<PrivateKeySigner, 
     let key = store
         .find_by_address(&address)
         .expect("must find key in store");
-    let key = SigningKey::from_slice(key.as_slice())
-        .expect("must create a valid signing key from keychain password");
-    Ok(PrivateKeySigner::from(key))
+    Ok(SigningKey::from_slice(key.as_slice()).map(PrivateKeySigner::from_signing_key)?)
 }
 
 pub fn create_privatekey_wallet() -> Address {
