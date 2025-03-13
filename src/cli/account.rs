@@ -1,8 +1,5 @@
-#[cfg(target_os = "macos")]
-use std::{collections::HashMap, str::FromStr};
-
 use crate::{
-    disk::{Config, DiskInterface, InsecurePrivateKeyStore},
+    disk::{Config, DiskInterface},
     error::Error,
     impl_inquire_selection,
     traits::Handle,
@@ -16,21 +13,8 @@ use alloy::{
     },
 };
 use clap::{command, Subcommand};
-#[cfg(target_os = "macos")]
-use core_foundation::{
-    base::{CFCopyDescription, CFGetTypeID, TCFType},
-    data::CFData,
-    date::CFDate,
-    dictionary::CFDictionary,
-    string::CFString,
-};
 use inquire::{Password, Select};
 use rand::{rngs::OsRng, RngCore};
-#[cfg(target_os = "macos")]
-use security_framework::{
-    item::{ItemClass, ItemSearchOptions, SearchResult},
-    os::macos::keychain::SecKeychain,
-};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 
@@ -60,14 +44,27 @@ impl Handle for AccountActions {
     }
 }
 
-#[cfg(target_os = "macos")]
-fn keychain() -> SecKeychain {
-    SecKeychain::default().expect("SecKeychain::default() - accessing default keychain failed")
+pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
+    #[cfg(target_os = "macos")]
+    let key = macos::load_wallet(address);
+    #[cfg(target_os = "linux")]
+    let key = linux_insecure::load_wallet(address);
+    key
 }
 
-#[cfg(target_os = "macos")]
-fn address_to_service(address: &Address) -> String {
-    format!("gm:{address}")
+fn create_privatekey_wallet() -> Address {
+    #[cfg(target_os = "macos")]
+    let address = macos::create_privatekey_wallet();
+    #[cfg(target_os = "linux")]
+    let address = linux_insecure::create_privatekey_wallet();
+    address
+}
+
+fn list_of_wallets() {
+    #[cfg(target_os = "macos")]
+    macos::list_of_wallets();
+    #[cfg(target_os = "linux")]
+    linux_insecure::list_of_wallets();
 }
 
 fn gen_wallet() -> (FieldBytes, PrivateKeySigner, Address) {
@@ -116,160 +113,166 @@ fn gen_wallet() -> (FieldBytes, PrivateKeySigner, Address) {
     (private_key_bytes, signer, address)
 }
 
-/// Create a new private key wallet and store it in the keychain
 #[cfg(target_os = "macos")]
-pub fn create_privatekey_wallet_macos() -> Address {
-    let (private_key_bytes, _signer, address) = gen_wallet();
+mod macos {
+    use core_foundation::{
+        base::{CFCopyDescription, CFGetTypeID, TCFType},
+        data::CFData,
+        date::CFDate,
+        dictionary::CFDictionary,
+        string::CFString,
+    };
+    use security_framework::{
+        item::{ItemClass, ItemSearchOptions, SearchResult},
+        os::macos::keychain::SecKeychain,
+    };
+    use std::{collections::HashMap, str::FromStr};
 
-    keychain()
-        .add_generic_password(
-            &address_to_service(&address),
-            &address.to_string(),
-            private_key_bytes.as_slice(),
-        )
-        .unwrap();
+    use super::*;
 
-    println!("Wallet created with address: {}", address);
-    println!("The private key is stored securely in your keychain.");
+    fn keychain() -> SecKeychain {
+        SecKeychain::default().expect("SecKeychain::default() - accessing default keychain failed")
+    }
 
-    address
-}
+    fn address_to_service(address: &Address) -> String {
+        format!("gm:{address}")
+    }
 
-#[cfg(target_os = "macos")]
-pub fn list_of_wallets_macos() {
-    let mut search = ItemSearchOptions::default();
-    search.class(ItemClass::generic_password());
-    search.limit(100);
-    search.load_attributes(true);
-    // search.load_data(true);
+    /// Create a new private key wallet and store it in the keychain
+    pub fn create_privatekey_wallet() -> Address {
+        let (private_key_bytes, _signer, address) = gen_wallet();
 
-    let mut accounts = vec![];
+        keychain()
+            .add_generic_password(
+                &address_to_service(&address),
+                &address.to_string(),
+                private_key_bytes.as_slice(),
+            )
+            .unwrap();
 
-    if let Ok(result) = search.search() {
-        for item in result {
-            if let SearchResult::Dict(item) = item {
-                let item = simplify_dict(&item);
-                let service = item.get("svce");
-                if let Some(service) = service {
-                    if service.starts_with("gm") {
-                        let addr_str = item.get("acct").expect("must have an account address");
-                        accounts.push(Address::from_str(addr_str).unwrap());
+        println!("Wallet created with address: {}", address);
+        println!("The private key is stored securely in your keychain.");
+
+        address
+    }
+
+    pub fn list_of_wallets() {
+        let mut search = ItemSearchOptions::default();
+        search.class(ItemClass::generic_password());
+        search.limit(100);
+        search.load_attributes(true);
+        // search.load_data(true);
+
+        let mut accounts = vec![];
+
+        if let Ok(result) = search.search() {
+            for item in result {
+                if let SearchResult::Dict(item) = item {
+                    let item = simplify_dict(&item);
+                    let service = item.get("svce");
+                    if let Some(service) = service {
+                        if service.starts_with("gm") {
+                            let addr_str = item.get("acct").expect("must have an account address");
+                            accounts.push(Address::from_str(addr_str).unwrap());
+                        }
                     }
                 }
             }
         }
-    }
 
-    let address = Select::new("Choose account to load:", accounts)
-        .with_formatter(&|a| format!("{a}"))
-        .prompt()
-        .ok();
+        let address = Select::new("Choose account to load:", accounts)
+            .with_formatter(&|a| format!("{a}"))
+            .prompt()
+            .ok();
 
-    if let Some(address) = address {
-        let mut config = Config::load();
-        config.current_account = address;
-        config.save();
-    }
-}
-
-#[cfg(target_os = "macos")]
-pub fn load_wallet_macos(address: Address) -> Result<PrivateKeySigner, Error> {
-    println!("Unlocking wallet {:?}", address);
-    Ok(keychain()
-        .find_generic_password(&address_to_service(&address), &address.to_string())
-        .map(|(pswd, _item)| {
-            let key = SigningKey::from_slice(pswd.as_ref())
-                .expect("must create a valid signing key from keychain password");
-            PrivateKeySigner::from(key)
-        })?)
-}
-
-pub fn create_privatekey_wallet_linux_insecure() -> Address {
-    let (private_key_bytes, _signer, address) = gen_wallet();
-
-    let mut store = InsecurePrivateKeyStore::load();
-    store.add(address, private_key_bytes);
-    store.save();
-
-    println!("Wallet created with address: {}", address);
-    println!("The private key is stored insecurely in your filesystem.");
-
-    address
-}
-
-pub fn list_of_wallets_linux_insecure() {
-    let store = InsecurePrivateKeyStore::load();
-    let accounts = store.list();
-
-    let address = Select::new("Choose account to load:", accounts)
-        .with_formatter(&|a| format!("{a}"))
-        .prompt()
-        .ok();
-
-    if let Some(address) = address {
-        let mut config = Config::load();
-        config.current_account = *address;
-        config.save();
-    }
-}
-
-pub fn load_wallet_linux_insecure(address: Address) -> Result<PrivateKeySigner, Error> {
-    println!("Unlocking wallet {:?}", address);
-    let store = InsecurePrivateKeyStore::load();
-    let key = store
-        .find_by_address(&address)
-        .expect("must find key in store");
-    Ok(SigningKey::from_slice(key.as_slice()).map(PrivateKeySigner::from_signing_key)?)
-}
-
-pub fn create_privatekey_wallet() -> Address {
-    #[cfg(target_os = "macos")]
-    let address = create_privatekey_wallet_macos();
-    #[cfg(target_os = "linux")]
-    let address = create_privatekey_wallet_linux_insecure();
-    address
-}
-
-pub fn list_of_wallets() {
-    #[cfg(target_os = "macos")]
-    list_of_wallets_macos();
-    #[cfg(target_os = "linux")]
-    list_of_wallets_linux_insecure();
-}
-
-pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
-    #[cfg(target_os = "macos")]
-    let key = load_wallet_macos(address);
-    #[cfg(target_os = "linux")]
-    let key = load_wallet_linux_insecure(address);
-    key
-}
-
-#[cfg(target_os = "macos")]
-fn simplify_dict(dict: &CFDictionary) -> HashMap<String, String> {
-    unsafe {
-        let mut retmap = HashMap::new();
-        let (keys, values) = dict.get_keys_and_values();
-        for (k, v) in keys.iter().zip(values.iter()) {
-            let keycfstr = CFString::wrap_under_get_rule((*k).cast());
-            let val: String = match CFGetTypeID(*v) {
-                cfstring if cfstring == CFString::type_id() => {
-                    format!("{}", CFString::wrap_under_get_rule((*v).cast()))
-                }
-                cfdata if cfdata == CFData::type_id() => {
-                    let buf = CFData::wrap_under_get_rule((*v).cast());
-                    let mut vec = Vec::new();
-                    vec.extend_from_slice(buf.bytes());
-                    format!("{}", String::from_utf8_lossy(&vec))
-                }
-                cfdate if cfdate == CFDate::type_id() => format!(
-                    "{}",
-                    CFString::wrap_under_create_rule(CFCopyDescription(*v))
-                ),
-                _ => String::from("unknown"),
-            };
-            retmap.insert(format!("{keycfstr}"), val);
+        if let Some(address) = address {
+            let mut config = Config::load();
+            config.current_account = address;
+            config.save();
         }
-        retmap
+    }
+
+    pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
+        println!("Unlocking wallet {:?}", address);
+        Ok(keychain()
+            .find_generic_password(&address_to_service(&address), &address.to_string())
+            .map(|(pswd, _item)| {
+                let key = SigningKey::from_slice(pswd.as_ref())
+                    .expect("must create a valid signing key from keychain password");
+                PrivateKeySigner::from(key)
+            })?)
+    }
+
+    fn simplify_dict(dict: &CFDictionary) -> HashMap<String, String> {
+        unsafe {
+            let mut retmap = HashMap::new();
+            let (keys, values) = dict.get_keys_and_values();
+            for (k, v) in keys.iter().zip(values.iter()) {
+                let keycfstr = CFString::wrap_under_get_rule((*k).cast());
+                let val: String = match CFGetTypeID(*v) {
+                    cfstring if cfstring == CFString::type_id() => {
+                        format!("{}", CFString::wrap_under_get_rule((*v).cast()))
+                    }
+                    cfdata if cfdata == CFData::type_id() => {
+                        let buf = CFData::wrap_under_get_rule((*v).cast());
+                        let mut vec = Vec::new();
+                        vec.extend_from_slice(buf.bytes());
+                        format!("{}", String::from_utf8_lossy(&vec))
+                    }
+                    cfdate if cfdate == CFDate::type_id() => format!(
+                        "{}",
+                        CFString::wrap_under_create_rule(CFCopyDescription(*v))
+                    ),
+                    _ => String::from("unknown"),
+                };
+                retmap.insert(format!("{keycfstr}"), val);
+            }
+            retmap
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod linux_insecure {
+    use crate::disk::InsecurePrivateKeyStore;
+
+    use super::*;
+
+    fn create_privatekey_wallet() -> Address {
+        let (private_key_bytes, _signer, address) = gen_wallet();
+
+        let mut store = InsecurePrivateKeyStore::load();
+        store.add(address, private_key_bytes);
+        store.save();
+
+        println!("Wallet created with address: {}", address);
+        println!("The private key is stored insecurely in your filesystem.");
+
+        address
+    }
+
+    fn list_of_wallets() {
+        let store = InsecurePrivateKeyStore::load();
+        let accounts = store.list();
+
+        let address = Select::new("Choose account to load:", accounts)
+            .with_formatter(&|a| format!("{a}"))
+            .prompt()
+            .ok();
+
+        if let Some(address) = address {
+            let mut config = Config::load();
+            config.current_account = *address;
+            config.save();
+        }
+    }
+
+    fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
+        println!("Unlocking wallet {:?}", address);
+        let store = InsecurePrivateKeyStore::load();
+        let key = store
+            .find_by_address(&address)
+            .expect("must find key in store");
+        Ok(SigningKey::from_slice(key.as_slice()).map(PrivateKeySigner::from_signing_key)?)
     }
 }
