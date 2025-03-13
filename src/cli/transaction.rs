@@ -4,6 +4,7 @@ use super::account::load_wallet;
 use crate::{
     disk::{Config, DiskInterface},
     impl_inquire_selection,
+    network::{get_networks, Network},
     traits::{Handle, Inquire},
 };
 
@@ -16,7 +17,7 @@ use alloy::{
     rlp::Encodable,
 };
 use clap::{ArgAction, Subcommand};
-use inquire::Text;
+use inquire::{Select, Text};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use tokio::runtime::Runtime;
@@ -30,7 +31,7 @@ pub enum TransactionActions {
     #[command(alias = "new")]
     Create {
         #[arg(long, short)]
-        network: Option<String>,
+        network: Option<Network>,
 
         #[arg(long, short)]
         to: Option<Address>,
@@ -57,7 +58,7 @@ impl Handle for TransactionActions {
                 value,
                 confirm,
             } => {
-                let result = if confirm.unwrap_or_default() {
+                let tx_input = if confirm.unwrap_or_default() {
                     TransactionCreateCarryOn {
                         network: network.clone(),
                         to: *to,
@@ -74,22 +75,20 @@ impl Handle for TransactionActions {
                 };
 
                 // Implement transaction creation logic
-                println!("Creating transaction with args: {:?}", result);
 
-                let rpc_url =
-                    "https://eth-sepolia.g.alchemy.com/v2/T0Fv_dXv5Kepb_KIa69-JR_JDxXdABxG"
-                        .parse()
-                        .expect("rpc url issue");
+                let network = tx_input.network.as_ref().expect("network must be provided");
+                let rpc_url = network.get_rpc().parse().expect("error parsing URL");
                 let provider = ProviderBuilder::new().on_http(rpc_url);
+
                 let mut tx = TxEip1559::default();
 
-                if let Some(to) = result.to {
+                if let Some(to) = tx_input.to {
                     tx.to = TxKind::Call(to);
                 } else {
                     tx.to = TxKind::Create;
                 }
 
-                if let Some(value) = result.value {
+                if let Some(value) = tx_input.value {
                     tx.value = value;
                 }
 
@@ -114,37 +113,35 @@ impl Handle for TransactionActions {
 
                 let signer = load_wallet(config.current_account).expect("wallet issue");
 
-                let result = signer
+                let signature = signer
                     .sign_transaction_sync(&mut tx)
                     .expect("signing error");
-
-                println!("unsigned tx {:?}", tx);
-                let signed = tx.into_signed(result);
-                let mut out = BytesMut::new();
-                signed.rlp_encode(&mut out);
-
-                println!("out {:?}", hex::encode(&out));
+                let tx_signed = tx.into_signed(signature);
 
                 let mut out = BytesMut::new();
-                let tx_typed = TxEnvelope::Eip1559(signed);
+                let tx_typed = TxEnvelope::Eip1559(tx_signed);
                 tx_typed.encode(&mut out);
-
-                println!("out {:?}", hex::encode(&out));
                 let out = &out[2..];
 
-                println!("out {:?}", hex::encode(out));
-                // println!("out {:?}", hex::encode(&out));
-
-                // .rlp_encode(&mut out);
-
+                // TODO submit this to all RPCs available parallely
                 let result = rt
                     .block_on(provider.send_raw_transaction(out).into_future())
                     .expect("submit failure");
-                println!("pending tx: {:?} {:?}", result.tx_hash(), result);
 
+                let tx_hash = hex::encode_prefixed(result.tx_hash());
+                println!(
+                    "tx is pending: {}",
+                    network.get_tx_url(tx_hash.as_str()).unwrap_or(tx_hash)
+                );
                 let receipt = rt.block_on(result.get_receipt()).expect("wait failed");
 
-                println!("confirmed {:?}", receipt)
+                println!(
+                    "Confirmed in block {}",
+                    receipt
+                        .block_number
+                        .map(|n| n.to_string())
+                        .unwrap_or("unknown".to_string())
+                )
             }
             TransactionActions::List => {
                 println!("Listing all transactions...");
@@ -163,10 +160,11 @@ fn insert_gm_mark(gas_price: u128) -> u128 {
     }
 }
 
+// TODO rename this from actions to options
 #[derive(Subcommand, EnumIter, Clone)]
 pub enum TransactionCreateActions {
     #[command(alias = "net")]
-    Network { network: Option<String> },
+    Network { network: Option<Network> },
 
     #[command(alias = "to")]
     To { to: Option<Address> },
@@ -182,7 +180,14 @@ impl Display for TransactionCreateActions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TransactionCreateActions::Network { network } => {
-                write!(f, "Network: {}", network.as_deref().unwrap_or("<empty>"))
+                write!(
+                    f,
+                    "Network: {}",
+                    network
+                        .as_ref()
+                        .map(|n| n.to_string())
+                        .unwrap_or("<empty>".to_string())
+                )
             }
             TransactionCreateActions::To { to } => {
                 write!(
@@ -206,7 +211,7 @@ struct TransactionCreateActionsVec(Vec<TransactionCreateActions>);
 
 #[derive(Debug)]
 pub struct TransactionCreateCarryOn {
-    pub network: Option<String>,
+    pub network: Option<Network>,
     pub to: Option<Address>,
     pub value: Option<U256>,
 }
@@ -265,12 +270,8 @@ impl Inquire<TransactionCreateCarryOn> for TransactionCreateActionsVec {
                 .prompt()
                 .ok()?;
             match selected {
-                TransactionCreateActions::Network { network } => {
-                    let network = Text::new("Enter network:")
-                        .with_initial_value(&network.unwrap_or_default())
-                        .prompt()
-                        .ok();
-
+                TransactionCreateActions::Network { .. } => {
+                    let network = Select::new("Select network", get_networks()).prompt().ok();
                     options.0[0] = TransactionCreateActions::Network { network }
                 }
                 TransactionCreateActions::To { to } => {

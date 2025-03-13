@@ -119,8 +119,9 @@ impl AddressBook {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Config {
-    pub current_account: Address,
+    pub current_account: Address, // TODO change to Option<Address>
     pub debug_mode: bool,
+    pub alchemy_api_key: Option<String>,
 }
 
 impl DiskInterface for Config {
