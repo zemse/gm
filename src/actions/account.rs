@@ -239,7 +239,7 @@ mod linux_insecure {
 
     use super::*;
 
-    fn create_privatekey_wallet() -> Address {
+    pub fn create_privatekey_wallet() -> Address {
         let (private_key_bytes, _signer, address) = gen_wallet();
 
         let mut store = InsecurePrivateKeyStore::load();
@@ -252,7 +252,7 @@ mod linux_insecure {
         address
     }
 
-    fn list_of_wallets() {
+    pub fn list_of_wallets() {
         let store = InsecurePrivateKeyStore::load();
         let accounts = store.list();
 
@@ -268,7 +268,7 @@ mod linux_insecure {
         }
     }
 
-    fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
+   pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
         println!("Unlocking wallet {:?}", address);
         let store = InsecurePrivateKeyStore::load();
         let key = store
