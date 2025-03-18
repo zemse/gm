@@ -144,7 +144,7 @@ impl AddressBook {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Config {
-    pub current_account: Address, // TODO change to Option<Address>
+    pub current_account: Option<Address>,
     pub debug_mode: bool,
     pub alchemy_api_key: Option<String>,
 }
@@ -156,12 +156,14 @@ impl DiskInterface for Config {
 
 impl Config {
     pub fn current_account() -> Address {
-        Config::load().current_account
+        Config::load()
+            .current_account
+            .expect("current_account is not available")
     }
 
     pub fn set_current_account(address: Address) {
         let mut config = Config::load();
-        config.current_account = address;
+        config.current_account = Some(address);
         config.save();
     }
 
@@ -201,7 +203,7 @@ impl InsecurePrivateKeyStore {
         })
     }
 
-    pub fn list(&self) -> Vec<&Address> {
-        self.keys.iter().map(|(address, _)| address).collect()
+    pub fn list(self) -> Vec<Address> {
+        self.keys.into_iter().map(|(address, _)| address).collect()
     }
 }

@@ -1,9 +1,4 @@
-use crate::{
-    disk::{Config, DiskInterface},
-    error::Error,
-    impl_inquire_selection,
-    utils::Handle,
-};
+use crate::{disk::Config, error::Error, impl_inquire_selection, utils::Handle};
 
 use alloy::{
     primitives::{bytes::BytesMut, keccak256, Address, Bytes, U256},
@@ -20,11 +15,11 @@ use strum_macros::{Display, EnumIter};
 
 #[derive(Subcommand, Display, EnumIter)]
 pub enum AccountActions {
-    #[command(alias = "new")]
-    Create,
-
     #[command(alias = "ls")]
     List,
+
+    #[command(alias = "new")]
+    Create,
 }
 
 impl_inquire_selection!(AccountActions, ());
@@ -34,11 +29,12 @@ impl Handle for AccountActions {
         match self {
             AccountActions::List => {
                 println!("Listing all accounts...");
-                list_of_wallets();
+                display_list_of_wallets();
             }
             AccountActions::Create => {
                 println!("Creating a new account...");
-                create_privatekey_wallet();
+                let address = create_privatekey_wallet();
+                Config::set_current_account(address);
             }
         }
     }
@@ -60,11 +56,19 @@ fn create_privatekey_wallet() -> Address {
     address
 }
 
-fn list_of_wallets() {
+pub fn list_of_wallets() -> Vec<Address> {
     #[cfg(target_os = "macos")]
-    macos::list_of_wallets();
+    let accounts = macos::list_of_wallets();
     #[cfg(target_os = "linux")]
-    linux_insecure::list_of_wallets();
+    let accounts = linux_insecure::list_of_wallets();
+    accounts
+}
+
+fn display_list_of_wallets() {
+    #[cfg(target_os = "macos")]
+    macos::display_list_of_wallets();
+    #[cfg(target_os = "linux")]
+    linux_insecure::display_list_of_wallets();
 }
 
 fn gen_wallet() -> (FieldBytes, PrivateKeySigner, Address) {
@@ -157,7 +161,7 @@ mod macos {
         address
     }
 
-    pub fn list_of_wallets() {
+    pub fn list_of_wallets() -> Vec<Address> {
         let mut search = ItemSearchOptions::default();
         search.class(ItemClass::generic_password());
         search.limit(100);
@@ -181,15 +185,19 @@ mod macos {
             }
         }
 
+        accounts
+    }
+
+    pub fn display_list_of_wallets() {
+        let accounts = list_of_wallets();
+
         let address = Select::new("Choose account to load:", accounts)
             .with_formatter(&|a| format!("{a}"))
             .prompt()
             .ok();
 
         if let Some(address) = address {
-            let mut config = Config::load();
-            config.current_account = address;
-            config.save();
+            Config::set_current_account(address);
         }
     }
 
@@ -252,9 +260,13 @@ mod linux_insecure {
         address
     }
 
-    pub fn list_of_wallets() {
+    pub fn list_of_wallets() -> Vec<Address> {
         let store = InsecurePrivateKeyStore::load();
-        let accounts = store.list();
+        store.list()
+    }
+
+    pub fn display_list_of_wallets() {
+        let accounts = list_of_wallets();
 
         let address = Select::new("Choose account to load:", accounts)
             .with_formatter(&|a| format!("{a}"))
@@ -263,7 +275,7 @@ mod linux_insecure {
 
         if let Some(address) = address {
             let mut config = Config::load();
-            config.current_account = *address;
+            config.current_account = address;
             config.save();
         }
     }

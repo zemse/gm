@@ -1,10 +1,6 @@
 use clap::Parser;
 use figlet_rs::FIGfont;
-use gm_cli::{
-    actions::Action,
-    disk::{Config, DiskInterface},
-    utils::Handle,
-};
+use gm_cli::{actions::Action, disk::Config, utils::Handle};
 
 /// Top level CLI struct
 #[derive(Parser)]
@@ -21,8 +17,7 @@ impl Cli {
             gm_art();
             println!("Welcome to GM CLI tool!");
 
-            let config = Config::load();
-            println!("Current account: {:?}\n", config.current_account);
+            println!("Current account: {:?}\n", Config::current_account());
         }
 
         Action::handle_optn_inquire(&self.action, ());

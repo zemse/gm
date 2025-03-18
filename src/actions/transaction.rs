@@ -93,8 +93,8 @@ impl Handle for TransactionActions {
                     tx.value = value;
                 }
 
-                let config = Config::load();
-                let result = provider.get_transaction_count(config.current_account);
+                let current_account = Config::current_account();
+                let result = provider.get_transaction_count(current_account);
 
                 // Create a Tokio runtime
                 let rt = Runtime::new().expect("runtime failed");
@@ -112,7 +112,7 @@ impl Handle for TransactionActions {
                 tx.max_priority_fee_per_gas = fee_estimation.max_priority_fee_per_gas;
                 tx.max_fee_per_gas = insert_gm_mark(fee_estimation.max_fee_per_gas);
 
-                let signer = load_wallet(config.current_account).expect("wallet issue");
+                let signer = load_wallet(current_account).expect("wallet issue");
 
                 let signature = signer
                     .sign_transaction_sync(&mut tx)

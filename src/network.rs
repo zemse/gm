@@ -4,7 +4,7 @@ use alloy::{primitives::Address, providers::ProviderBuilder};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    disk::{DiskInterface, FileFormat},
+    disk::{Config, DiskInterface, FileFormat},
     utils::Provider,
 };
 
@@ -37,17 +37,13 @@ impl Display for Network {
 
 impl Network {
     pub fn get_rpc(&self) -> String {
-        let config = crate::disk::Config::load();
         if let Some(rpc_url) = &self.rpc_url {
             rpc_url.clone()
         } else if let Some(rpc_alchemy) = &self.rpc_alchemy {
             rpc_alchemy.replace(
                 "{}",
-                config
-                    .alchemy_api_key
-                    .as_ref()
-                    // TODO ask user to provide this
-                    .expect("ALCHEMY_API_KEY is not net in config"),
+                // TODO handle this error when alchemy API key not present
+                &Config::alchemy_api_key(),
             )
         } else if let Some(rpc_infura) = &self.rpc_infura {
             rpc_infura.clone()
