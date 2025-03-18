@@ -2,7 +2,7 @@ use crate::{
     disk::{Config, DiskInterface},
     error::Error,
     impl_inquire_selection,
-    traits::Handle,
+    utils::Handle,
 };
 
 use alloy::{
@@ -268,7 +268,7 @@ mod linux_insecure {
         }
     }
 
-   pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
+    pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
         println!("Unlocking wallet {:?}", address);
         let store = InsecurePrivateKeyStore::load();
         let key = store

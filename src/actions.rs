@@ -1,9 +1,10 @@
 pub mod account;
 pub mod address_book;
+pub mod balances;
 pub mod sign_message;
 pub mod transaction;
 
-use crate::{impl_inquire_selection, traits::Handle};
+use crate::{impl_inquire_selection, utils::Handle};
 
 use account::AccountActions;
 use clap::Subcommand;
@@ -18,6 +19,9 @@ use transaction::TransactionActions;
 /// Transactions - `gm tx`
 #[derive(Subcommand, Display, EnumIter)]
 pub enum Action {
+    #[command(alias = "bal")]
+    Assets,
+
     #[command(alias = "acc")]
     Account {
         #[command(subcommand)]
@@ -45,6 +49,9 @@ impl_inquire_selection!(Action, ());
 impl Handle for Action {
     fn handle(&self, _carry_on: ()) {
         match self {
+            Action::Assets => {
+                balances::get_all_balances();
+            }
             Action::Account { action } => {
                 AccountActions::handle_optn_inquire(action, ());
             }

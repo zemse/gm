@@ -9,7 +9,7 @@ where
 #[macro_export]
 macro_rules! impl_inquire_selection {
     ($enum_name:ident, $carry_on_name:tt) => {
-        impl $crate::traits::Inquire<$carry_on_name> for $enum_name {
+        impl $crate::utils::Inquire<$carry_on_name> for $enum_name {
             fn inquire(_: &$carry_on_name) -> Option<$enum_name> {
                 let options: Vec<$enum_name> = $enum_name::iter().collect();
 
@@ -40,3 +40,20 @@ where
         };
     }
 }
+
+pub type Provider = alloy::providers::fillers::FillProvider<
+    alloy::providers::fillers::JoinFill<
+        alloy::providers::Identity,
+        alloy::providers::fillers::JoinFill<
+            alloy::providers::fillers::GasFiller,
+            alloy::providers::fillers::JoinFill<
+                alloy::providers::fillers::BlobGasFiller,
+                alloy::providers::fillers::JoinFill<
+                    alloy::providers::fillers::NonceFiller,
+                    alloy::providers::fillers::ChainIdFiller,
+                >,
+            >,
+        >,
+    >,
+    alloy::providers::RootProvider,
+>;

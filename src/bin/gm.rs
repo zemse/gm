@@ -3,7 +3,7 @@ use figlet_rs::FIGfont;
 use gm_cli::{
     actions::Action,
     disk::{Config, DiskInterface},
-    traits::Handle,
+    utils::Handle,
 };
 
 /// Top level CLI struct

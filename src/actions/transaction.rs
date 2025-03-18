@@ -4,8 +4,8 @@ use super::account::load_wallet;
 use crate::{
     disk::{Config, DiskInterface},
     impl_inquire_selection,
-    network::{get_networks, Network},
-    traits::{Handle, Inquire},
+    network::{Network, NetworkStore},
+    utils::{Handle, Inquire},
 };
 
 use alloy::{
@@ -27,6 +27,7 @@ use tokio::runtime::Runtime;
 /// List - `gm tx ls`
 /// Create - `gm tx new`
 #[derive(Subcommand, Display, EnumIter)]
+#[allow(clippy::large_enum_variant)]
 pub enum TransactionActions {
     #[command(alias = "new")]
     Create {
@@ -271,7 +272,9 @@ impl Inquire<TransactionCreateCarryOn> for TransactionCreateActionsVec {
                 .ok()?;
             match selected {
                 TransactionCreateActions::Network { .. } => {
-                    let network = Select::new("Select network", get_networks()).prompt().ok();
+                    let network = Select::new("Select network", NetworkStore::load().networks)
+                        .prompt()
+                        .ok();
                     options.0[0] = TransactionCreateActions::Network { network }
                 }
                 TransactionCreateActions::To { to } => {

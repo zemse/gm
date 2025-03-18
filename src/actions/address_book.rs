@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::{
     disk::{AddressBook, AddressBookEntry, DiskInterface},
     impl_inquire_selection,
-    traits::{Handle, Inquire},
+    utils::{Handle, Inquire},
 };
 
 use alloy::{hex::FromHex, primitives::Address};

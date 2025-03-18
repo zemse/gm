@@ -4,20 +4,39 @@ use alloy::{hex, primitives::Address, signers::k256::FieldBytes};
 use directories::BaseDirs;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+use crate::error::Error;
+
+pub enum FileFormat {
+    TOML,
+    YAML,
+}
+
 pub trait DiskInterface
 where
     Self: Sized + Debug + Default + Serialize + DeserializeOwned,
 {
     const FILE_NAME: &'static str;
+    const FORMAT: FileFormat;
 
     /// Get the path to the file
     fn path() -> PathBuf {
         let dirs = BaseDirs::new().expect("Failed to get base directories");
-        dirs.home_dir().join(".gm").join(Self::FILE_NAME)
+        dirs.home_dir()
+            .join(".gm")
+            .join(Self::FILE_NAME)
+            .with_extension(match Self::FORMAT {
+                FileFormat::TOML => "toml".to_string(),
+                FileFormat::YAML => "yaml".to_string(),
+            })
     }
 
-    /// Load settings from a file
+    /// Load the content, this function can be overloaded
     fn load() -> Self {
+        Self::load_internal()
+    }
+
+    /// Load the content from the file
+    fn load_internal() -> Self {
         let path = Self::path();
 
         if path.exists() {
@@ -36,7 +55,12 @@ where
             fs::create_dir_all(parent).ok(); // Ensure config directory exists
         }
 
-        let content = toml::to_string_pretty(self).expect("Failed to serialize");
+        let content = match Self::FORMAT {
+            FileFormat::TOML => toml::to_string_pretty(self).map_err(Error::from),
+            FileFormat::YAML => serde_yaml::to_string(self).map_err(Error::from),
+        }
+        .unwrap_or_else(|err| panic!("Err({err:?}) while serializing {path:?}: {self:?}"));
+
         fs::write(path, content).expect("Failed to write file");
     }
 }
@@ -47,7 +71,8 @@ pub struct AddressBook {
 }
 
 impl DiskInterface for AddressBook {
-    const FILE_NAME: &'static str = "address_book.toml";
+    const FILE_NAME: &'static str = "address_book";
+    const FORMAT: FileFormat = FileFormat::YAML;
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -125,7 +150,26 @@ pub struct Config {
 }
 
 impl DiskInterface for Config {
-    const FILE_NAME: &'static str = "config.toml";
+    const FILE_NAME: &'static str = "config";
+    const FORMAT: FileFormat = FileFormat::TOML;
+}
+
+impl Config {
+    pub fn current_account() -> Address {
+        Config::load().current_account
+    }
+
+    pub fn set_current_account(address: Address) {
+        let mut config = Config::load();
+        config.current_account = address;
+        config.save();
+    }
+
+    pub fn alchemy_api_key() -> String {
+        Config::load()
+            .alchemy_api_key
+            .expect("alchemy_api_key is not set in the config")
+    }
 }
 
 // TODO remove this once we have implemented a secure store for linux
@@ -135,7 +179,8 @@ pub struct InsecurePrivateKeyStore {
 }
 
 impl DiskInterface for InsecurePrivateKeyStore {
-    const FILE_NAME: &'static str = "insecure_private_key_store.toml";
+    const FILE_NAME: &'static str = "insecure_private_key_store";
+    const FORMAT: FileFormat = FileFormat::TOML;
 }
 
 impl InsecurePrivateKeyStore {
