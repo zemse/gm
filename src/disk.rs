@@ -41,7 +41,11 @@ where
 
         if path.exists() {
             let content = fs::read_to_string(&path).unwrap_or_else(|_| "{}".to_string());
-            toml::from_str(&content).unwrap_or_else(|_| Self::default())
+            match Self::FORMAT {
+                FileFormat::TOML => toml::from_str(&content).map_err(Error::from),
+                FileFormat::YAML => serde_yaml::from_str(&content).map_err(Error::from),
+            }
+            .unwrap_or_else(|err| panic!("Err({err:?}) while deserializing content at {path:?}"))
         } else {
             Self::default()
         }

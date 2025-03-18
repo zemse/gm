@@ -4,6 +4,7 @@ pub enum Error {
     AppleSecurityFrameworkError(security_framework::base::Error),
     InquireError(inquire::InquireError),
     AlloyEcdsaError(alloy::signers::k256::ecdsa::Error),
+    TomlDeError(toml::de::Error),
     TomlSerError(toml::ser::Error),
     YamlError(serde_yaml::Error),
     ReqwestError(reqwest::Error),
@@ -26,6 +27,12 @@ impl From<inquire::InquireError> for Error {
 impl From<alloy::signers::k256::ecdsa::Error> for Error {
     fn from(e: alloy::signers::k256::ecdsa::Error) -> Self {
         Error::AlloyEcdsaError(e)
+    }
+}
+
+impl From<toml::de::Error> for Error {
+    fn from(e: toml::de::Error) -> Self {
+        Error::TomlDeError(e)
     }
 }
 
