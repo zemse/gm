@@ -30,13 +30,8 @@ where
             })
     }
 
-    /// Load the content, this function can be overloaded
-    fn load() -> Self {
-        Self::load_internal()
-    }
-
     /// Load the content from the file
-    fn load_internal() -> Self {
+    fn load() -> Self {
         let path = Self::path();
 
         if path.exists() {

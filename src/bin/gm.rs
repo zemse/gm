@@ -1,6 +1,13 @@
 use clap::Parser;
 use figlet_rs::FIGfont;
-use gm_cli::{actions::Action, disk::Config, utils::Handle};
+use gm_cli::{actions::Action, disk::Config, network::NetworkStore, utils::Handle};
+
+fn main() {
+    preload_hook();
+
+    let cli = Cli::parse();
+    cli.handle();
+}
 
 /// Top level CLI struct
 #[derive(Parser)]
@@ -38,7 +45,7 @@ fn gm_art() {
     }
 }
 
-fn main() {
-    let cli = Cli::parse();
-    cli.handle();
+fn preload_hook() {
+    // TODO its better to do it when it is needed instead of always
+    NetworkStore::sort_config();
 }

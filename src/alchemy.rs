@@ -52,45 +52,54 @@ impl Alchemy {
         Config::alchemy_api_key()
     }
 
-    pub async fn get_tokens_by_wallet(address: Address) -> Result<Vec<TokensByWalletEntry>, Error> {
-        // Build the request body using serde_json::json! macro:
-        let body = json!({
-            "addresses": [
-                {
-                    "address": address,
-                    "networks": ["eth-mainnet", "arb-mainnet", "base-mainnet", "matic-mainnet"]
-                }
-            ],
-            "withMetadata": true,
-            "withPrices": true
-        });
+    // docs: https://docs.alchemy.com/reference/get-tokens-by-address
+    pub async fn get_tokens_by_wallet(
+        address: Address,
+        networks: Vec<String>,
+    ) -> Result<Vec<TokensByWalletEntry>, Error> {
+        let mut result = Vec::new();
+        for networks in networks.chunks(5) {
+            // Build the request body using serde_json::json! macro:
+            let body = json!({
+                "addresses": [
+                    {
+                        "address": address,
+                        "networks": networks
+                    }
+                ],
+                "withMetadata": true,
+                "withPrices": true
+            });
 
-        // Initialize the reqwest Client
-        let client = Client::new();
+            // Initialize the reqwest Client
+            let client = Client::new();
 
-        let api_key = Self::api_key();
+            let api_key = Self::api_key();
 
-        // Make the POST request
-        let response = client
-            .post(format!(
-                "https://api.g.alchemy.com/data/v1/{api_key}/assets/tokens/by-address"
-            ))
-            .header("accept", "application/json")
-            .header("content-type", "application/json")
-            .json(&body) // send JSON body
-            .send() // execute the request
-            .await? // await the response
-            .json::<Value>() // Parse the JSON into serde_json::Value
-            .await?;
+            // Make the POST request
+            let response = client
+                .post(format!(
+                    "https://api.g.alchemy.com/data/v1/{api_key}/assets/tokens/by-address"
+                ))
+                .header("accept", "application/json")
+                .header("content-type", "application/json")
+                .json(&body) // send JSON body
+                .send() // execute the request
+                .await? // await the response
+                .json::<Value>() // Parse the JSON into serde_json::Value
+                .await?;
 
-        let response = response
-            .get("data")
-            .expect("'data' not present in response")
-            .get("tokens")
-            .expect("'tokens' not present in response");
+            let response = response
+                .get("data")
+                .expect("'data' not present in response")
+                .get("tokens")
+                .expect("'tokens' not present in response");
 
-        let parsed: Vec<TokensByWalletEntry> = serde_json::from_value(response.clone())?;
-        Ok(parsed)
+            let parsed: Vec<TokensByWalletEntry> = serde_json::from_value(response.clone())?;
+            result.extend(parsed);
+        }
+
+        Ok(result)
     }
 
     pub async fn get_token_balances_by_wallet(

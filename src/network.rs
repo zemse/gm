@@ -74,9 +74,22 @@ pub struct NetworkStore {
 impl DiskInterface for NetworkStore {
     const FILE_NAME: &'static str = "networks";
     const FORMAT: FileFormat = FileFormat::YAML;
+}
 
-    fn load() -> Self {
+impl NetworkStore {
+    pub fn sort_config() -> Self {
         let mut networks = HashMap::<u32, Network>::new();
+
+        let merge_tokens = |a: Vec<Token>, b: Vec<Token>| {
+            let mut tokens = HashMap::<Address, Token>::new();
+            for token in a.into_iter().chain(b) {
+                tokens.insert(token.contract_address, token);
+            }
+            let mut tokens = tokens.values().cloned().collect::<Vec<Token>>();
+            tokens.sort_by(|a, b| a.contract_address.cmp(&b.contract_address));
+            tokens
+        };
+
         let mut insert = |entry: Network| {
             let existing = networks.remove(&entry.chain_id);
             let entry = if let Some(existing) = existing {
@@ -90,13 +103,7 @@ impl DiskInterface for NetworkStore {
                     rpc_infura: entry.rpc_infura.or(existing.rpc_infura),
                     explorer_url: entry.explorer_url.or(existing.explorer_url),
                     is_testnet: entry.is_testnet,
-                    // TODO avoid duplicates
-                    tokens: entry
-                        .tokens
-                        .iter()
-                        .chain(existing.tokens.iter())
-                        .cloned()
-                        .collect(),
+                    tokens: merge_tokens(entry.tokens, existing.tokens),
                 }
             } else {
                 entry
@@ -105,9 +112,99 @@ impl DiskInterface for NetworkStore {
             networks.insert(entry.chain_id, entry);
         };
 
-        // TODO move this to a separate file
+        for network in default_networks() {
+            insert(network);
+        }
 
-        insert(Network {
+        // load networks from disk and override defaults
+        // TODO too many .clone() used here, improve it
+        let store = NetworkStore::load();
+        for network in &store.networks {
+            insert(network.clone());
+        }
+
+        // Sort by chain ID and keep testnets at the bottom
+        let mut networks: Vec<Network> = networks.values().cloned().collect();
+        networks.sort_by(|a, b| {
+            a.chain_id
+                .cmp(&b.chain_id)
+                .then(a.is_testnet.cmp(&b.is_testnet))
+        });
+
+        let store = NetworkStore {
+            networks: networks.clone(),
+        };
+
+        store.save();
+        store
+    }
+
+    pub fn get_by_name(&self, network_name: &str) -> Option<Network> {
+        self.networks
+            .iter()
+            .find(|n| {
+                n.name == network_name
+                    || n.name_alchemy
+                        .as_ref()
+                        .map(|name| name == network_name)
+                        .unwrap_or(false)
+            })
+            .cloned()
+    }
+
+    pub fn get_alchemy_network_names(&self) -> Vec<String> {
+        self.networks
+            .iter()
+            .filter_map(|n| n.name_alchemy.clone())
+            .collect()
+    }
+
+    pub fn register_token(
+        &mut self,
+        network_name: &str,
+        token_address: Address,
+        token_symbol: &str,
+        token_name: &str,
+        token_decimals: u8,
+    ) {
+        let network = self
+            .networks
+            .iter_mut()
+            .find(|n| {
+                n.name == network_name
+                    || n.name_alchemy
+                        .as_ref()
+                        .map(|name| name == network_name)
+                        .unwrap_or(false)
+            })
+            .expect("network not found");
+
+        let result = network
+            .tokens
+            .iter()
+            .find(|token| token.contract_address == token_address);
+
+        if result.is_none() {
+            network.tokens.push(Token {
+                name: token_name.to_string(),
+                symbol: token_symbol.to_string(),
+                decimals: token_decimals,
+                contract_address: token_address,
+            });
+        }
+    }
+}
+
+impl From<String> for Network {
+    fn from(value: String) -> Self {
+        let networks = NetworkStore::load();
+        networks.get_by_name(&value).expect("network not found")
+    }
+}
+
+fn default_networks() -> Vec<Network> {
+    vec![
+        Network {
             name: "Mainnet".to_string(),
             name_alchemy: Some("eth-mainnet".to_string()),
             chain_id: 1,
@@ -150,9 +247,8 @@ impl DiskInterface for NetworkStore {
                         .unwrap(),
                 },
             ],
-        });
-
-        insert(Network {
+        },
+        Network {
             name: "Arbitrum".to_string(),
             name_alchemy: Some("arb-mainnet".to_string()),
             chain_id: 42161,
@@ -203,9 +299,8 @@ impl DiskInterface for NetworkStore {
                         .unwrap(),
                 },
             ],
-        });
-
-        insert(Network {
+        },
+        Network {
             name: "Base".to_string(),
             name_alchemy: Some("base-mainnet".to_string()),
             chain_id: 8453,
@@ -232,9 +327,8 @@ impl DiskInterface for NetworkStore {
                         .unwrap(),
                 },
             ],
-        });
-
-        insert(Network {
+        },
+        Network {
             name: "Sepolia".to_string(),
             name_alchemy: Some("eth-sepolia".to_string()),
             chain_id: 11155111,
@@ -244,41 +338,6 @@ impl DiskInterface for NetworkStore {
             explorer_url: Some("https://sepolia.etherscan.io/tx/{}".to_string()),
             is_testnet: true,
             tokens: vec![],
-        });
-
-        // load networks from disk and override defaults
-        // TODO too many .clone() used here, improve it
-        let store = NetworkStore::load_internal();
-        for network in &store.networks {
-            insert(network.clone());
-        }
-        store.save();
-
-        // Sort by chain ID and keep testnets at the bottom
-        let mut networks: Vec<Network> = networks.values().cloned().collect();
-        networks.sort_by(|a, b| {
-            a.chain_id
-                .cmp(&b.chain_id)
-                .then(a.is_testnet.cmp(&b.is_testnet))
-        });
-
-        let store = NetworkStore {
-            networks: networks.clone(),
-        };
-        store.save();
-        store
-    }
-}
-
-impl NetworkStore {
-    pub fn get_by_name(&self, name: &str) -> Option<Network> {
-        self.networks.iter().find(|n| n.name == name).cloned()
-    }
-}
-
-impl From<String> for Network {
-    fn from(value: String) -> Self {
-        let networks = NetworkStore::load();
-        networks.get_by_name(&value).expect("network not found")
-    }
+        },
+    ]
 }
