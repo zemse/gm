@@ -1,6 +1,7 @@
 pub mod account;
 pub mod address_book;
 pub mod balances;
+pub mod config;
 pub mod sign_message;
 pub mod transaction;
 
@@ -8,6 +9,7 @@ use crate::{impl_inquire_selection, utils::Handle};
 
 use account::AccountActions;
 use clap::Subcommand;
+use config::ConfigActions;
 use inquire::Text;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -42,6 +44,12 @@ pub enum Action {
 
     #[command(alias = "sm")]
     SignMessage { message: String },
+
+    #[command(alias = "cfg")]
+    Config {
+        #[command(subcommand)]
+        action: Option<config::ConfigActions>,
+    },
 }
 
 impl_inquire_selection!(Action, ());
@@ -49,6 +57,7 @@ impl_inquire_selection!(Action, ());
 impl Handle for Action {
     fn handle(&self, _carry_on: ()) {
         match self {
+            // TODO Add a setup option which helps user to enter any pending API keys or other configurations
             Action::Assets => {
                 balances::get_all_balances();
             }
@@ -71,6 +80,9 @@ impl Handle for Action {
                 };
 
                 sign_message::sign_message(message);
+            }
+            Action::Config { action } => {
+                ConfigActions::handle_optn_inquire(action, ());
             }
         }
     }
