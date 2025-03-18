@@ -17,7 +17,7 @@ pub enum ConfigActions {
     AlchemyApiKey { key: Option<String> },
 
     #[command(alias = "dm")]
-    DebugMode { enabled: Option<bool> },
+    TestnetMode { enabled: Option<bool> },
 }
 
 impl Display for ConfigActions {
@@ -34,11 +34,11 @@ impl Display for ConfigActions {
                     }
                 )
             }
-            ConfigActions::DebugMode { .. } => {
+            ConfigActions::TestnetMode { .. } => {
                 write!(
                     f,
-                    "Debug Mode: {}",
-                    match config.debug_mode {
+                    "Testnet Mode: {}",
+                    match config.testnet_mode {
                         true => "Activated",
                         false => "Not activated",
                     }
@@ -71,13 +71,13 @@ impl Handle for ConfigActions {
                     config.alchemy_api_key = Some(key);
                 }
             }
-            ConfigActions::DebugMode { enabled } => {
+            ConfigActions::TestnetMode { enabled } => {
                 let enabled = enabled
                     .or_else(|| {
                         Some(
-                            match Select::new("Enable debug mode?", vec!["Yes", "No"])
+                            match Select::new("Enable testnet mode?", vec!["Yes", "No"])
                                 .prompt()
-                                .expect("must input debug mode")
+                                .expect("must input testnet mode")
                             {
                                 "Yes" => true,
                                 "No" => false,
@@ -85,9 +85,9 @@ impl Handle for ConfigActions {
                             },
                         )
                     })
-                    .expect("must have a debug mode");
+                    .expect("must have a testnet mode");
 
-                config.debug_mode = enabled;
+                config.testnet_mode = enabled;
             }
         }
         config.save();

@@ -3,7 +3,10 @@ use std::{
     future::IntoFuture,
 };
 
-use alloy::primitives::{utils::format_units, Address, U256};
+use alloy::{
+    primitives::{utils::format_units, Address, U256},
+    providers::Provider,
+};
 use inquire::Select;
 use tokio::runtime::Runtime;
 
@@ -57,15 +60,19 @@ impl Balance {
 
 // multichain balances
 pub fn get_all_balances() {
-    let wallet_address = Config::current_account();
+    let config = Config::load();
+    let wallet_address = config.current_account.expect("must have a wallet address");
 
     let mut networks = NetworkStore::load();
 
-    let balances: Vec<Balance> = Runtime::new()
-        .unwrap()
+    let rt = Runtime::new().unwrap();
+    let mut balances: Vec<Balance> = rt
         .block_on(
-            Alchemy::get_tokens_by_wallet(wallet_address, networks.get_alchemy_network_names())
-                .into_future(),
+            Alchemy::get_tokens_by_wallet(
+                wallet_address,
+                networks.get_alchemy_network_names(config.testnet_mode),
+            )
+            .into_future(),
         )
         .unwrap()
         .into_iter()
@@ -101,6 +108,26 @@ pub fn get_all_balances() {
         }
     }
     networks.save();
+
+    for network in networks.get_iter(config.testnet_mode) {
+        let provider = network.get_provider();
+
+        let balance = rt
+            .block_on(provider.get_balance(wallet_address).into_future())
+            .unwrap();
+        if !balance.is_zero() {
+            balances.push(Balance {
+                wallet_address,
+                token_address: None,
+                network: network.name.clone(),
+                value: balance,
+                symbol: "ETH".to_string(),
+                name: network.name.clone(),
+                decimals: 18,
+                usd_price: None,
+            });
+        }
+    }
 
     Select::new("Select asset to use", balances)
         .prompt()

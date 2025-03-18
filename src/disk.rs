@@ -144,7 +144,7 @@ impl AddressBook {
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Config {
     pub current_account: Option<Address>,
-    pub debug_mode: bool,
+    pub testnet_mode: bool,
     pub alchemy_api_key: Option<String>,
 }
 

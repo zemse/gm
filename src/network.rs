@@ -13,6 +13,7 @@ pub struct Network {
     pub name: String,
     pub name_alchemy: Option<String>,
     pub chain_id: u32,
+    pub ticker: Option<String>,
     pub rpc_url: Option<String>, // TODO this can rather be an array
     pub rpc_alchemy: Option<String>,
     pub rpc_infura: Option<String>,
@@ -98,6 +99,7 @@ impl NetworkStore {
                     name: entry.name,
                     name_alchemy: entry.name_alchemy.or(existing.name_alchemy),
                     chain_id: entry.chain_id,
+                    ticker: entry.ticker.or(existing.ticker),
                     rpc_url: entry.rpc_url.or(existing.rpc_url),
                     rpc_alchemy: entry.rpc_alchemy.or(existing.rpc_alchemy),
                     rpc_infura: entry.rpc_infura.or(existing.rpc_infura),
@@ -152,11 +154,21 @@ impl NetworkStore {
             .cloned()
     }
 
-    pub fn get_alchemy_network_names(&self) -> Vec<String> {
+    pub fn get_alchemy_network_names(&self, testnet_mode: bool) -> Vec<String> {
         self.networks
             .iter()
-            .filter_map(|n| n.name_alchemy.clone())
+            .filter_map(|n| {
+                (n.is_testnet == testnet_mode)
+                    .then_some(n.name_alchemy.clone())
+                    .flatten()
+            })
             .collect()
+    }
+
+    pub fn get_iter(&self, testnet_mode: bool) -> impl Iterator<Item = &Network> {
+        self.networks
+            .iter()
+            .filter(move |n| n.is_testnet == testnet_mode)
     }
 
     pub fn register_token(
@@ -208,6 +220,7 @@ fn default_networks() -> Vec<Network> {
             name: "Mainnet".to_string(),
             name_alchemy: Some("eth-mainnet".to_string()),
             chain_id: 1,
+            ticker: Some("ETH".to_string()),
             rpc_url: None,
             rpc_alchemy: Some(("https://eth-mainnet.g.alchemy.com/v2/{}").to_string()),
             rpc_infura: None,
@@ -252,6 +265,7 @@ fn default_networks() -> Vec<Network> {
             name: "Arbitrum".to_string(),
             name_alchemy: Some("arb-mainnet".to_string()),
             chain_id: 42161,
+            ticker: Some("ArbETH".to_string()),
             rpc_url: None,
             rpc_alchemy: Some(("https://arb-mainnet.g.alchemy.com/v2/{}").to_string()),
             rpc_infura: None,
@@ -304,6 +318,7 @@ fn default_networks() -> Vec<Network> {
             name: "Base".to_string(),
             name_alchemy: Some("base-mainnet".to_string()),
             chain_id: 8453,
+            ticker: Some("BaseETH".to_string()),
             rpc_url: None,
             rpc_alchemy: Some(("https://base-mainnet.g.alchemy.com/v2/{}").to_string()),
             rpc_infura: None,
@@ -332,6 +347,7 @@ fn default_networks() -> Vec<Network> {
             name: "Sepolia".to_string(),
             name_alchemy: Some("eth-sepolia".to_string()),
             chain_id: 11155111,
+            ticker: Some("sepoliaETH".to_string()),
             rpc_url: None,
             rpc_alchemy: Some(("https://eth-sepolia.g.alchemy.com/v2/{}").to_string()),
             rpc_infura: None,
