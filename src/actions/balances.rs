@@ -46,8 +46,9 @@ impl Display for Balance {
 
 impl Balance {
     pub fn formatted_value(&self) -> f64 {
-        format_units(self.value, self.decimals)
-            .expect("format_units failed")
+        let temp_formatted = format_units(self.value, self.decimals).expect("format_units failed");
+
+        temp_formatted
             .parse::<f64>()
             .expect("parse into f64 failed")
     }
@@ -109,6 +110,8 @@ pub fn get_all_balances() {
     }
     networks.save();
 
+    let mut eth_price = None;
+
     for network in networks.get_iter(config.testnet_mode) {
         let provider = network.get_provider();
 
@@ -116,15 +119,34 @@ pub fn get_all_balances() {
             .block_on(provider.get_balance(wallet_address).into_future())
             .unwrap();
         if !balance.is_zero() {
+            let usd_price = if let Some(price_ticker) = &network.price_ticker {
+                if price_ticker == "ETH" {
+                    eth_price.or_else(|| {
+                        let (price, _) = rt
+                            .block_on(Alchemy::get_price("ETH").into_future())
+                            .expect("api failed");
+                        eth_price = Some(price);
+                        eth_price
+                    })
+                } else {
+                    let (price, _) = rt
+                        .block_on(Alchemy::get_price(price_ticker).into_future())
+                        .expect("api failed");
+                    Some(price)
+                }
+            } else {
+                None
+            };
+
             balances.push(Balance {
                 wallet_address,
                 token_address: None,
                 network: network.name.clone(),
                 value: balance,
-                symbol: "ETH".to_string(),
+                symbol: network.symbol.clone().unwrap_or("ETH".to_string()),
                 name: network.name.clone(),
                 decimals: 18,
-                usd_price: None,
+                usd_price,
             });
         }
     }

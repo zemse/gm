@@ -1,5 +1,9 @@
 #[derive(Debug)]
 pub enum Error {
+    InternalError(String),
+
+    ParseFloatError(std::num::ParseFloatError),
+
     #[cfg(target_os = "macos")]
     AppleSecurityFrameworkError(security_framework::base::Error),
     InquireError(inquire::InquireError),
@@ -9,6 +13,18 @@ pub enum Error {
     YamlError(serde_yaml::Error),
     ReqwestError(reqwest::Error),
     SerdeJson(serde_json::Error),
+}
+
+impl From<&str> for Error {
+    fn from(e: &str) -> Self {
+        Error::InternalError(e.to_string())
+    }
+}
+
+impl From<std::num::ParseFloatError> for Error {
+    fn from(e: std::num::ParseFloatError) -> Self {
+        Error::ParseFloatError(e)
+    }
 }
 
 #[cfg(target_os = "macos")]
