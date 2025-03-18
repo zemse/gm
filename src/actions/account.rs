@@ -48,7 +48,7 @@ pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
     key
 }
 
-fn create_privatekey_wallet() -> Address {
+pub fn create_privatekey_wallet() -> Address {
     #[cfg(target_os = "macos")]
     let address = macos::create_privatekey_wallet();
     #[cfg(target_os = "linux")]

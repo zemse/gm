@@ -2,15 +2,17 @@ pub mod account;
 pub mod address_book;
 pub mod balances;
 pub mod config;
+pub mod setup;
 pub mod sign_message;
 pub mod transaction;
 
-use crate::{impl_inquire_selection, utils::Handle};
+use crate::utils::{Handle, Inquire};
 
 use account::AccountActions;
 use clap::Subcommand;
 use config::ConfigActions;
 use inquire::Text;
+use setup::{get_setup_menu, setup_inquire_and_handle};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use transaction::TransactionActions;
@@ -21,6 +23,8 @@ use transaction::TransactionActions;
 /// Transactions - `gm tx`
 #[derive(Subcommand, Display, EnumIter)]
 pub enum Action {
+    Setup,
+
     #[command(alias = "bal")]
     Assets,
 
@@ -43,7 +47,9 @@ pub enum Action {
     },
 
     #[command(alias = "sm")]
-    SignMessage { message: String },
+    SignMessage {
+        message: String,
+    },
 
     #[command(alias = "cfg")]
     Config {
@@ -52,12 +58,27 @@ pub enum Action {
     },
 }
 
-impl_inquire_selection!(Action, ());
+impl Inquire for Action {
+    fn inquire(_: &()) -> Option<Action> {
+        let mut options: Vec<Action> = Action::iter().collect();
+
+        let setup_menu = get_setup_menu();
+        if setup_menu.is_empty() {
+            options.remove(0);
+        }
+
+        inquire::Select::new("Choose subcommand:", options)
+            .with_formatter(&|a| format!("{a}"))
+            .prompt()
+            .ok()
+    }
+}
 
 impl Handle for Action {
     fn handle(&self, _carry_on: ()) {
         match self {
             // TODO Add a setup option which helps user to enter any pending API keys or other configurations
+            Action::Setup => setup_inquire_and_handle(),
             Action::Assets => {
                 balances::get_all_balances();
             }

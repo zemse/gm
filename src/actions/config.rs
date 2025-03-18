@@ -65,8 +65,11 @@ impl Handle for ConfigActions {
                         )
                     })
                     .expect("must have an api key");
-
-                config.alchemy_api_key = Some(key);
+                if key.is_empty() {
+                    config.alchemy_api_key = None;
+                } else {
+                    config.alchemy_api_key = Some(key);
+                }
             }
             ConfigActions::DebugMode { enabled } => {
                 let enabled = enabled

@@ -172,6 +172,12 @@ impl Config {
             .alchemy_api_key
             .expect("alchemy_api_key is not set in the config")
     }
+
+    pub fn set_alchemy_api_key(alchemy_api_key: String) {
+        let mut config = Config::load();
+        config.alchemy_api_key = Some(alchemy_api_key);
+        config.save();
+    }
 }
 
 // TODO remove this once we have implemented a secure store for linux
