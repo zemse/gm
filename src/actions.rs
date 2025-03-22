@@ -5,6 +5,7 @@ pub mod config;
 pub mod setup;
 pub mod sign_message;
 pub mod transaction;
+pub mod send_message;
 
 use crate::utils::{Handle, Inquire};
 
@@ -16,6 +17,8 @@ use setup::{get_setup_menu, setup_inquire_and_handle};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use transaction::TransactionActions;
+use alloy::primitives::Address;
+use crate::actions::send_message::send_message;
 
 /// First subcommand
 ///
@@ -50,6 +53,20 @@ pub enum Action {
     SignMessage {
         message: String,
     },
+
+    #[command(alias = "send")]
+    SendMessage {
+        /// Recipient address
+        to: String,
+
+        /// Message to send
+        msg: String,
+
+        // Network to use
+       // network: String,
+        
+    },
+
 
     #[command(alias = "cfg")]
     Config {
@@ -102,9 +119,18 @@ impl Handle for Action {
 
                 sign_message::sign_message(message);
             }
+            
+            Action::SendMessage { to, msg } => {
+                let to_address: Address = to.parse().expect("Invalid Ethereum address");
+                tokio::runtime::Runtime::new()
+                    .unwrap()
+                    .block_on(send_message(to_address, msg.clone()));
+            }
+
             Action::Config { action } => {
                 ConfigActions::handle_optn_inquire(action, ());
             }
+
         }
     }
 }

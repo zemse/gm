@@ -17,6 +17,7 @@ use crate::{
 };
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Balance {
     wallet_address: Address,
     token_address: Option<Address>,
