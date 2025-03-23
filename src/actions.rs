@@ -19,6 +19,8 @@ use strum_macros::{Display, EnumIter};
 use transaction::TransactionActions;
 use alloy::primitives::Address;
 use crate::actions::send_message::send_message;
+use crate::network::Network; // Assuming `Network` is defined in a `network` module
+use tokio::runtime::Runtime;
 
 /// First subcommand
 ///
@@ -63,7 +65,7 @@ pub enum Action {
         msg: String,
 
         // Network to use
-       // network: String,
+        network: Option<Network>,
         
     },
 
@@ -120,11 +122,9 @@ impl Handle for Action {
                 sign_message::sign_message(message);
             }
             
-            Action::SendMessage { to, msg } => {
-                let to_address: Address = to.parse().expect("Invalid Ethereum address");
-                tokio::runtime::Runtime::new()
-                    .unwrap()
-                    .block_on(send_message(to_address, msg.clone()));
+            Action::SendMessage { to, msg, network } => {
+                let rt = Runtime::new().expect("Failed to create runtime");
+                rt.block_on(send_message(to.clone(), msg.clone(), network.clone()));
             }
 
             Action::Config { action } => {
