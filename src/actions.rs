@@ -22,7 +22,9 @@ use transaction::TransactionActions;
 /// Accounts - `gm acc`
 /// Transactions - `gm tx`
 #[derive(Subcommand, Display, EnumIter)]
+#[allow(clippy::large_enum_variant)]
 pub enum Action {
+    #[command(hide = true)]
     Setup,
 
     #[command(alias = "bal")]
@@ -47,9 +49,7 @@ pub enum Action {
     },
 
     #[command(alias = "sm")]
-    SignMessage {
-        message: String,
-    },
+    SignMessage { message: String },
 
     #[command(alias = "cfg")]
     Config {
