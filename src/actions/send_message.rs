@@ -60,7 +60,7 @@ pub async fn send_message(to: String, msg: String, network: Option<Network>) {
         .expect("❌ Failed to fetch chain ID");
     tx.chain_id = chain_id;
 
-    tx.gas_limit = 21_000;
+    tx.gas_limit = 51_000;
 
     // Estimate gas fees
     let fee_estimation = provider.estimate_eip1559_fees(None)
