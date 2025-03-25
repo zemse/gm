@@ -151,6 +151,16 @@ pub fn get_all_balances() {
         }
     }
 
+    if balances.is_empty() {
+        println!("No balances found");
+        if config.testnet_mode {
+            println!("\nYou can use https://www.alchemy.com/faucets/ethereum-sepolia\nto get some testnet ETH on your wallet {wallet_address:?}\n");
+        } else {
+            println!("Withdraw some ETH to your wallet {wallet_address:?}\n");
+        }
+        return;
+    }
+
     Select::new("Select asset to use", balances)
         .prompt()
         .unwrap();
