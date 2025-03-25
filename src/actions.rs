@@ -49,7 +49,7 @@ pub enum Action {
     },
 
     #[command(alias = "sm")]
-    SignMessage { message: String },
+    SignMessage { message: Option<String> },
 
     #[command(alias = "cfg")]
     Config {
@@ -92,12 +92,12 @@ impl Handle for Action {
                 TransactionActions::handle_optn_inquire(action, ());
             }
             Action::SignMessage { message } => {
-                let message = if message.is_empty() {
+                let message = if let Some(message) = message {
+                    message.clone()
+                } else {
                     Text::new("Enter the message to sign:")
                         .prompt()
                         .expect("must enter message to sign")
-                } else {
-                    message.clone()
                 };
 
                 sign_message::sign_message(message);
