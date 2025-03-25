@@ -1,4 +1,4 @@
-use std::future::IntoFuture;
+use crate::{actions::account::load_wallet, disk::Config, network::Network};
 use alloy::{
     consensus::{SignableTransaction, Transaction, TxEip1559, TxEnvelope},
     hex,
@@ -7,8 +7,8 @@ use alloy::{
     providers::{Provider, ProviderBuilder},
     rlp::Encodable,
 };
+use std::future::IntoFuture;
 use tokio::runtime::Runtime;
-use crate::{actions::account::load_wallet, disk::Config, network::Network};
 
 /// Sends a message from the currently selected wallet to a recipient wallet.
 pub async fn send_message(to: String, msg: String, network: Option<Network>) {
@@ -23,7 +23,10 @@ pub async fn send_message(to: String, msg: String, network: Option<Network>) {
         eprintln!("❌ Error: Invalid Ethereum address format: {}", to);
         std::process::exit(1);
     }
-    let to_address: Address = to.trim().parse().expect("❌ Failed to parse recipient Ethereum address");
+    let to_address: Address = to
+        .trim()
+        .parse()
+        .expect("❌ Failed to parse recipient Ethereum address");
 
     // Encode message as transaction calldata
     let calldata = Bytes::from(msg.into_bytes());
@@ -55,7 +58,8 @@ pub async fn send_message(to: String, msg: String, network: Option<Network>) {
     tx.nonce = nonce;
 
     // Fetch chain ID
-    let chain_id = provider.get_chain_id()
+    let chain_id = provider
+        .get_chain_id()
         .await
         .expect("❌ Failed to fetch chain ID");
     tx.chain_id = chain_id;
@@ -63,14 +67,17 @@ pub async fn send_message(to: String, msg: String, network: Option<Network>) {
     tx.gas_limit = 51_000;
 
     // Estimate gas fees
-    let fee_estimation = provider.estimate_eip1559_fees(None)
+    let fee_estimation = provider
+        .estimate_eip1559_fees(None)
         .await
         .expect("❌ Gas fee estimation failed");
     tx.max_priority_fee_per_gas = fee_estimation.max_priority_fee_per_gas;
     tx.max_fee_per_gas = fee_estimation.max_fee_per_gas;
 
     // Sign transaction
-    let signature = wallet.sign_transaction_sync(&mut tx).expect("❌ Signing error");
+    let signature = wallet
+        .sign_transaction_sync(&mut tx)
+        .expect("❌ Signing error");
     let tx_signed = SignableTransaction::into_signed(tx, signature);
 
     // Encode transaction
@@ -80,7 +87,8 @@ pub async fn send_message(to: String, msg: String, network: Option<Network>) {
     let out = &out[2..];
 
     // Submit transaction
-    let result = provider.send_raw_transaction(out)
+    let result = provider
+        .send_raw_transaction(out)
         .await
         .expect("❌ Transaction submission failed");
 
@@ -91,11 +99,21 @@ pub async fn send_message(to: String, msg: String, network: Option<Network>) {
     );
 
     // Wait for transaction confirmation
-    let receipt = result.get_receipt()
+    let receipt = result
+        .get_receipt()
         .await
         .expect("❌ Failed to get receipt");
     println!(
         "Confirmed in block {}",
-        receipt.block_number.map(|n| n.to_string()).unwrap_or("unknown".to_string())
+        receipt
+            .block_number
+            .map(|n| n.to_string())
+            .unwrap_or("unknown".to_string())
     );
 }
+
+pub fn handle_send_message(to: String, msg: String, network: Option<Network>) {
+    let rt = Runtime::new().expect("Failed to create runtime");
+    rt.block_on(send_message(to, msg, network));
+}
+

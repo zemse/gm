@@ -2,25 +2,25 @@ pub mod account;
 pub mod address_book;
 pub mod balances;
 pub mod config;
+pub mod send_message;
 pub mod setup;
 pub mod sign_message;
 pub mod transaction;
-pub mod send_message;
 
 use crate::utils::{Handle, Inquire};
 
+use crate::actions::send_message::send_message;
+use crate::network::Network;
 use account::AccountActions;
+use alloy::primitives::Address;
 use clap::Subcommand;
 use config::ConfigActions;
 use inquire::Text;
 use setup::{get_setup_menu, setup_inquire_and_handle};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-use transaction::TransactionActions;
-use alloy::primitives::Address;
-use crate::actions::send_message::send_message;
-use crate::network::Network; // Assuming `Network` is defined in a `network` module
 use tokio::runtime::Runtime;
+use transaction::TransactionActions;
 
 /// First subcommand
 ///
@@ -66,9 +66,7 @@ pub enum Action {
 
         // Network to use
         network: Option<Network>,
-        
     },
-
 
     #[command(alias = "cfg")]
     Config {
@@ -121,16 +119,15 @@ impl Handle for Action {
 
                 sign_message::sign_message(message);
             }
-            
+
             Action::SendMessage { to, msg, network } => {
-                let rt = Runtime::new().expect("Failed to create runtime");
-                rt.block_on(send_message(to.clone(), msg.clone(), network.clone()));
+                send_message::handle_send_message(to.clone(), msg.clone(), network.clone());
             }
+            
 
             Action::Config { action } => {
                 ConfigActions::handle_optn_inquire(action, ());
             }
-
         }
     }
 }

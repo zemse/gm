@@ -1,5 +1,5 @@
-use crate::{disk::Config, error::Error, impl_inquire_selection, utils::Handle};
 use crate::disk::DiskInterface;
+use crate::{disk::Config, error::Error, impl_inquire_selection, utils::Handle};
 
 use alloy::{
     primitives::{bytes::BytesMut, keccak256, Address, Bytes, U256},
