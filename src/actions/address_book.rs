@@ -8,7 +8,7 @@ use crate::{
 
 use alloy::{hex::FromHex, primitives::Address};
 use clap::Subcommand;
-use inquire::Text;
+use inquire::{Text, Select};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 

@@ -179,6 +179,16 @@ impl Config {
     }
 }
 
+// send_message select address book test
+use std::fmt;
+
+impl fmt::Display for AddressBookEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.name, self.address)
+    }
+}
+
+
 // TODO remove this once we have implemented a secure store for linux
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct InsecurePrivateKeyStore {
