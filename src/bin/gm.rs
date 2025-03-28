@@ -1,6 +1,7 @@
 use clap::Parser;
 use figlet_rs::FIGfont;
 use gm_cli::{actions::Action, disk::Config, network::NetworkStore, utils::Handle};
+use inquire::Confirm;
 
 fn main() {
     preload_hook();
@@ -25,9 +26,18 @@ impl Cli {
             println!("Welcome to GM CLI tool!");
 
             println!("Current account: {:?}\n", Config::current_account());
-        }
 
-        Action::handle_optn_inquire(&self.action, ());
+            let result = Confirm::new("Open menu?")
+                .with_default(true)
+                .with_help_message("Press ESC if you want to quit")
+                .prompt();
+
+            if let Ok(true) = result {
+                Action::handle_optn_inquire(&None, ());
+            }
+        } else {
+            Action::handle_optn_inquire(&self.action, ());
+        }
     }
 }
 
