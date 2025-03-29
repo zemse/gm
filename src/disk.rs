@@ -1,4 +1,4 @@
-use std::{fmt::Debug, fs, path::PathBuf};
+use std::{fmt::Debug, fs, path::PathBuf, fmt};
 
 use alloy::{hex, primitives::Address, signers::k256::FieldBytes};
 use directories::BaseDirs;
@@ -179,9 +179,7 @@ impl Config {
     }
 }
 
-// send_message select address book test
-use std::fmt;
-
+// send_message select address book
 impl fmt::Display for AddressBookEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} ({})", self.name, self.address)

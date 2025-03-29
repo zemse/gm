@@ -60,7 +60,7 @@ pub enum Action {
     #[command(alias = "send")]
     SendMessage {
         /// Recipient address
-        to: String,
+        to: Option<String>,
 
         /// Message to send
         msg: String,
@@ -122,33 +122,33 @@ impl Handle for Action {
             }
 
             Action::SendMessage { to, msg, network } => {
-                let to = if to.is_empty() {
-                    let choice = Select::new("Select recipient method:", vec!["Enter manually", "Choose from address book"])
-                        .prompt()
-                        .expect("❌ Must select a method");
-            
-                    if choice == "Enter manually" {
-                        Text::new("Enter recipient address:")
+                let to = match to {
+                    Some(addr) if !addr.is_empty() => addr.clone(),
+                    _ => {
+                        let choice = Select::new("Select recipient method:", vec!["Enter manually", "Choose from address book"])
                             .prompt()
-                            .expect("❌ Must enter recipient address")
-                    } else {
-                        let address_book = AddressBook::load();
-                        let addresses = address_book.list().to_vec();
-            
-                        if addresses.is_empty() {
-                            println!("⚠️ Address book is empty, please enter manually.");
+                            .expect("❌ Must select a method");
+                        if choice == "Enter manually" {
                             Text::new("Enter recipient address:")
                                 .prompt()
                                 .expect("❌ Must enter recipient address")
                         } else {
-                            let selected = Select::new("Select recipient:", addresses)
-                                .prompt()
-                                .expect("❌ Must select an address");
-                            selected.address.to_string()
+                            let address_book = AddressBook::load();
+                            let addresses = address_book.list().to_vec();
+            
+                            if addresses.is_empty() {
+                                println!("⚠️ Address book is empty, please enter manually.");
+                                Text::new("Enter recipient address:")
+                                    .prompt()
+                                    .expect("❌ Must enter recipient address")
+                            } else {
+                                let selected = Select::new("Select recipient:", addresses)
+                                    .prompt()
+                                    .expect("❌ Must select an address");
+                                selected.address.to_string()
+                            }
                         }
                     }
-                } else {
-                    to.clone()
                 };
             
                 let msg = if msg.is_empty() {
