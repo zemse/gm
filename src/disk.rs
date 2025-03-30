@@ -179,7 +179,7 @@ impl Config {
     }
 }
 
-// send_message select address book
+// Implementing Display for AddressBookEntry to format how entries appear in selections.
 impl fmt::Display for AddressBookEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} ({})", self.name, self.address)

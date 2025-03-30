@@ -63,7 +63,7 @@ pub enum Action {
         to: Option<String>,
 
         /// Message to send
-        msg: String,
+        msg: Option<String>,
 
         // Network to use
         network: Option<Network>,
@@ -151,13 +151,13 @@ impl Handle for Action {
                     }
                 };
             
-                let msg = if msg.is_empty() {
-                    Text::new("Enter message:")
-                        .prompt()
-                        .expect("❌ Must enter a message")
-                } else {
-                    msg.clone()
+                let msg = match msg {
+                    Some(m) if !m.is_empty() => m.clone(),
+                    _ => Text::new("Enter message:")
+                            .prompt()
+                            .expect("❌ Must enter a message"),
                 };
+                
             
                 let network = network.clone().or_else(|| {
                     let networks = NetworkStore::load().networks;
