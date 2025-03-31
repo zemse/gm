@@ -2,19 +2,25 @@ pub mod account;
 pub mod address_book;
 pub mod balances;
 pub mod config;
+pub mod send_message;
 pub mod setup;
 pub mod sign_message;
 pub mod transaction;
 
 use crate::utils::{Handle, Inquire};
 
+use crate::actions::send_message::send_message;
+use crate::disk::{AddressBook,DiskInterface};
+use crate::network::{Network, NetworkStore};
 use account::AccountActions;
+use alloy::primitives::Address;
 use clap::Subcommand;
 use config::ConfigActions;
-use inquire::Text;
+use inquire::{Text,Select};
 use setup::{get_setup_menu, setup_inquire_and_handle};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
+use tokio::runtime::Runtime;
 use transaction::TransactionActions;
 
 /// First subcommand
@@ -50,6 +56,18 @@ pub enum Action {
 
     #[command(alias = "sm")]
     SignMessage { message: Option<String> },
+
+    #[command(alias = "send")]
+    SendMessage {
+        /// Recipient address
+        to: Option<String>,
+
+        /// Message to send
+        msg: Option<String>,
+
+        // Network to use
+        network: Option<Network>,
+    },
 
     #[command(alias = "cfg")]
     Config {
@@ -102,6 +120,56 @@ impl Handle for Action {
 
                 sign_message::sign_message(message);
             }
+
+            Action::SendMessage { to, msg, network } => {
+                let to = match to {
+                    Some(addr) if !addr.is_empty() => addr.clone(),
+                    _ => {
+                        let choice = Select::new("Select recipient method:", vec!["Enter manually", "Choose from address book"])
+                            .prompt()
+                            .expect("❌ Must select a method");
+                        if choice == "Enter manually" {
+                            Text::new("Enter recipient address:")
+                                .prompt()
+                                .expect("❌ Must enter recipient address")
+                        } else {
+                            let address_book = AddressBook::load();
+                            let addresses = address_book.list().to_vec();
+            
+                            if addresses.is_empty() {
+                                println!("⚠️ Address book is empty, please enter manually.");
+                                Text::new("Enter recipient address:")
+                                    .prompt()
+                                    .expect("❌ Must enter recipient address")
+                            } else {
+                                let selected = Select::new("Select recipient:", addresses)
+                                    .prompt()
+                                    .expect("❌ Must select an address");
+                                selected.address.to_string()
+                            }
+                        }
+                    }
+                };
+            
+                let msg = match msg {
+                    Some(m) if !m.is_empty() => m.clone(),
+                    _ => Text::new("Enter message:")
+                            .prompt()
+                            .expect("❌ Must enter a message"),
+                };
+                
+            
+                let network = network.clone().or_else(|| {
+                    let networks = NetworkStore::load().networks;
+                    Select::new("Select a network:", networks)
+                        .prompt()
+                        .ok()
+                });
+            
+                send_message::handle_send_message(to, msg, network);
+            }
+            
+
             Action::Config { action } => {
                 ConfigActions::handle_optn_inquire(action, ());
             }

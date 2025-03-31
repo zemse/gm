@@ -1,4 +1,4 @@
-use std::{fmt::Debug, fs, path::PathBuf};
+use std::{fmt::Debug, fs, path::PathBuf, fmt};
 
 use alloy::{hex, primitives::Address, signers::k256::FieldBytes};
 use directories::BaseDirs;
@@ -178,6 +178,14 @@ impl Config {
         config.save();
     }
 }
+
+// Implementing Display for AddressBookEntry to format how entries appear in selections.
+impl fmt::Display for AddressBookEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.name, self.address)
+    }
+}
+
 
 // TODO remove this once we have implemented a secure store for linux
 #[derive(Serialize, Deserialize, Debug, Default)]

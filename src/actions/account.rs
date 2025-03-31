@@ -1,3 +1,4 @@
+use crate::disk::DiskInterface;
 use crate::{disk::Config, error::Error, impl_inquire_selection, utils::Handle};
 
 use alloy::{
@@ -275,7 +276,7 @@ mod linux_insecure {
 
         if let Some(address) = address {
             let mut config = Config::load();
-            config.current_account = address;
+            config.current_account = Some(address);
             config.save();
         }
     }
