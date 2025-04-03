@@ -1,4 +1,6 @@
 use std::fmt::Display;
+use qrcode::QrCode;
+use qrcode::render::unicode;
 
 use crate::{
     disk::{AddressBook, AddressBookEntry, DiskInterface},
@@ -36,7 +38,17 @@ impl Display for AddressBookActions {
                 let (id, entry) = AddressBook::load()
                     .find(id, address, &name.as_ref())
                     .expect("entry not found");
-                write!(f, "{}) {}:{}", id, entry.name, entry.address)
+
+                writeln!(f, "{}) {}:{}", id, entry.name, entry.address)?;
+
+                // Generate the QR code
+                let qr = QrCode::new(entry.address.to_string()).expect("Failed to generate QR code");
+
+                // Render QR code in Unicode and display
+                let qr_display = qr.render::<unicode::Dense1x2>().build();
+                writeln!(f, "\n{}\n", qr_display)?;
+
+                Ok(())
             }
         }
     }
