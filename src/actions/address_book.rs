@@ -39,20 +39,12 @@ impl Display for AddressBookActions {
                     .find(id, address, &name.as_ref())
                     .expect("entry not found");
 
-                writeln!(f, "{}) {}:{}", id, entry.name, entry.address)?;
-
-                // Generate the QR code
-                let qr = QrCode::new(entry.address.to_string()).expect("Failed to generate QR code");
-
-                // Render QR code in Unicode and display
-                let qr_display = qr.render::<unicode::Dense1x2>().build();
-                writeln!(f, "\n{}\n", qr_display)?;
-
-                Ok(())
+                write!(f, "{}) {} - {}", id, entry.name, entry.address)
             }
         }
     }
 }
+
 
 impl Inquire for AddressBookActions {
     fn inquire(_: &()) -> Option<AddressBookActions> {
@@ -142,6 +134,12 @@ pub enum AddressBookViewActions {
         address: Option<Address>,
         name: Option<String>,
     },
+    #[command(alias = "qr")]
+    ShowQRCode { 
+        id: Option<usize>,
+        address: Option<Address>,
+        name: Option<String>,
+     },
 }
 
 pub struct AddressBookViewCarryOn {
@@ -247,6 +245,23 @@ impl Handle<AddressBookViewCarryOn> for AddressBookViewActions {
 
                 println!("Entry deleted from address book");
             }
+
+            AddressBookViewActions::ShowQRCode { id, address, name } => {
+                let (_, entry) = AddressBook::load()
+                    .find(
+                        &id.or(carry_on.id),
+                        &address.or(carry_on.address),
+                        &name.as_ref().or(carry_on.name.as_ref()),
+                    )
+                    .expect("entry not found");
+            
+                let qr = QrCode::new(entry.address.to_string()).expect("Failed to generate QR code");
+                let qr_display = qr.render::<unicode::Dense1x2>().quiet_zone(false).build();
+            
+                println!("\n{}'s Address:\n{}\n", entry.name, entry.address);
+                println!("QR Code:\n{}\n", qr_display);
+            }
+            
         }
     }
 }
