@@ -16,6 +16,8 @@ use strum_macros::{Display, EnumIter};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use rayon::prelude::*;
+use std::time::Duration;
+use indicatif::{ProgressBar, ProgressStyle};
 
 #[derive(Subcommand, Display, EnumIter)]
 pub enum AccountActions {
@@ -145,30 +147,35 @@ fn gen_wallet_with_prefix(_vanity: Option<&str>) -> (FieldBytes, PrivateKeySigne
 }
 
 
-fn create_vanity_wallet(prefix: &str) -> Address {
+pub fn create_vanity_wallet(prefix: &str) -> Address {
     
-    println!("🔍 Searching for an address starting with: 0x{prefix}...");
+    println!("🔍 Searching for address starting with: 0x{prefix}...");
 
     let found = Arc::new(AtomicBool::new(false));
-    let result = (0..u64::MAX).into_par_iter().find_any(|_| {
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_message("Generating...");
+    spinner.set_style(ProgressStyle::default_spinner()
+        .template("{spinner:.green} {msg}")
+        .expect("invalid spinner template"));
+    spinner.enable_steady_tick(Duration::from_millis(80));
+
+    let result = (0u64..u64::MAX).into_par_iter().find_any(|_| {
         if found.load(Ordering::Relaxed) {
             return false;
         }
 
-        let (private_key_bytes, signer, address) = gen_wallet_with_prefix(Some(prefix));
-        if format!("{address}").to_lowercase().trim_start_matches("0x").starts_with(prefix) {
+        let (priv_bytes, _signer, address) = gen_wallet_with_prefix(Some(prefix));
+        let addr_str = format!("{address}").to_lowercase();
+
+        if addr_str.trim_start_matches("0x").starts_with(prefix) {
             found.store(true, Ordering::Relaxed);
 
             #[cfg(target_os = "macos")]
-            {
-                macos::store_wallet(&address, &private_key_bytes);
-            }
+            macos::store_wallet(&address, &priv_bytes);
             #[cfg(target_os = "linux")]
-            {
-                linux_insecure::store_wallet(&address, &private_key_bytes);
-            }
+            linux_insecure::store_wallet(&address, &priv_bytes);
 
-            println!("✅ Found vanity address: {}", address);
+            spinner.finish_with_message(format!("✅ Found: {address}"));
             return true;
         }
 
@@ -176,12 +183,13 @@ fn create_vanity_wallet(prefix: &str) -> Address {
     });
 
     if result.is_none() {
-        panic!("Could not find a vanity address. Try a simpler pattern.");
+        spinner.abandon_with_message("❌ Vanity address not found. Try simpler pattern.");
+        panic!("No address found.");
     }
 
-    // Just return the latest stored address
     list_of_wallets().last().cloned().unwrap()
 }
+
 
 
 #[cfg(target_os = "macos")]
