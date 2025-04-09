@@ -20,6 +20,8 @@ strum = "0.26"
 strum_macros = "0.26"
 tui-qrcode = "0.1.1"
 qrcode = "0.12"
+indicatif = "0.17"
+
 # Ethereum
 alloy = { version = "0.11", features = ["full", "rlp"] }
 rand = "0.8"
@@ -40,4 +42,3 @@ directories = "5.0"
 tokio = { version = "1.43.0", features = ["rt-multi-thread", "macros"] }
 reqwest = { version = "0.11", features = ["json"] }
 rayon = "1.8"
-indicatif = "0.17"
