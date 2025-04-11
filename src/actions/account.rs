@@ -147,15 +147,41 @@ fn gen_wallet_with_prefix(_vanity: Option<&str>) -> (FieldBytes, PrivateKeySigne
 
 
 pub fn create_vanity_wallet(prefix: &str) -> Address {
-    
+    let prefix = prefix.trim().to_lowercase();
+
+    if prefix.is_empty() {
+        eprintln!("❌ Prefix cannot be empty. Use regular account creation instead.");
+        std::process::exit(1);
+    }
+
+    if !prefix.chars().all(|c| c.is_ascii_hexdigit()) {
+        eprintln!("❌ Invalid vanity prefix. Only hexadecimal characters (0-9, a-f) are allowed.");
+        std::process::exit(1);
+    }
+
+    // Warning if the prefix is likely to take a long time
+    if prefix.len() > 6 {
+        println!(
+            "⚠️  Warning: Prefix length is {}. This may take a *very* long time ⏳",
+            prefix.len()
+        );
+    } else if prefix.len() > 4 {
+        println!(
+            "Note: Searching for a prefix of length {} could take a while.",
+            prefix.len()
+        );
+    }
+
     println!("🔍 Searching for address starting with: 0x{prefix}...");
 
     let found = Arc::new(AtomicBool::new(false));
     let spinner = ProgressBar::new_spinner();
     spinner.set_message("Generating...");
-    spinner.set_style(ProgressStyle::default_spinner()
-        .template("{spinner:.green} {msg}")
-        .expect("invalid spinner template"));
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} {msg}")
+            .expect("invalid spinner template"),
+    );
     spinner.enable_steady_tick(Duration::from_millis(80));
 
     let result = (0u64..u64::MAX).into_par_iter().find_any(|_| {
@@ -163,10 +189,10 @@ pub fn create_vanity_wallet(prefix: &str) -> Address {
             return false;
         }
 
-        let (priv_bytes, _signer, address) = gen_wallet_with_prefix(Some(prefix));
+        let (priv_bytes, _signer, address) = gen_wallet_with_prefix(Some(&prefix));
         let addr_str = format!("{address}").to_lowercase();
 
-        if addr_str.trim_start_matches("0x").starts_with(prefix) {
+        if addr_str.trim_start_matches("0x").starts_with(&prefix) {
             found.store(true, Ordering::Relaxed);
 
             #[cfg(target_os = "macos")]
@@ -182,12 +208,13 @@ pub fn create_vanity_wallet(prefix: &str) -> Address {
     });
 
     if result.is_none() {
-        spinner.abandon_with_message("❌ Vanity address not found. Try simpler pattern.");
+        spinner.abandon_with_message("❌ Vanity address not found. Try a simpler pattern.");
         panic!("No address found.");
     }
 
     list_of_wallets().last().cloned().unwrap()
 }
+
 
 
 
