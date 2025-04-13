@@ -8,15 +8,15 @@ use alloy::{
     },
 };
 use clap::{command, Subcommand};
+use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{Password, Select};
 use rand::{rngs::OsRng, RngCore};
-use strum::IntoEnumIterator;
-use strum_macros::{Display, EnumIter};
+use rayon::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use rayon::prelude::*;
 use std::time::Duration;
-use indicatif::{ProgressBar, ProgressStyle};
+use strum::IntoEnumIterator;
+use strum_macros::{Display, EnumIter};
 
 #[derive(Subcommand, Display, EnumIter)]
 pub enum AccountActions {
@@ -38,22 +38,21 @@ impl Handle for AccountActions {
             }
             AccountActions::Create => {
                 println!("Creating a new account...");
-            
+
                 let vanity_prefix = inquire::Text::new("Enter vanity prefix (or leave blank):")
                     .prompt()
                     .unwrap_or_default()
                     .trim()
                     .to_lowercase();
-            
+
                 let address = if vanity_prefix.is_empty() {
                     create_privatekey_wallet()
                 } else {
                     create_vanity_wallet(&vanity_prefix)
                 };
-            
+
                 Config::set_current_account(address);
             }
-            
         }
     }
 }
@@ -145,7 +144,6 @@ fn gen_wallet_with_prefix(_vanity: Option<&str>) -> (FieldBytes, PrivateKeySigne
     (private_key_bytes, signer, address)
 }
 
-
 pub fn create_vanity_wallet(prefix: &str) -> Address {
     let prefix = prefix.trim().to_lowercase();
 
@@ -214,9 +212,6 @@ pub fn create_vanity_wallet(prefix: &str) -> Address {
 
     list_of_wallets().last().cloned().unwrap()
 }
-
-
-
 
 #[cfg(target_os = "macos")]
 mod macos {
@@ -321,7 +316,6 @@ mod macos {
             )
             .unwrap();
     }
-    
 
     fn simplify_dict(dict: &CFDictionary) -> HashMap<String, String> {
         unsafe {
@@ -354,7 +348,7 @@ mod macos {
 
 #[cfg(target_os = "linux")]
 mod linux_insecure {
-    use crate::disk::InsecurePrivateKeyStore;
+    use crate::disk::{DiskInterface, InsecurePrivateKeyStore};
 
     use super::*;
 
@@ -406,5 +400,4 @@ mod linux_insecure {
         store.add(*address, *key);
         store.save();
     }
-    
 }
