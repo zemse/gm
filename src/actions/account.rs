@@ -8,8 +8,13 @@ use alloy::{
     },
 };
 use clap::{command, Subcommand};
+use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{Password, Select};
 use rand::{rngs::OsRng, RngCore};
+use rayon::prelude::*;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 
@@ -33,7 +38,19 @@ impl Handle for AccountActions {
             }
             AccountActions::Create => {
                 println!("Creating a new account...");
-                let address = create_privatekey_wallet();
+
+                let vanity_prefix = inquire::Text::new("Enter vanity prefix (or leave blank):")
+                    .prompt()
+                    .unwrap_or_default()
+                    .trim()
+                    .to_lowercase();
+
+                let address = if vanity_prefix.is_empty() {
+                    create_privatekey_wallet()
+                } else {
+                    create_vanity_wallet(&vanity_prefix)
+                };
+
                 Config::set_current_account(address);
             }
         }
@@ -116,6 +133,84 @@ fn gen_wallet() -> (FieldBytes, PrivateKeySigner, Address) {
     let address = signer.address();
 
     (private_key_bytes, signer, address)
+}
+
+fn gen_wallet_with_prefix(_vanity: Option<&str>) -> (FieldBytes, PrivateKeySigner, Address) {
+    let private_key = SigningKey::random(&mut OsRng);
+    let private_key_bytes = private_key.to_bytes();
+    let signer = PrivateKeySigner::from(private_key);
+    let address = signer.address();
+
+    (private_key_bytes, signer, address)
+}
+
+pub fn create_vanity_wallet(prefix: &str) -> Address {
+    let prefix = prefix.trim().to_lowercase();
+
+    if prefix.is_empty() {
+        eprintln!("❌ Prefix cannot be empty. Use regular account creation instead.");
+        std::process::exit(1);
+    }
+
+    if !prefix.chars().all(|c| c.is_ascii_hexdigit()) {
+        eprintln!("❌ Invalid vanity prefix. Only hexadecimal characters (0-9, a-f) are allowed.");
+        std::process::exit(1);
+    }
+
+    // Warning if the prefix is likely to take a long time
+    if prefix.len() > 6 {
+        println!(
+            "⚠️  Warning: Prefix length is {}. This may take a *very* long time ⏳",
+            prefix.len()
+        );
+    } else if prefix.len() > 4 {
+        println!(
+            "Note: Searching for a prefix of length {} could take a while.",
+            prefix.len()
+        );
+    }
+
+    println!("🔍 Searching for address starting with: 0x{prefix}...");
+
+    let found = Arc::new(AtomicBool::new(false));
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_message("Generating...");
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} {msg}")
+            .expect("invalid spinner template"),
+    );
+    spinner.enable_steady_tick(Duration::from_millis(80));
+
+    let result = (0u64..u64::MAX).into_par_iter().find_any(|_| {
+        if found.load(Ordering::Relaxed) {
+            return false;
+        }
+
+        let (priv_bytes, _signer, address) = gen_wallet_with_prefix(Some(&prefix));
+        let addr_str = format!("{address}").to_lowercase();
+
+        if addr_str.trim_start_matches("0x").starts_with(&prefix) {
+            found.store(true, Ordering::Relaxed);
+
+            #[cfg(target_os = "macos")]
+            macos::store_wallet(&address, &priv_bytes);
+            #[cfg(target_os = "linux")]
+            linux_insecure::store_wallet(&address, &priv_bytes);
+
+            spinner.finish_with_message(format!("✅ Found: {address}"));
+            return true;
+        }
+
+        false
+    });
+
+    if result.is_none() {
+        spinner.abandon_with_message("❌ Vanity address not found. Try a simpler pattern.");
+        panic!("No address found.");
+    }
+
+    list_of_wallets().last().cloned().unwrap()
 }
 
 #[cfg(target_os = "macos")]
@@ -212,6 +307,16 @@ mod macos {
             })?)
     }
 
+    pub fn store_wallet(address: &Address, key: &FieldBytes) {
+        keychain()
+            .add_generic_password(
+                &address_to_service(address),
+                &address.to_string(),
+                key.as_slice(),
+            )
+            .unwrap();
+    }
+
     fn simplify_dict(dict: &CFDictionary) -> HashMap<String, String> {
         unsafe {
             let mut retmap = HashMap::new();
@@ -243,7 +348,7 @@ mod macos {
 
 #[cfg(target_os = "linux")]
 mod linux_insecure {
-    use crate::disk::InsecurePrivateKeyStore;
+    use crate::disk::{DiskInterface, InsecurePrivateKeyStore};
 
     use super::*;
 
@@ -287,5 +392,12 @@ mod linux_insecure {
             .find_by_address(&address)
             .expect("must find key in store");
         Ok(SigningKey::from_slice(key.as_slice()).map(PrivateKeySigner::from_signing_key)?)
+    }
+
+    pub fn store_wallet(address: &Address, key: &FieldBytes) {
+        // linux version
+        let mut store = InsecurePrivateKeyStore::load();
+        store.add(*address, *key);
+        store.save();
     }
 }
