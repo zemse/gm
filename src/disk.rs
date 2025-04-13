@@ -1,4 +1,4 @@
-use std::{fmt::Debug, fs, path::PathBuf, fmt};
+use std::{fmt, fmt::Debug, fs, path::PathBuf};
 
 use alloy::{hex, primitives::Address, signers::k256::FieldBytes};
 use directories::BaseDirs;
@@ -185,7 +185,6 @@ impl fmt::Display for AddressBookEntry {
         write!(f, "{} ({})", self.name, self.address)
     }
 }
-
 
 // TODO remove this once we have implemented a secure store for linux
 #[derive(Serialize, Deserialize, Debug, Default)]
