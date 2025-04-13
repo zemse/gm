@@ -1,13 +1,23 @@
+use std::io;
+
 use clap::Parser;
 use figlet_rs::FIGfont;
-use gm_cli::{actions::Action, disk::Config, network::NetworkStore, utils::Handle};
+use gm_cli::{actions::Action, disk::Config, network::NetworkStore, tui::Tui, utils::Handle};
 use inquire::Confirm;
 
-fn main() {
+#[tokio::main]
+async fn main() -> io::Result<()> {
     preload_hook();
 
     let cli = Cli::parse();
-    cli.handle();
+
+    if cli.is_empty() {
+        Tui::default().run().await?;
+    } else {
+        cli.handle();
+    }
+
+    Ok(())
 }
 
 /// Top level CLI struct
@@ -38,6 +48,10 @@ impl Cli {
         } else {
             Action::handle_optn_inquire(&self.action, ());
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.action.is_none()
     }
 }
 
