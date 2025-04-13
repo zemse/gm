@@ -12,13 +12,14 @@ use title::Title;
 use super::{controller::navigation::Navigation, traits::BorderedWidget};
 
 mod body;
+mod components;
 mod footer;
 mod title;
 
 pub struct View<'a> {
     pub exit: bool,
     pub eth_price: &'a Option<String>,
-    pub cursor: &'a Navigation,
+    pub navigation: &'a Navigation,
 }
 
 impl View<'_> {
@@ -28,7 +29,7 @@ impl View<'_> {
                 &View {
                     exit: self.exit,
                     eth_price: self.eth_price,
-                    cursor: self.cursor,
+                    navigation: self.navigation,
                 },
                 frame.area(),
             );
@@ -52,7 +53,7 @@ impl Widget for &View<'_> {
         Title.render(title_area, buf);
         Body {
             eth_price: self.eth_price,
-            cursor: self.cursor,
+            navigation: self.navigation,
         }
         .render(body_area, buf);
         Footer { exit: self.exit }.render(footer_area, buf);

@@ -9,7 +9,7 @@ use super::events::Event;
 pub struct Controller {
     pub exit: bool,
     pub eth_price: Option<String>,
-    pub cursor: Navigation,
+    pub navigation: Navigation,
 }
 impl Controller {
     pub fn exit(&self) -> bool {
@@ -25,28 +25,24 @@ impl Controller {
                         KeyCode::Char('q') => {
                             self.exit = true;
                         }
-                        KeyCode::Esc => {
-                            if !self.cursor.esc() {
-                                self.exit = true;
-                            }
-                        }
-                        KeyCode::Enter => {
-                            // go to next menu
-                            self.cursor.enter();
-                        }
+                        // KeyCode::Esc => {
+                        //     if !self.navigation.esc() {
+                        //         self.exit = true;
+                        //     }
+                        // }
+                        // KeyCode::Enter => {
+                        //     // go to next menu
+                        //     self.navigation.enter();
+                        // }
                         KeyCode::Up => {
-                            self.cursor.up();
+                            self.navigation.up();
                         }
                         KeyCode::Down => {
-                            self.cursor.down();
+                            self.navigation.down();
                         }
-                        KeyCode::Left => {
-                            self.cursor.left();
-                        }
-                        KeyCode::Right => {
-                            // TODO first implement what to do in the right side
-                            // self.cursor.right();
-                        }
+                        // TODO
+                        // KeyCode::Left => {}
+                        // KeyCode::Right => {}
                         _ => {}
                     }
                 }

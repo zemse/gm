@@ -73,14 +73,29 @@ pub enum Action {
     },
 }
 
-impl Inquire for Action {
-    fn inquire(_: &()) -> Option<Action> {
+impl Action {
+    pub fn get_menu() -> Vec<Action> {
         let mut options: Vec<Action> = Action::iter().collect();
 
         let setup_menu = get_setup_menu();
         if setup_menu.is_empty() {
             options.remove(0);
         }
+
+        options
+    }
+
+    pub fn get_menu_str() -> Vec<String> {
+        Action::get_menu()
+            .into_iter()
+            .map(|action| format!("{action}"))
+            .collect()
+    }
+}
+
+impl Inquire for Action {
+    fn inquire(_: &()) -> Option<Action> {
+        let options: Vec<Action> = Action::get_menu();
 
         inquire::Select::new("Choose subcommand:", options)
             .with_formatter(&|a| format!("{a}"))

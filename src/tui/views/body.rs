@@ -13,7 +13,7 @@ mod right;
 
 pub struct Body<'a> {
     pub eth_price: &'a Option<String>,
-    pub cursor: &'a Navigation,
+    pub navigation: &'a Navigation,
 }
 
 impl Widget for Body<'_> {
@@ -25,7 +25,7 @@ impl Widget for Body<'_> {
             Layout::horizontal([Constraint::Percentage(70), Constraint::Percentage(30)]);
         let [left_area, right_area] = horizontal_layout.areas(area);
         Left {
-            cursor: self.cursor,
+            page: self.navigation.current_page(),
         }
         .render_with_block(
             left_area,

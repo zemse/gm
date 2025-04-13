@@ -1,12 +1,8 @@
-use crate::tui::controller::navigation::Navigation;
-use ratatui::{
-    style::{Color, Modifier, Style},
-    text::Line,
-    widgets::{List, ListItem, Widget},
-};
+use crate::tui::{controller::navigation::Page, views::components::select::Select};
+use ratatui::widgets::Widget;
 
 pub struct Left<'a> {
-    pub cursor: &'a Navigation,
+    pub page: &'a Page,
 }
 
 impl Widget for Left<'_> {
@@ -14,25 +10,13 @@ impl Widget for Left<'_> {
     where
         Self: Sized,
     {
-        let idx = self.cursor.left_idx();
-        let items: Vec<ListItem> = self
-            .cursor
-            .left_list()
-            .into_iter()
-            .enumerate()
-            .map(|(i, action)| {
-                let content = Line::from(action);
-                let style = if Some(i) == idx {
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD | Modifier::REVERSED)
-                } else {
-                    Style::default()
-                };
-                ListItem::new(content).style(style)
-            })
-            .collect();
-
-        List::new(items).render(area, buf);
+        match self.page {
+            Page::MainMenu { list, cursor, .. } => Select {
+                list,
+                cursor: Some(*cursor),
+            }
+            .render(area, buf),
+            _ => unimplemented!(),
+        }
     }
 }

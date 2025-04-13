@@ -46,7 +46,7 @@ impl Tui {
             View {
                 exit: tui.controller.exit,
                 eth_price: &tui.controller.eth_price,
-                cursor: &tui.controller.cursor,
+                navigation: &tui.controller.navigation,
             }
             .draw(&mut terminal)?;
 
