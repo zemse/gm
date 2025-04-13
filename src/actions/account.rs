@@ -1,4 +1,3 @@
-use crate::disk::DiskInterface;
 use crate::{disk::Config, error::Error, impl_inquire_selection, utils::Handle};
 
 use alloy::{

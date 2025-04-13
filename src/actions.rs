@@ -9,18 +9,15 @@ pub mod transaction;
 
 use crate::utils::{Handle, Inquire};
 
-use crate::actions::send_message::send_message;
-use crate::disk::{AddressBook,DiskInterface};
+use crate::disk::{AddressBook, DiskInterface};
 use crate::network::{Network, NetworkStore};
 use account::AccountActions;
-use alloy::primitives::Address;
 use clap::Subcommand;
 use config::ConfigActions;
-use inquire::{Text,Select};
+use inquire::{Select, Text};
 use setup::{get_setup_menu, setup_inquire_and_handle};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-use tokio::runtime::Runtime;
 use transaction::TransactionActions;
 
 /// First subcommand
@@ -125,9 +122,12 @@ impl Handle for Action {
                 let to = match to {
                     Some(addr) if !addr.is_empty() => addr.clone(),
                     _ => {
-                        let choice = Select::new("Select recipient method:", vec!["Enter manually", "Choose from address book"])
-                            .prompt()
-                            .expect("❌ Must select a method");
+                        let choice = Select::new(
+                            "Select recipient method:",
+                            vec!["Enter manually", "Choose from address book"],
+                        )
+                        .prompt()
+                        .expect("❌ Must select a method");
                         if choice == "Enter manually" {
                             Text::new("Enter recipient address:")
                                 .prompt()
@@ -135,7 +135,7 @@ impl Handle for Action {
                         } else {
                             let address_book = AddressBook::load();
                             let addresses = address_book.list().to_vec();
-            
+
                             if addresses.is_empty() {
                                 println!("⚠️ Address book is empty, please enter manually.");
                                 Text::new("Enter recipient address:")
@@ -150,25 +150,21 @@ impl Handle for Action {
                         }
                     }
                 };
-            
+
                 let msg = match msg {
                     Some(m) if !m.is_empty() => m.clone(),
                     _ => Text::new("Enter message:")
-                            .prompt()
-                            .expect("❌ Must enter a message"),
+                        .prompt()
+                        .expect("❌ Must enter a message"),
                 };
-                
-            
+
                 let network = network.clone().or_else(|| {
                     let networks = NetworkStore::load().networks;
-                    Select::new("Select a network:", networks)
-                        .prompt()
-                        .ok()
+                    Select::new("Select a network:", networks).prompt().ok()
                 });
-            
+
                 send_message::handle_send_message(to, msg, network);
             }
-            
 
             Action::Config { action } => {
                 ConfigActions::handle_optn_inquire(action, ());

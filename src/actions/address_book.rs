@@ -1,6 +1,6 @@
-use std::fmt::Display;
-use qrcode::QrCode;
 use qrcode::render::unicode;
+use qrcode::QrCode;
+use std::fmt::Display;
 
 use crate::{
     disk::{AddressBook, AddressBookEntry, DiskInterface},
@@ -10,7 +10,7 @@ use crate::{
 
 use alloy::{hex::FromHex, primitives::Address};
 use clap::Subcommand;
-use inquire::{Text, Select};
+use inquire::Text;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 
@@ -44,7 +44,6 @@ impl Display for AddressBookActions {
         }
     }
 }
-
 
 impl Inquire for AddressBookActions {
     fn inquire(_: &()) -> Option<AddressBookActions> {
@@ -135,11 +134,11 @@ pub enum AddressBookViewActions {
         name: Option<String>,
     },
     #[command(alias = "qr")]
-    ShowQRCode { 
+    ShowQRCode {
         id: Option<usize>,
         address: Option<Address>,
         name: Option<String>,
-     },
+    },
 }
 
 pub struct AddressBookViewCarryOn {
@@ -254,14 +253,14 @@ impl Handle<AddressBookViewCarryOn> for AddressBookViewActions {
                         &name.as_ref().or(carry_on.name.as_ref()),
                     )
                     .expect("entry not found");
-            
-                let qr = QrCode::new(entry.address.to_string()).expect("Failed to generate QR code");
+
+                let qr =
+                    QrCode::new(entry.address.to_string()).expect("Failed to generate QR code");
                 let qr_display = qr.render::<unicode::Dense1x2>().quiet_zone(false).build();
-            
+
                 println!("\n{}'s Address:\n{}\n", entry.name, entry.address);
                 println!("QR Code:\n{}\n", qr_display);
             }
-            
         }
     }
 }

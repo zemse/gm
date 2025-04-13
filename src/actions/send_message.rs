@@ -1,13 +1,12 @@
 use crate::{actions::account::load_wallet, disk::Config, network::Network};
 use alloy::{
-    consensus::{SignableTransaction, Transaction, TxEip1559, TxEnvelope},
+    consensus::{SignableTransaction, TxEip1559, TxEnvelope},
     hex,
     network::TxSignerSync,
     primitives::{bytes::BytesMut, Address, Bytes, TxKind, U256},
     providers::{Provider, ProviderBuilder},
     rlp::Encodable,
 };
-use std::future::IntoFuture;
 use tokio::runtime::Runtime;
 
 /// Sends a message from the currently selected wallet to a recipient wallet.
@@ -45,10 +44,12 @@ pub async fn send_message(to: String, msg: String, network: Option<Network>) {
     let provider = ProviderBuilder::new().on_http(rpc_url);
 
     // Construct transaction
-    let mut tx = TxEip1559::default();
-    tx.to = TxKind::Call(to_address);
-    tx.input = calldata;
-    tx.value = U256::ZERO; // No ETH transfer, just a message
+    let mut tx = TxEip1559 {
+        to: TxKind::Call(to_address),
+        input: calldata,
+        value: U256::ZERO, // No ETH transfer, just a message
+        ..Default::default()
+    };
 
     // Fetch nonce asynchronously
     let nonce = provider
@@ -116,4 +117,3 @@ pub fn handle_send_message(to: String, msg: String, network: Option<Network>) {
     let rt = Runtime::new().expect("Failed to create runtime");
     rt.block_on(send_message(to, msg, network));
 }
-
