@@ -9,7 +9,7 @@ use ratatui::{
 };
 use title::Title;
 
-use super::traits::BorderedWidget;
+use super::{controller::navigation::Navigation, traits::BorderedWidget};
 
 mod body;
 mod footer;
@@ -18,6 +18,7 @@ mod title;
 pub struct View<'a> {
     pub exit: bool,
     pub eth_price: &'a Option<String>,
+    pub cursor: &'a Navigation,
 }
 
 impl View<'_> {
@@ -27,6 +28,7 @@ impl View<'_> {
                 &View {
                     exit: self.exit,
                     eth_price: self.eth_price,
+                    cursor: self.cursor,
                 },
                 frame.area(),
             );
@@ -50,6 +52,7 @@ impl Widget for &View<'_> {
         Title.render(title_area, buf);
         Body {
             eth_price: self.eth_price,
+            cursor: self.cursor,
         }
         .render(body_area, buf);
         Footer { exit: self.exit }.render(footer_area, buf);

@@ -1,9 +1,9 @@
+mod controller;
 mod events;
 mod traits;
 mod views;
 
 use std::{
-    io,
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc, Arc,
@@ -11,18 +11,17 @@ use std::{
     thread,
 };
 
-use crossterm::event::{KeyCode, KeyEventKind};
+use controller::Controller;
 use events::Event;
 use views::View;
 
 #[derive(Default)]
 pub struct Tui {
-    exit: bool,
-    eth_price: Option<String>,
+    controller: Controller,
 }
 
 impl Tui {
-    pub async fn run(mut self) -> io::Result<()> {
+    pub async fn run() -> crate::Result<()> {
         let (event_tr, event_rc) = mpsc::channel::<Event>();
         let shutdown = Arc::new(AtomicBool::new(false));
 
@@ -40,31 +39,19 @@ impl Tui {
 
         let mut terminal = ratatui::init();
 
-        while !self.exit {
-            // make any changes to App state
-            #[allow(clippy::single_match)]
-            match event_rc.recv().unwrap() {
-                Event::Input(key_event) => {
-                    if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Char('q')
-                    {
-                        self.exit = true
-                    }
-                    if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Char('e')
-                    {
-                        self.eth_price = Some("tempxx".to_string());
-                    }
-                }
-                Event::EthPriceUpdate(eth_price) => {
-                    self.eth_price = Some(eth_price);
-                }
-            };
+        let mut tui = Tui::default();
 
-            // then render the views
+        while !tui.controller.exit() {
+            // render the view based on the controller state
             View {
-                exit: self.exit,
-                eth_price: &self.eth_price,
+                exit: tui.controller.exit,
+                eth_price: &tui.controller.eth_price,
+                cursor: &tui.controller.cursor,
             }
             .draw(&mut terminal)?;
+
+            // make any changes to Controller state
+            tui.controller.handle(event_rc.recv()?);
         }
 
         // signal all the threads to exit

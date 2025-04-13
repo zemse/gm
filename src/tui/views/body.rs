@@ -1,3 +1,5 @@
+use crate::tui::controller::navigation::Navigation;
+
 use super::BorderedWidget;
 use left::Left;
 use ratatui::{
@@ -11,6 +13,7 @@ mod right;
 
 pub struct Body<'a> {
     pub eth_price: &'a Option<String>,
+    pub cursor: &'a Navigation,
 }
 
 impl Widget for Body<'_> {
@@ -21,7 +24,10 @@ impl Widget for Body<'_> {
         let horizontal_layout =
             Layout::horizontal([Constraint::Percentage(70), Constraint::Percentage(30)]);
         let [left_area, right_area] = horizontal_layout.areas(area);
-        Left.render_with_block(
+        Left {
+            cursor: self.cursor,
+        }
+        .render_with_block(
             left_area,
             buf,
             Block::bordered().border_type(BorderType::Plain),

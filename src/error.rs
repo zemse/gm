@@ -1,9 +1,10 @@
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[derive(Debug)]
 pub enum Error {
     InternalError(String),
-
     ParseFloatError(std::num::ParseFloatError),
-
+    IoError(std::io::Error),
     #[cfg(target_os = "macos")]
     AppleSecurityFrameworkError(security_framework::base::Error),
     InquireError(inquire::InquireError),
@@ -13,6 +14,7 @@ pub enum Error {
     YamlError(serde_yaml::Error),
     ReqwestError(reqwest::Error),
     SerdeJson(serde_json::Error),
+    MpscRecvError(std::sync::mpsc::RecvError),
 }
 
 impl From<&str> for Error {
@@ -24,6 +26,12 @@ impl From<&str> for Error {
 impl From<std::num::ParseFloatError> for Error {
     fn from(e: std::num::ParseFloatError) -> Self {
         Error::ParseFloatError(e)
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::IoError(e)
     }
 }
 
@@ -73,5 +81,11 @@ impl From<reqwest::Error> for Error {
 impl From<serde_json::Error> for Error {
     fn from(e: serde_json::Error) -> Self {
         Error::SerdeJson(e)
+    }
+}
+
+impl From<std::sync::mpsc::RecvError> for Error {
+    fn from(e: std::sync::mpsc::RecvError) -> Self {
+        Error::MpscRecvError(e)
     }
 }

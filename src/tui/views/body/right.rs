@@ -9,11 +9,13 @@ impl Widget for Right<'_> {
     where
         Self: Sized,
     {
-        Line::from(format!(
-            "EthPrice: {}",
-            self.eth_price.as_ref().unwrap_or(&"Loading...".to_string())
-        ))
-        .bold()
-        .render(area, buf);
+        let eth_price = if let Some(eth_price) = self.eth_price {
+            eth_price.clone()
+        } else {
+            "Loading...".to_string()
+        };
+        Line::from(format!("EthPrice: {eth_price}"))
+            .bold()
+            .render(area, buf);
     }
 }

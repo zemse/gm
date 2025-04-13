@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "gm_cli"  # This sets the library name (can be different from the package name)
+name = "gm_lib"  # This sets the library name (can be different from the package name)
 path = "src/lib.rs"  # The default is src/lib.rs, but you can change it if needed
 
 [[bin]]

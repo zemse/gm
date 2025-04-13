@@ -2,22 +2,30 @@ use super::Event;
 use serde::Deserialize;
 use std::{
     sync::{
-        Arc,
         atomic::{AtomicBool, Ordering},
         mpsc::Sender,
+        Arc,
     },
     thread,
     time::Duration,
 };
 
 pub async fn watch_eth_price_change(transmitter: Sender<Event>, shutdown_signal: Arc<AtomicBool>) {
+    let query_interval_milli = 2000;
+    let thread_sleep_duration_milli = 100;
+
+    let mut counter = query_interval_milli;
     while !shutdown_signal.load(Ordering::Relaxed) {
-        // Send GET request
-        if let Ok(price) = query_eth_price().await {
-            transmitter.send(Event::EthPriceUpdate(price)).unwrap();
+        if counter >= query_interval_milli {
+            // Send GET request
+            if let Ok(price) = query_eth_price().await {
+                transmitter.send(Event::EthPriceUpdate(price)).unwrap();
+            }
+            counter = 0;
         }
 
-        thread::sleep(Duration::from_secs(2));
+        counter += thread_sleep_duration_milli;
+        thread::sleep(Duration::from_millis(thread_sleep_duration_milli));
     }
 }
 

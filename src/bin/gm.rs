@@ -1,18 +1,16 @@
-use std::io;
-
 use clap::Parser;
 use figlet_rs::FIGfont;
-use gm_cli::{actions::Action, disk::Config, network::NetworkStore, tui::Tui, utils::Handle};
+use gm_lib::{actions::Action, disk::Config, network::NetworkStore, tui::Tui, utils::Handle};
 use inquire::Confirm;
 
 #[tokio::main]
-async fn main() -> io::Result<()> {
+async fn main() -> gm_lib::Result<()> {
     preload_hook();
 
     let cli = Cli::parse();
 
     if cli.is_empty() {
-        Tui::default().run().await?;
+        Tui::run().await?;
     } else {
         cli.handle();
     }
