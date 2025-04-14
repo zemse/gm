@@ -30,10 +30,10 @@ impl Controller {
                         //         self.exit = true;
                         //     }
                         // }
-                        // KeyCode::Enter => {
-                        //     // go to next menu
-                        //     self.navigation.enter();
-                        // }
+                        KeyCode::Enter => {
+                            // go to next menu
+                            self.navigation.enter();
+                        }
                         KeyCode::Up => {
                             self.navigation.up();
                         }

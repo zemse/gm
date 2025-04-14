@@ -45,9 +45,9 @@ impl Display for AddressBookActions {
     }
 }
 
-impl Inquire for AddressBookActions {
-    fn inquire(_: &()) -> Option<AddressBookActions> {
-        let options = vec![AddressBookActions::Create {
+impl AddressBookActions {
+    pub fn get_menu() -> Vec<AddressBookActions> {
+        vec![AddressBookActions::Create {
             address: None,
             name: None,
         }]
@@ -59,8 +59,13 @@ impl Inquire for AddressBookActions {
                 id: Some(index + 1),
             }),
         )
-        .collect::<Vec<AddressBookActions>>();
+        .collect()
+    }
+}
 
+impl Inquire for AddressBookActions {
+    fn inquire(_: &()) -> Option<AddressBookActions> {
+        let options = AddressBookActions::get_menu();
         inquire::Select::new("Select entry:", options).prompt().ok()
     }
 }

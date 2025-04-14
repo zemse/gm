@@ -1,17 +1,14 @@
-use crate::actions::Action;
+use crate::actions::{address_book::AddressBookActions, Action};
 
 pub enum Page {
     MainMenu {
         list: Vec<Action>,
         cursor: usize,
-        cursor_max: usize,
     },
     AddressBook {
-        full_list: Vec<String>,
-        list: Vec<String>,
+        full_list: Vec<AddressBookActions>,
         cursor: usize,
         search_string: String,
-        cursor_max: usize,
     },
     Input {
         prompt: String,
@@ -27,7 +24,7 @@ impl Default for Navigation {
         let list = Action::get_menu();
         Self {
             pages: vec![Page::MainMenu {
-                cursor_max: list.len(),
+                // cursor_max: list.len(),
                 list,
                 cursor: 0,
             }],
@@ -46,13 +43,20 @@ impl Navigation {
 
     pub fn up(&mut self) {
         match self.current_page_mut() {
-            Page::MainMenu {
-                cursor_max, cursor, ..
+            Page::MainMenu { list, cursor, .. } => {
+                let cursor_max = list.len();
+                *cursor = (*cursor + cursor_max - 1) % cursor_max;
             }
-            | Page::AddressBook {
-                cursor_max, cursor, ..
+            Page::AddressBook {
+                full_list,
+                cursor,
+                search_string,
             } => {
-                *cursor = (*cursor + *cursor_max) % (*cursor_max + 1);
+                let cursor_max = full_list
+                    .iter()
+                    .filter(|entry| format!("{entry}").contains(search_string.as_str()))
+                    .count();
+                *cursor = (*cursor + cursor_max - 1) % cursor_max;
             }
             _ => {}
         }
@@ -60,15 +64,39 @@ impl Navigation {
 
     pub fn down(&mut self) {
         match self.current_page_mut() {
-            Page::MainMenu {
-                cursor_max, cursor, ..
+            Page::MainMenu { list, cursor, .. } => {
+                let cursor_max = list.len();
+                *cursor = (*cursor + 1) % cursor_max;
             }
-            | Page::AddressBook {
-                cursor_max, cursor, ..
+            Page::AddressBook {
+                full_list,
+                cursor,
+                search_string,
             } => {
-                *cursor = (*cursor + 1) % (*cursor_max + 1);
+                let cursor_max = full_list
+                    .iter()
+                    .filter(|entry| format!("{entry}").contains(search_string.as_str()))
+                    .count();
+                *cursor = (*cursor + 1) % cursor_max;
             }
             _ => {}
+        }
+    }
+
+    pub fn enter(&mut self) {
+        match self.current_page() {
+            Page::MainMenu { list, cursor, .. } => match &list[*cursor] {
+                Action::AddressBook { .. } => {
+                    let full_list = AddressBookActions::get_menu();
+                    self.pages.push(Page::AddressBook {
+                        full_list,
+                        cursor: 0,
+                        search_string: String::new(),
+                    });
+                }
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
         }
     }
 }

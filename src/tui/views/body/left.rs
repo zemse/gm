@@ -1,4 +1,7 @@
-use crate::tui::{controller::navigation::Page, views::components::select::Select};
+use crate::{
+    actions::address_book::AddressBookActions,
+    tui::{controller::navigation::Page, views::components::select::Select},
+};
 use ratatui::widgets::Widget;
 
 pub struct Left<'a> {
@@ -13,6 +16,18 @@ impl Widget for Left<'_> {
         match self.page {
             Page::MainMenu { list, cursor, .. } => Select {
                 list,
+                cursor: Some(*cursor),
+            }
+            .render(area, buf),
+            Page::AddressBook {
+                full_list,
+                cursor,
+                search_string,
+            } => Select {
+                list: &full_list
+                    .iter()
+                    .filter(|item| item.to_string().contains(search_string))
+                    .collect::<Vec<&AddressBookActions>>(),
                 cursor: Some(*cursor),
             }
             .render(area, buf),
