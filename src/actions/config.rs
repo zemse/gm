@@ -11,7 +11,7 @@ use crate::{
     utils::Handle,
 };
 
-#[derive(Subcommand, EnumIter)]
+#[derive(Subcommand, Debug, EnumIter)]
 pub enum ConfigActions {
     #[command(alias = "alchemy")]
     AlchemyApiKey { key: Option<String> },

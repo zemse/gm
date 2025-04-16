@@ -23,12 +23,20 @@ impl Controller<'_> {
                 // handle all the navigation and text input captures
                 self.navigation.handle(key_event);
 
+                if self.navigation.pages.is_empty() {
+                    self.exit = true;
+                }
+
                 // check if we should exit on 'q' press
                 if key_event.kind == KeyEventKind::Press {
-                    if let KeyCode::Char(char) = key_event.code {
-                        if self.navigation.text_input.is_none() && char == 'q' {
-                            self.exit = true;
+                    #[allow(clippy::single_match)]
+                    match key_event.code {
+                        KeyCode::Char(char) => {
+                            if self.navigation.text_input.is_none() && char == 'q' {
+                                self.exit = true;
+                            }
                         }
+                        _ => {}
                     }
                 }
             }

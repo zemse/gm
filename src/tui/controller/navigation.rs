@@ -1,9 +1,10 @@
-use std::marker::PhantomData;
-
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use std::marker::PhantomData;
+use strum_macros::Display;
 
 use crate::actions::{address_book::AddressBookActions, Action};
 
+#[derive(Display, Debug)]
 pub enum Page {
     MainMenu {
         list: Vec<Action>,
@@ -18,8 +19,10 @@ pub enum Page {
         input: String,
     },
 }
+
+#[derive(Debug)]
 pub struct Navigation<'a> {
-    pages: Vec<Page>,
+    pub pages: Vec<Page>,
     pub text_input: Option<String>,
     _marker: PhantomData<&'a ()>,
 }
@@ -50,10 +53,12 @@ impl Navigation<'_> {
                     }
                 }
                 KeyCode::Esc => {
-                    if self.text_input.is_none() && self.pages.len() > 1 {
+                    if self.is_text_input_user_typing() {
+                        self.text_input = None;
+                    } else {
                         self.pages.pop();
+                        self.text_input = None;
                     }
-                    self.text_input = None;
                 }
                 KeyCode::Enter => {
                     // go to next menu
@@ -71,22 +76,6 @@ impl Navigation<'_> {
                 _ => {}
             }
         }
-    }
-
-    pub fn current_page(&self) -> &Page {
-        self.pages.last().unwrap()
-    }
-
-    pub fn enable_text_input(&mut self) {
-        self.text_input = Some(String::new());
-    }
-
-    pub fn disable_text_input(&mut self) {
-        self.text_input = None;
-    }
-
-    pub fn current_page_mut(&mut self) -> &mut Page {
-        self.pages.last_mut().unwrap()
     }
 
     pub fn up(&mut self) {
@@ -134,19 +123,55 @@ impl Navigation<'_> {
     }
 
     pub fn enter(&mut self) {
-        match self.current_page() {
-            Page::MainMenu { list, cursor, .. } => match &list[*cursor] {
-                Action::AddressBook { .. } => {
-                    let full_list = AddressBookActions::get_menu();
-                    self.pages.push(Page::AddressBook {
-                        full_list,
-                        cursor: 0,
-                    });
-                    self.text_input = Some(String::new());
-                }
+        if let Some(current_page) = self.current_page() {
+            match current_page {
+                Page::MainMenu { list, cursor, .. } => match &list[*cursor] {
+                    Action::AddressBook { .. } => {
+                        let full_list = AddressBookActions::get_menu();
+                        self.pages.push(Page::AddressBook {
+                            full_list,
+                            cursor: 0,
+                        });
+                        self.text_input = Some(String::new());
+                    }
+                    _ => unimplemented!(),
+                },
                 _ => unimplemented!(),
-            },
-            _ => unimplemented!(),
+            }
+        } else {
+            unreachable!()
         }
+    }
+
+    pub fn is_main_menu(&self) -> bool {
+        self.pages.len() == 1
+    }
+
+    pub fn current_page(&self) -> Option<&Page> {
+        self.pages.last()
+    }
+
+    pub fn enable_text_input(&mut self) {
+        self.text_input = Some(String::new());
+    }
+
+    pub fn disable_text_input(&mut self) {
+        self.text_input = None;
+    }
+
+    pub fn is_text_input_active(&self) -> bool {
+        self.text_input.is_some()
+    }
+
+    pub fn is_text_input_user_typing(&self) -> bool {
+        self.text_input
+            .as_ref()
+            .map(|s| s.len())
+            .unwrap_or_default()
+            != 0
+    }
+
+    pub fn current_page_mut(&mut self) -> &mut Page {
+        self.pages.last_mut().unwrap()
     }
 }

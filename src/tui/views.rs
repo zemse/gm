@@ -56,6 +56,10 @@ impl Widget for &View<'_> {
             navigation: self.navigation,
         }
         .render(body_area, buf);
-        Footer { exit: self.exit }.render(footer_area, buf);
+        Footer {
+            exit: self.exit,
+            navigation: self.navigation,
+        }
+        .render(footer_area, buf);
     }
 }

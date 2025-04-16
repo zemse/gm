@@ -14,7 +14,7 @@ use inquire::Text;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum AddressBookActions {
     #[command(alias = "new")]
     Create {

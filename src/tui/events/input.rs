@@ -14,13 +14,19 @@ pub fn watch_input_events(tx: mpsc::Sender<super::Event>, shutdown_signal: Arc<A
         match crossterm::event::read().unwrap() {
             crossterm::event::Event::Key(key_event) => {
                 tx.send(super::Event::Input(key_event)).unwrap();
-                // When we get `q` or `Esc` we are not sure if the app is
-                // exiting as these keys might be useful in the application.
-                // The `shutdown_signal` takes a while to be updated on the
-                // main thread.
+                // When we want to quit from our main thread, we want to
+                // gracefully quit the this thread, however it is blocked on the
+                // `event::read()` above. It needs a key press to be able to
+                // check the shutdown signal.
+                //
+                // Exit is only triggered by `q` and `ESC` keys. Hence we are
+                // adding a hacky solution to the above problem. The
+                // `shutdown_signal` takes a while to be updated on the main
+                // thread, so we wait for a moment before letting the execution
+                // go to the while loop condition check.
                 if key_event.code == KeyCode::Char('q') || key_event.code == KeyCode::Esc {
                     // TODO improve this as this is a hacky solution
-                    thread::sleep(std::time::Duration::from_millis(50));
+                    thread::sleep(std::time::Duration::from_millis(10));
                 }
             }
             _ => {}

@@ -18,7 +18,7 @@ use std::time::Duration;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 
-#[derive(Subcommand, Display, EnumIter)]
+#[derive(Subcommand, Display, Debug, EnumIter)]
 pub enum AccountActions {
     #[command(alias = "ls")]
     List,

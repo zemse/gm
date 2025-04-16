@@ -26,7 +26,7 @@ use tokio::runtime::Runtime;
 ///
 /// List - `gm tx ls`
 /// Create - `gm tx new`
-#[derive(Subcommand, Display, EnumIter)]
+#[derive(Subcommand, Display, Debug, EnumIter)]
 #[allow(clippy::large_enum_variant)]
 pub enum TransactionActions {
     #[command(alias = "new")]

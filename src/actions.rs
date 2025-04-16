@@ -24,7 +24,7 @@ use transaction::TransactionActions;
 ///
 /// Accounts - `gm acc`
 /// Transactions - `gm tx`
-#[derive(Subcommand, Display, EnumIter)]
+#[derive(Subcommand, Display, Debug, EnumIter)]
 #[allow(clippy::large_enum_variant)]
 pub enum Action {
     #[command(hide = true)]
