@@ -13,7 +13,7 @@ mod right;
 
 pub struct Body<'a> {
     pub eth_price: &'a Option<String>,
-    pub navigation: &'a Navigation,
+    pub navigation: &'a Navigation<'a>,
 }
 
 impl Widget for Body<'_> {
@@ -26,6 +26,8 @@ impl Widget for Body<'_> {
         let [left_area, right_area] = horizontal_layout.areas(area);
         Left {
             page: self.navigation.current_page(),
+            text_input: self.navigation.text_input.clone(),
+            _marker: std::marker::PhantomData,
         }
         .render_with_block(
             left_area,

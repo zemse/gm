@@ -19,7 +19,7 @@ mod title;
 pub struct View<'a> {
     pub exit: bool,
     pub eth_price: &'a Option<String>,
-    pub navigation: &'a Navigation,
+    pub navigation: &'a Navigation<'a>,
 }
 
 impl View<'_> {

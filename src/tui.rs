@@ -16,11 +16,11 @@ use events::Event;
 use views::View;
 
 #[derive(Default)]
-pub struct Tui {
-    controller: Controller,
+pub struct Tui<'a> {
+    controller: Controller<'a>,
 }
 
-impl Tui {
+impl Tui<'_> {
     pub async fn run() -> crate::Result<()> {
         let (event_tr, event_rc) = mpsc::channel::<Event>();
         let shutdown = Arc::new(AtomicBool::new(false));

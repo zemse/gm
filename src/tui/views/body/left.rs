@@ -1,11 +1,15 @@
-use crate::{
-    actions::address_book::AddressBookActions,
-    tui::{controller::navigation::Page, views::components::select::Select},
+use std::marker::PhantomData;
+
+use crate::tui::{
+    controller::navigation::Page,
+    views::components::{filter_select::FilterSelect, select::Select},
 };
 use ratatui::widgets::Widget;
 
 pub struct Left<'a> {
     pub page: &'a Page,
+    pub text_input: Option<String>,
+    pub _marker: PhantomData<&'a ()>,
 }
 
 impl Widget for Left<'_> {
@@ -19,18 +23,14 @@ impl Widget for Left<'_> {
                 cursor: Some(*cursor),
             }
             .render(area, buf),
-            Page::AddressBook {
+
+            Page::AddressBook { full_list, cursor } => FilterSelect {
                 full_list,
-                cursor,
-                search_string,
-            } => Select {
-                list: &full_list
-                    .iter()
-                    .filter(|item| item.to_string().contains(search_string))
-                    .collect::<Vec<&AddressBookActions>>(),
                 cursor: Some(*cursor),
+                search_string: &self.text_input.unwrap_or_default(),
             }
             .render(area, buf),
+
             _ => unimplemented!(),
         }
     }

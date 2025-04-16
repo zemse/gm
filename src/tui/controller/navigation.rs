@@ -1,3 +1,7 @@
+use std::marker::PhantomData;
+
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+
 use crate::actions::{address_book::AddressBookActions, Action};
 
 pub enum Page {
@@ -8,33 +12,76 @@ pub enum Page {
     AddressBook {
         full_list: Vec<AddressBookActions>,
         cursor: usize,
-        search_string: String,
     },
     Input {
         prompt: String,
         input: String,
     },
 }
-pub struct Navigation {
+pub struct Navigation<'a> {
     pages: Vec<Page>,
+    pub text_input: Option<String>,
+    _marker: PhantomData<&'a ()>,
 }
 
-impl Default for Navigation {
+impl Default for Navigation<'_> {
     fn default() -> Self {
         let list = Action::get_menu();
         Self {
-            pages: vec![Page::MainMenu {
-                // cursor_max: list.len(),
-                list,
-                cursor: 0,
-            }],
+            pages: vec![Page::MainMenu { list, cursor: 0 }],
+            text_input: None,
+            _marker: PhantomData,
         }
     }
 }
 
-impl Navigation {
+impl Navigation<'_> {
+    pub fn handle(&mut self, key_event: KeyEvent) {
+        if key_event.kind == KeyEventKind::Press {
+            match key_event.code {
+                KeyCode::Char(char) => {
+                    if let Some(text_input) = self.text_input.as_mut() {
+                        text_input.push(char);
+                    }
+                }
+                KeyCode::Backspace => {
+                    if let Some(text_input) = self.text_input.as_mut() {
+                        text_input.pop();
+                    }
+                }
+                // KeyCode::Esc => {
+                //     if !self.navigation.esc() {
+                //         self.exit = true;
+                //     }
+                // }
+                KeyCode::Enter => {
+                    // go to next menu
+                    self.enter();
+                }
+                KeyCode::Up => {
+                    self.up();
+                }
+                KeyCode::Down => {
+                    self.down();
+                }
+                // TODO
+                // KeyCode::Left => {}
+                // KeyCode::Right => {}
+                _ => {}
+            }
+        }
+    }
+
     pub fn current_page(&self) -> &Page {
         self.pages.last().unwrap()
+    }
+
+    pub fn enable_text_input(&mut self) {
+        self.text_input = Some(String::new());
+    }
+
+    pub fn disable_text_input(&mut self) {
+        self.text_input = None;
     }
 
     pub fn current_page_mut(&mut self) -> &mut Page {
@@ -42,20 +89,21 @@ impl Navigation {
     }
 
     pub fn up(&mut self) {
+        let search_string = self.text_input.clone();
         match self.current_page_mut() {
             Page::MainMenu { list, cursor, .. } => {
                 let cursor_max = list.len();
                 *cursor = (*cursor + cursor_max - 1) % cursor_max;
             }
-            Page::AddressBook {
-                full_list,
-                cursor,
-                search_string,
-            } => {
-                let cursor_max = full_list
-                    .iter()
-                    .filter(|entry| format!("{entry}").contains(search_string.as_str()))
-                    .count();
+            Page::AddressBook { full_list, cursor } => {
+                let cursor_max = if let Some(search_string) = search_string {
+                    full_list
+                        .iter()
+                        .filter(|entry| format!("{entry}").contains(search_string.as_str()))
+                        .count()
+                } else {
+                    full_list.len()
+                };
                 *cursor = (*cursor + cursor_max - 1) % cursor_max;
             }
             _ => {}
@@ -63,20 +111,21 @@ impl Navigation {
     }
 
     pub fn down(&mut self) {
+        let search_string = self.text_input.clone();
         match self.current_page_mut() {
             Page::MainMenu { list, cursor, .. } => {
                 let cursor_max = list.len();
                 *cursor = (*cursor + 1) % cursor_max;
             }
-            Page::AddressBook {
-                full_list,
-                cursor,
-                search_string,
-            } => {
-                let cursor_max = full_list
-                    .iter()
-                    .filter(|entry| format!("{entry}").contains(search_string.as_str()))
-                    .count();
+            Page::AddressBook { full_list, cursor } => {
+                let cursor_max = if let Some(search_string) = search_string {
+                    full_list
+                        .iter()
+                        .filter(|entry| format!("{entry}").contains(search_string.as_str()))
+                        .count()
+                } else {
+                    full_list.len()
+                };
                 *cursor = (*cursor + 1) % cursor_max;
             }
             _ => {}
@@ -91,8 +140,8 @@ impl Navigation {
                     self.pages.push(Page::AddressBook {
                         full_list,
                         cursor: 0,
-                        search_string: String::new(),
                     });
+                    self.text_input = Some(String::new());
                 }
                 _ => unimplemented!(),
             },
