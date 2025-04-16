@@ -49,11 +49,12 @@ impl Navigation<'_> {
                         text_input.pop();
                     }
                 }
-                // KeyCode::Esc => {
-                //     if !self.navigation.esc() {
-                //         self.exit = true;
-                //     }
-                // }
+                KeyCode::Esc => {
+                    if self.text_input.is_none() && self.pages.len() > 1 {
+                        self.pages.pop();
+                    }
+                    self.text_input = None;
+                }
                 KeyCode::Enter => {
                     // go to next menu
                     self.enter();
