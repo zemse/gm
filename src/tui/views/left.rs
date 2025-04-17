@@ -65,7 +65,36 @@ impl Widget for Left<'_> {
                     ],
                 }
                 .render(area, buf),
-                _ => unimplemented!(),
+
+                Page::AddressBookDisplayEntry {
+                    cursor,
+                    name,
+                    address,
+                    error,
+                    ..
+                } => Form {
+                    items: vec![
+                        FormItem::Heading("Edit AddressBook entry"),
+                        FormItem::InputBox {
+                            focus: *cursor == 0,
+                            label: &"name".to_string(),
+                            text: name,
+                        },
+                        FormItem::InputBox {
+                            focus: *cursor == 1,
+                            label: &"address".to_string(),
+                            text: address,
+                        },
+                        FormItem::Button {
+                            focus: *cursor == 2,
+                            label: &"Save".to_string(),
+                        },
+                        FormItem::Error {
+                            label: &error.as_ref(),
+                        },
+                    ],
+                }
+                .render(area, buf),
             }
         }
     }

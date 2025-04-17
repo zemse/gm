@@ -1,4 +1,3 @@
-use alloy::primitives::Address;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use std::marker::PhantomData;
 use strum_macros::Display;
@@ -27,10 +26,10 @@ pub enum Page {
     },
     AddressBookDisplayEntry {
         cursor: usize,
-        edit: bool,
         id: usize,
         name: String,
-        address: Address,
+        address: String,
+        error: Option<String>,
     },
 }
 
@@ -94,12 +93,17 @@ impl Navigation<'_> {
                     name,
                     address,
                     ..
+                }
+                | Page::AddressBookDisplayEntry {
+                    cursor,
+                    name,
+                    address,
+                    ..
                 } => match cursor {
                     0 => Some(name),
                     1 => Some(address),
                     _ => None,
                 },
-                Page::AddressBookDisplayEntry { .. } => todo!(),
                 _ => None,
             }
         } else {
@@ -116,12 +120,17 @@ impl Navigation<'_> {
                     name,
                     address,
                     ..
+                }
+                | Page::AddressBookDisplayEntry {
+                    cursor,
+                    name,
+                    address,
+                    ..
                 } => match cursor {
                     0 => Some(name),
                     1 => Some(address),
                     _ => None,
                 },
-                Page::AddressBookDisplayEntry { .. } => todo!(),
                 _ => None,
             }
         } else {
@@ -151,11 +160,11 @@ impl Navigation<'_> {
                     };
                     *cursor = (*cursor + cursor_max - 1) % cursor_max;
                 }
-                Page::AddressBookCreateNewEntry { cursor, .. } => {
+                Page::AddressBookCreateNewEntry { cursor, .. }
+                | Page::AddressBookDisplayEntry { cursor, .. } => {
                     let cursor_max = 3;
                     *cursor = (*cursor + cursor_max - 1) % cursor_max;
                 }
-                _ => {}
             }
         }
     }
@@ -182,11 +191,11 @@ impl Navigation<'_> {
                     };
                     *cursor = (*cursor + 1) % cursor_max;
                 }
-                Page::AddressBookCreateNewEntry { cursor, .. } => {
+                Page::AddressBookCreateNewEntry { cursor, .. }
+                | Page::AddressBookDisplayEntry { cursor, .. } => {
                     let cursor_max = 3;
                     *cursor = (*cursor + 1) % cursor_max;
                 }
-                _ => {}
             }
         }
     }
@@ -223,10 +232,10 @@ impl Navigation<'_> {
                                 .expect("entry not found");
                             Page::AddressBookDisplayEntry {
                                 cursor: 0,
-                                edit: false,
                                 id,
                                 name: entry.name,
-                                address: entry.address,
+                                address: entry.address.to_string(),
+                                error: None,
                             }
                         }
                     };
@@ -267,7 +276,43 @@ impl Navigation<'_> {
                         *cursor += 1;
                     }
                 }
-                _ => unimplemented!("{current_page:?}"),
+
+                Page::AddressBookDisplayEntry {
+                    cursor,
+                    id,
+                    name,
+                    address,
+                    error,
+                } => {
+                    if *cursor == 2 {
+                        if name.is_empty() {
+                            *error =
+                                Some("Please enter name, you cannot leave it empty".to_string());
+                        } else {
+                            let mut address_book = AddressBook::load();
+
+                            let result =
+                                address.parse().map_err(crate::Error::from).map(|address| {
+                                    address_book.update(
+                                        *id,
+                                        AddressBookEntry {
+                                            name: name.clone(),
+                                            address,
+                                        },
+                                    );
+                                });
+                            if let Err(e) = result {
+                                *error = Some(format!("{e:?}"));
+                            } else {
+                                self.pages.pop();
+                                self.pages.pop();
+                                self.enter(); // trigger re-generation for the previous page
+                            }
+                        }
+                    } else {
+                        *cursor += 1;
+                    }
+                }
             }
         } else {
             unreachable!()
