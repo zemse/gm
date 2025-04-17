@@ -15,13 +15,11 @@ impl Widget for Footer<'_> {
         let footer_text = if self.exit {
             "exiting please wait..."
         } else if self.navigation.is_main_menu() {
-            "press 'q' or [ESC] to exit"
-        } else if self.navigation.is_text_input_user_typing() {
-            "press [ESC] to clear text input"
-        } else if self.navigation.is_text_input_active() {
-            "press [ESC] to go back"
+            "press control c or [ESC] to exit"
+        // } else if self.navigation.is_text_input_user_typing() {
+        //     "press control c to quit | press [ESC] to clear text input"
         } else {
-            "press 'q' to exit | press [ESC] to go back"
+            "press control c to quit | press [ESC] to go back"
         };
         Line::from(footer_text).render(
             Rect {

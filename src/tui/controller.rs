@@ -1,6 +1,6 @@
 pub mod navigation;
 
-use crossterm::event::{KeyCode, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
 use navigation::Navigation;
 
 use super::events::Event;
@@ -32,7 +32,11 @@ impl Controller<'_> {
                     #[allow(clippy::single_match)]
                     match key_event.code {
                         KeyCode::Char(char) => {
-                            if self.navigation.text_input().is_none() && char == 'q' {
+                            if char == 'q' && self.navigation.text_input().is_none() {
+                                self.exit = true;
+                            }
+
+                            if char == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
                                 self.exit = true;
                             }
                         }
