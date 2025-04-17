@@ -257,6 +257,10 @@ impl Navigation<'_> {
                                     });
                             if let Err(e) = result {
                                 *error = Some(format!("{e:?}"));
+                            } else {
+                                self.pages.pop();
+                                self.pages.pop();
+                                self.enter(); // trigger re-generation for the previous page
                             }
                         }
                     } else {
