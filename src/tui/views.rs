@@ -58,7 +58,6 @@ impl Widget for &View<'_> {
         Title.render(title_area, buf);
         Left {
             page: self.navigation.current_page(),
-            text_input: self.navigation.text_input.clone(),
             _marker: std::marker::PhantomData,
         }
         .render_with_block(

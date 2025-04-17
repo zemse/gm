@@ -24,3 +24,7 @@ impl<T: Widget> BorderedWidget for T {
         self.render(inner_area, buf);
     }
 }
+
+pub trait WidgetHeight {
+    fn height_used(&self, area: ratatui::prelude::Rect) -> u16;
+}

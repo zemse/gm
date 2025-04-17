@@ -95,7 +95,9 @@ impl Handle for AddressBookActions {
                     panic!("Name must be at least 1 characters long");
                 }
 
-                AddressBook::load().add(AddressBookEntry { name, address });
+                AddressBook::load()
+                    .add(AddressBookEntry { name, address })
+                    .unwrap();
                 println!("Entry added to address book");
             }
             AddressBookActions::View { id, address, name } => {

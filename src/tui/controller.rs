@@ -32,7 +32,7 @@ impl Controller<'_> {
                     #[allow(clippy::single_match)]
                     match key_event.code {
                         KeyCode::Char(char) => {
-                            if self.navigation.text_input.is_none() && char == 'q' {
+                            if self.navigation.text_input().is_none() && char == 'q' {
                                 self.exit = true;
                             }
                         }

@@ -82,9 +82,23 @@ pub struct AddressBookEntry {
 }
 
 impl AddressBook {
-    pub fn add(&mut self, entry: AddressBookEntry) {
+    pub fn add(&mut self, entry: AddressBookEntry) -> Result<(), Error> {
+        if self.find_by_name(&entry.name).is_some() {
+            return Err(Error::AddressBook(
+                "Name already exists in the addressbook".into(),
+            ));
+        }
+
+        if self.find_by_address(&entry.address).is_some() {
+            return Err(Error::AddressBook(
+                "Address already exists in the addressbook".into(),
+            ));
+        }
+
         self.entries.push(entry);
         self.save();
+
+        Ok(())
     }
 
     pub fn remove(&mut self, index: usize) {

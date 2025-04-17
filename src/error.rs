@@ -1,10 +1,14 @@
+use std::fmt::Display;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    AddressBook(String),
     InternalError(String),
     ParseFloatError(std::num::ParseFloatError),
     IoError(std::io::Error),
+    FromHexError(alloy::hex::FromHexError),
     #[cfg(target_os = "macos")]
     AppleSecurityFrameworkError(security_framework::base::Error),
     InquireError(inquire::InquireError),
@@ -17,6 +21,15 @@ pub enum Error {
     MpscRecvError(std::sync::mpsc::RecvError),
 }
 
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::AddressBook(s) => write!(f, "Error from AddressBook: {s}"),
+            _ => write!(f, "{self:?}"),
+        }
+    }
+}
+
 impl From<&str> for Error {
     fn from(e: &str) -> Self {
         Error::InternalError(e.to_string())
@@ -26,6 +39,12 @@ impl From<&str> for Error {
 impl From<std::num::ParseFloatError> for Error {
     fn from(e: std::num::ParseFloatError) -> Self {
         Error::ParseFloatError(e)
+    }
+}
+
+impl From<alloy::hex::FromHexError> for Error {
+    fn from(e: alloy::hex::FromHexError) -> Self {
+        Error::FromHexError(e)
     }
 }
 

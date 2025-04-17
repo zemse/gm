@@ -6,9 +6,10 @@ use crate::tui::{
 };
 use ratatui::widgets::Widget;
 
+use super::components::form::{Form, FormItem};
+
 pub struct Left<'a> {
     pub page: Option<&'a Page>,
-    pub text_input: Option<String>,
     pub _marker: PhantomData<&'a ()>,
 }
 
@@ -25,13 +26,45 @@ impl Widget for Left<'_> {
                 }
                 .render(area, buf),
 
-                Page::AddressBook { full_list, cursor } => FilterSelect {
+                Page::AddressBook {
+                    full_list,
+                    cursor,
+                    search_string,
+                } => FilterSelect {
                     full_list,
                     cursor: Some(*cursor),
-                    search_string: &self.text_input.unwrap_or_default(),
+                    search_string,
                 }
                 .render(area, buf),
 
+                Page::AddressBookCreateNewEntry {
+                    cursor,
+                    name,
+                    address,
+                    error,
+                } => Form {
+                    items: vec![
+                        FormItem::Heading("Create New AddressBook entry"),
+                        FormItem::InputBox {
+                            focus: *cursor == 0,
+                            label: &"name".to_string(),
+                            text: name,
+                        },
+                        FormItem::InputBox {
+                            focus: *cursor == 1,
+                            label: &"address".to_string(),
+                            text: address,
+                        },
+                        FormItem::Button {
+                            focus: *cursor == 2,
+                            label: &"Save".to_string(),
+                        },
+                        FormItem::Error {
+                            label: &error.as_ref(),
+                        },
+                    ],
+                }
+                .render(area, buf),
                 _ => unimplemented!(),
             }
         }
