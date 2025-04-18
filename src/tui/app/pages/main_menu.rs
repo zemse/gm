@@ -10,7 +10,11 @@ use crate::{
     },
 };
 
-use super::address_book::AddressBookPage;
+use super::{
+    account::AccountPage, address_book::AddressBookPage, assets::AssetsPage, config::ConfigPage,
+    send_message::SendMessagePage, sign_message::SignMessagePage, transaction::TransactionPage,
+    Page,
+};
 
 pub struct MainMenuPage {
     cursor: usize,
@@ -46,12 +50,26 @@ impl Component for MainMenuPage {
                         self.cursor = (self.cursor + 1) % cursor_max;
                     }
                     KeyCode::Enter => match &self.list[self.cursor] {
+                        Action::Setup => todo!(),
                         Action::AddressBook { .. } => {
                             result
                                 .page_inserts
-                                .push(super::Page::AddressBook(AddressBookPage::default()));
+                                .push(Page::AddressBook(AddressBookPage::default()));
                         }
-                        _ => unimplemented!(),
+                        Action::Assets => result.page_inserts.push(Page::Assets(AssetsPage)),
+                        Action::Account { .. } => {
+                            result.page_inserts.push(Page::Account(AccountPage));
+                        }
+                        Action::Transaction { .. } => {
+                            result.page_inserts.push(Page::Transaction(TransactionPage))
+                        }
+                        Action::SignMessage { .. } => {
+                            result.page_inserts.push(Page::SignMessage(SignMessagePage))
+                        }
+                        Action::SendMessage { .. } => {
+                            result.page_inserts.push(Page::SendMessage(SendMessagePage))
+                        }
+                        Action::Config { .. } => result.page_inserts.push(Page::Config(ConfigPage)),
                     },
                     _ => {}
                 }
