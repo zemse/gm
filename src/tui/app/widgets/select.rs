@@ -8,7 +8,7 @@ use ratatui::{
 
 pub struct Select<'a, T: Display> {
     pub list: &'a Vec<T>,
-    pub cursor: Option<usize>,
+    pub cursor: Option<&'a usize>,
 }
 
 impl<T: Display> Widget for Select<'_, T> {
@@ -23,7 +23,7 @@ impl<T: Display> Widget for Select<'_, T> {
             .enumerate()
             .map(|(i, member)| {
                 let content = Line::from(format!("{member}"));
-                let style = if Some(i) == idx {
+                let style = if idx == Some(&i) {
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD | Modifier::REVERSED)

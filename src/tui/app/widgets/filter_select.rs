@@ -10,7 +10,7 @@ use super::select::Select;
 
 pub struct FilterSelect<'a, T: Display> {
     pub full_list: &'a Vec<T>,
-    pub cursor: Option<usize>,
+    pub cursor: Option<&'a usize>,
     pub search_string: &'a String,
 }
 

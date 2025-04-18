@@ -1,6 +1,6 @@
 use clap::Parser;
 use figlet_rs::FIGfont;
-use gm_lib::{actions::Action, disk::Config, network::NetworkStore, tui::Tui, utils::Handle};
+use gm_lib::{actions::Action, disk::Config, network::NetworkStore, tui, utils::Handle};
 use inquire::Confirm;
 
 #[tokio::main]
@@ -10,7 +10,7 @@ async fn main() -> gm_lib::Result<()> {
     let cli = Cli::parse();
 
     if cli.is_empty() {
-        Tui::run().await?;
+        tui::run().await?;
     } else {
         cli.handle();
     }

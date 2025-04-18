@@ -83,7 +83,7 @@ fn split_string(s: &str, max_width: usize) -> Vec<&str> {
 
 #[cfg(test)]
 mod test {
-    use crate::tui::views::components::input_box::split_string;
+    use crate::tui::app::widgets::input_box::split_string;
 
     #[test]
     fn test_split_string() {
