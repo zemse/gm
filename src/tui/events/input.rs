@@ -19,12 +19,12 @@ pub fn watch_input_events(tx: mpsc::Sender<super::Event>, shutdown_signal: Arc<A
                 // `event::read()` above. It needs a key press to be able to
                 // check the shutdown signal.
                 //
-                // Exit is only triggered by `q` and `ESC` keys. Hence we are
+                // Exit is only triggered by `control + c` and `ESC` keys. Hence we are
                 // adding a hacky solution to the above problem. The
                 // `shutdown_signal` takes a while to be updated on the main
                 // thread, so we wait for a moment before letting the execution
                 // go to the while loop condition check.
-                if key_event.code == KeyCode::Char('q') || key_event.code == KeyCode::Esc {
+                if key_event.code == KeyCode::Char('c') || key_event.code == KeyCode::Esc {
                     // TODO improve this as this is a hacky solution
                     thread::sleep(std::time::Duration::from_millis(10));
                 }
