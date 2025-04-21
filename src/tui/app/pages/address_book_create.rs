@@ -1,3 +1,5 @@
+use std::sync::mpsc;
+
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::widgets::Widget;
 
@@ -25,7 +27,11 @@ impl Component for AddressBookCreatePage {
         }
     }
 
-    fn handle_event(&mut self, event: &Event) -> crate::tui::traits::HandleResult {
+    fn handle_event(
+        &mut self,
+        event: &Event,
+        _transmitter: &mpsc::Sender<Event>,
+    ) -> crate::Result<HandleResult> {
         let cursor_max = 2;
 
         let mut handle_result = HandleResult::default();
@@ -84,7 +90,7 @@ impl Component for AddressBookCreatePage {
             }
         }
 
-        handle_result
+        Ok(handle_result)
     }
 
     fn render_component(

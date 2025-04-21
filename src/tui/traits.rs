@@ -1,3 +1,5 @@
+use std::sync::mpsc;
+
 use ratatui::{
     layout::Rect,
     widgets::{Block, Widget},
@@ -48,7 +50,11 @@ pub trait Component {
         None
     }
 
-    fn handle_event(&mut self, event: &Event) -> HandleResult;
+    fn handle_event(
+        &mut self,
+        event: &Event,
+        transmitter: &mpsc::Sender<Event>,
+    ) -> crate::Result<HandleResult>;
 
     fn render_component(
         &self,

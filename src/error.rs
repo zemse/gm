@@ -19,6 +19,7 @@ pub enum Error {
     ReqwestError(reqwest::Error),
     SerdeJson(serde_json::Error),
     MpscRecvError(std::sync::mpsc::RecvError),
+    MpscSendError(std::sync::mpsc::SendError<crate::tui::Event>),
 }
 
 impl Display for Error {
@@ -106,5 +107,11 @@ impl From<serde_json::Error> for Error {
 impl From<std::sync::mpsc::RecvError> for Error {
     fn from(e: std::sync::mpsc::RecvError) -> Self {
         Error::MpscRecvError(e)
+    }
+}
+
+impl From<std::sync::mpsc::SendError<crate::tui::Event>> for Error {
+    fn from(e: std::sync::mpsc::SendError<crate::tui::Event>) -> Self {
+        Error::MpscSendError(e)
     }
 }

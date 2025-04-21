@@ -1,5 +1,6 @@
-use std::io;
+use std::{io, sync::mpsc};
 
+use alloy::primitives::Address;
 use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
 use pages::{main_menu::MainMenuPage, Page};
 use ratatui::{
@@ -9,6 +10,8 @@ use ratatui::{
     DefaultTerminal,
 };
 use widgets::{footer::Footer, right::Right, title::Title};
+
+use crate::disk::Config;
 
 use super::{
     events::Event,
@@ -22,6 +25,7 @@ pub struct App {
     pub exit: bool,
     pub context: Vec<Page>,
     pub eth_price: Option<String>,
+    pub current_account: Option<Address>,
 }
 
 impl Default for App {
@@ -30,6 +34,7 @@ impl Default for App {
             exit: false,
             context: vec![Page::MainMenu(MainMenuPage::default())],
             eth_price: None,
+            current_account: Config::current_account_optn(),
         }
     }
 }
@@ -42,9 +47,13 @@ impl App {
         Ok(())
     }
 
-    pub fn handle_event(&mut self, event: super::events::Event) {
+    pub fn handle_event(
+        &mut self,
+        event: super::events::Event,
+        tr: &mpsc::Sender<Event>,
+    ) -> crate::Result<()> {
         if let Some(page) = self.current_page_mut() {
-            let result = page.handle_event(&event);
+            let result = page.handle_event(&event, tr)?;
             for _ in 0..result.page_pops {
                 self.context.pop();
             }
@@ -88,7 +97,12 @@ impl App {
             Event::EthPriceUpdate(eth_price) => {
                 self.eth_price = Some(eth_price);
             }
+            Event::AccountChange(address) => {
+                self.current_account = Some(address);
+            }
         };
+
+        Ok(())
     }
 
     fn current_page(&self) -> Option<&Page> {
@@ -115,7 +129,10 @@ impl Widget for &App {
         let [title_area, body_area, footer_area] = vertical_layout.areas(area);
 
         if let Some(page) = self.current_page() {
-            Title.render(title_area, buf);
+            Title {
+                current_account: self.current_account.as_ref(),
+            }
+            .render(title_area, buf);
 
             // Body render
             if page.is_full_screen() {

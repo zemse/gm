@@ -174,6 +174,10 @@ impl Config {
             .expect("current_account is not available")
     }
 
+    pub fn current_account_optn() -> Option<Address> {
+        Config::load().current_account
+    }
+
     pub fn set_current_account(address: Address) {
         let mut config = Config::load();
         config.current_account = Some(address);

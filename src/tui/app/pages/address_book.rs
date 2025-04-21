@@ -1,3 +1,5 @@
+use std::sync::mpsc;
+
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::widgets::Widget;
 
@@ -41,7 +43,11 @@ impl Component for AddressBookPage {
         Some(&mut self.search_string)
     }
 
-    fn handle_event(&mut self, event: &Event) -> HandleResult {
+    fn handle_event(
+        &mut self,
+        event: &Event,
+        _transmitter: &mpsc::Sender<Event>,
+    ) -> crate::Result<HandleResult> {
         let list: Vec<&AddressBookActions> = self
             .full_list
             .iter()
@@ -97,7 +103,7 @@ impl Component for AddressBookPage {
             }
         }
 
-        result
+        Ok(result)
     }
 
     fn render_component(

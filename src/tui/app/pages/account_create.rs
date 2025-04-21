@@ -8,9 +8,9 @@ use crate::tui::{
 };
 
 #[derive(Default)]
-pub struct ConfigPage;
+pub struct AccountCreatePage;
 
-impl Component for ConfigPage {
+impl Component for AccountCreatePage {
     fn handle_event(
         &mut self,
         _event: &Event,
@@ -23,7 +23,7 @@ impl Component for ConfigPage {
     where
         Self: Sized,
     {
-        "temp page".render(area, buf);
+        "assets page".render(area, buf);
         area
     }
 }

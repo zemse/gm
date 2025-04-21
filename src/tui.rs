@@ -12,7 +12,7 @@ use std::{
 };
 
 use app::App;
-use events::Event;
+pub use events::Event;
 
 pub async fn run() -> crate::Result<()> {
     let (event_tr, event_rc) = mpsc::channel::<Event>();
@@ -39,7 +39,7 @@ pub async fn run() -> crate::Result<()> {
         app.draw(&mut terminal)?;
 
         // make any changes to Controller state
-        app.handle_event(event_rc.recv()?);
+        app.handle_event(event_rc.recv()?, &event_tr)?;
     }
 
     // signal all the threads to exit

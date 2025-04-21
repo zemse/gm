@@ -297,7 +297,7 @@ mod macos {
     }
 
     pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
-        println!("Unlocking wallet {:?}", address);
+        // println!("Unlocking wallet {:?}", address);
         Ok(keychain()
             .find_generic_password(&address_to_service(&address), &address.to_string())
             .map(|(pswd, _item)| {
@@ -359,8 +359,8 @@ mod linux_insecure {
         store.add(address, private_key_bytes);
         store.save();
 
-        println!("Wallet created with address: {}", address);
-        println!("The private key is stored insecurely in your filesystem.");
+        // println!("Wallet created with address: {}", address);
+        // println!("The private key is stored insecurely in your filesystem.");
 
         address
     }

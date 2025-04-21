@@ -1,3 +1,5 @@
+use std::sync::mpsc;
+
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::widgets::Widget;
 
@@ -36,7 +38,11 @@ impl Component for MainMenuPage {
         self.list = fresh.list;
     }
 
-    fn handle_event(&mut self, event: &Event) -> HandleResult {
+    fn handle_event(
+        &mut self,
+        event: &Event,
+        _transmitter: &mpsc::Sender<Event>,
+    ) -> crate::Result<HandleResult> {
         let cursor_max = self.list.len();
 
         let mut result = HandleResult::default();
@@ -58,7 +64,9 @@ impl Component for MainMenuPage {
                         }
                         Action::Assets => result.page_inserts.push(Page::Assets(AssetsPage)),
                         Action::Account { .. } => {
-                            result.page_inserts.push(Page::Account(AccountPage));
+                            result
+                                .page_inserts
+                                .push(Page::Account(AccountPage::default()));
                         }
                         Action::Transaction { .. } => {
                             result.page_inserts.push(Page::Transaction(TransactionPage))
@@ -76,7 +84,7 @@ impl Component for MainMenuPage {
             }
         };
 
-        result
+        Ok(result)
     }
 
     fn render_component(
