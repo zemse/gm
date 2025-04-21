@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
     prelude::*,
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph},
 };
 use crate::tui::{
     events::Event,
@@ -44,10 +44,10 @@ impl Component for SendMessagePage {
                     KeyCode::Enter => {
                         match self.cursor {
                             2 => {
-                                self.status = Some("📒 Open Address Book".into());
+                                self.status = Some(" Open Address Book".into());
                             }
                             3 => {
-                                self.status = Some("Send Message (not ".into());
+                                self.status = Some(" Send Message (not ".into());
                             }
                             _ => {}
                         }
