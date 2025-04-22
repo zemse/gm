@@ -1,10 +1,19 @@
+use std::{
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+    time::{Duration, Instant},
+};
+
 use crate::error::Error;
 use alloy::{
     hex,
-    primitives::Address,
+    primitives::{address, Address, U256},
     signers::{
         k256::{ecdsa::SigningKey, FieldBytes},
         local::{MnemonicBuilder, PrivateKeySigner},
+        utils::secret_key_to_address,
     },
 };
 use coins_bip39::{English, Mnemonic};
@@ -101,6 +110,62 @@ fn get_signer_from_mnemonic(phrase: &str) -> crate::Result<PrivateKeySigner> {
 fn get_address_from_mnemonic(phrase: &str) -> crate::Result<Address> {
     let signer = get_signer_from_mnemonic(phrase)?;
     Ok(signer.address())
+}
+
+pub fn mine_wallet(
+    mask_a: Address,
+    mask_b: Address,
+    max_dur: Option<Duration>,
+) -> crate::Result<(Option<SigningKey>, usize, Duration)> {
+    let address_one = address!("0xffffffffffffffffffffffffffffffffffffffff");
+    let counter = Arc::new(AtomicUsize::new(0));
+    let stop = Arc::new(AtomicBool::new(false));
+    let result = Arc::new(Mutex::new(None));
+    let start = Instant::now();
+
+    rayon::scope(|s| {
+        for _ in 0..rayon::current_num_threads() {
+            let counter = Arc::clone(&counter);
+            let stop = Arc::clone(&stop);
+            let result = Arc::clone(&result);
+
+            s.spawn(move |_| {
+                // first private key is random
+                let key = coins_bip32::prelude::SigningKey::random(&mut OsRng);
+                let mut u = U256::from_be_slice(&key.to_bytes());
+
+                while !stop.load(Ordering::Relaxed) {
+                    if let Some(max_dur) = max_dur {
+                        if Instant::now().duration_since(start) > max_dur {
+                            break;
+                        }
+                    }
+
+                    if let Ok(credential) =
+                        SigningKey::from_bytes(FieldBytes::from_slice(&u.to_be_bytes_vec()))
+                    {
+                        let address = secret_key_to_address(&credential);
+                        if address.bit_and(mask_a) == mask_a
+                            && address.bit_xor(address_one).bit_and(mask_b) == mask_b
+                        {
+                            stop.store(true, Ordering::Relaxed);
+                            let mut result = result.lock().unwrap();
+                            *result = Some(credential);
+                        };
+                    } else {
+                        // generate new random key
+                    }
+                    // change private key by one
+                    u += U256::ONE;
+                    counter.fetch_add(1, Ordering::Relaxed);
+                }
+            });
+        }
+    });
+
+    let result = result.lock().unwrap().clone();
+    let counter = counter.load(Ordering::Relaxed);
+    Ok((result, counter, Instant::now().duration_since(start)))
 }
 
 #[derive(Clone, Debug)]

@@ -100,6 +100,7 @@ impl App {
             Event::AccountChange(address) => {
                 self.current_account = Some(address);
             }
+            _ => {}
         };
 
         Ok(())
