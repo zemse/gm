@@ -116,6 +116,7 @@ pub fn mine_wallet(
     mask_a: Address,
     mask_b: Address,
     max_dur: Option<Duration>,
+    shutdown_signal: Arc<AtomicBool>,
 ) -> crate::Result<(Option<SigningKey>, usize, Duration)> {
     let address_one = address!("0xffffffffffffffffffffffffffffffffffffffff");
     let counter = Arc::new(AtomicUsize::new(0));
@@ -128,13 +129,13 @@ pub fn mine_wallet(
             let counter = Arc::clone(&counter);
             let stop = Arc::clone(&stop);
             let result = Arc::clone(&result);
-
+            let shutdown_signal = shutdown_signal.clone();
             s.spawn(move |_| {
                 // first private key is random
                 let key = coins_bip32::prelude::SigningKey::random(&mut OsRng);
                 let mut u = U256::from_be_slice(&key.to_bytes());
 
-                while !stop.load(Ordering::Relaxed) {
+                while !stop.load(Ordering::Relaxed) && !shutdown_signal.load(Ordering::Relaxed) {
                     if let Some(max_dur) = max_dur {
                         if Instant::now().duration_since(start) > max_dur {
                             break;

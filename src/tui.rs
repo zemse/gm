@@ -39,11 +39,14 @@ pub async fn run() -> crate::Result<()> {
         app.draw(&mut terminal)?;
 
         // make any changes to Controller state
-        app.handle_event(event_rc.recv()?, &event_tr)?;
+        app.handle_event(event_rc.recv()?, &event_tr, &shutdown)?;
     }
 
     // signal all the threads to exit
     shutdown.store(true, Ordering::Relaxed);
+
+    // wait for app component threads to exit
+    app.exit_threads().await;
 
     // wait for threads to exit gracefully
     thread_1.join().unwrap();

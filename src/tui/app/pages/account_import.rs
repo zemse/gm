@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
 use crossterm::event::KeyCode;
 use ratatui::{
@@ -29,6 +29,7 @@ impl Component for AccountImportPage {
         &mut self,
         event: &Event,
         _transmitter: &mpsc::Sender<Event>,
+        _shutdown_signal: &Arc<AtomicBool>,
     ) -> crate::Result<HandleResult> {
         let mut result = HandleResult::default();
 

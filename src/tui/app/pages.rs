@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
 use account::AccountPage;
 use account_create::AccountCreatePage;
@@ -67,6 +67,27 @@ impl Page {
 }
 
 impl Component for Page {
+    async fn exit_threads(&mut self) {
+        match self {
+            Page::MainMenu(page) => page.exit_threads().await,
+            Page::Setup(page) => page.exit_threads().await,
+
+            Page::AddressBook(page) => page.exit_threads().await,
+            Page::AddressBookCreate(page) => page.exit_threads().await,
+            Page::AddressBookDisplay(page) => page.exit_threads().await,
+
+            Page::Account(page) => page.exit_threads().await,
+            Page::AccountCreate(page) => page.exit_threads().await,
+            Page::AccountImport(page) => page.exit_threads().await,
+
+            Page::Assets(page) => page.exit_threads().await,
+            Page::Config(page) => page.exit_threads().await,
+            Page::SendMessage(page) => page.exit_threads().await,
+            Page::SignMessage(page) => page.exit_threads().await,
+            Page::Transaction(page) => page.exit_threads().await,
+        }
+    }
+
     fn reload(&mut self) {
         match self {
             Page::MainMenu(page) => page.reload(),
@@ -92,24 +113,25 @@ impl Component for Page {
         &mut self,
         event: &Event,
         tr: &mpsc::Sender<Event>,
+        sd: &Arc<AtomicBool>,
     ) -> crate::Result<HandleResult> {
         match self {
-            Page::MainMenu(page) => page.handle_event(event, tr),
-            Page::Setup(page) => page.handle_event(event, tr),
+            Page::MainMenu(page) => page.handle_event(event, tr, sd),
+            Page::Setup(page) => page.handle_event(event, tr, sd),
 
-            Page::AddressBook(page) => page.handle_event(event, tr),
-            Page::AddressBookCreate(page) => page.handle_event(event, tr),
-            Page::AddressBookDisplay(page) => page.handle_event(event, tr),
+            Page::AddressBook(page) => page.handle_event(event, tr, sd),
+            Page::AddressBookCreate(page) => page.handle_event(event, tr, sd),
+            Page::AddressBookDisplay(page) => page.handle_event(event, tr, sd),
 
-            Page::Account(page) => page.handle_event(event, tr),
-            Page::AccountCreate(page) => page.handle_event(event, tr),
-            Page::AccountImport(page) => page.handle_event(event, tr),
+            Page::Account(page) => page.handle_event(event, tr, sd),
+            Page::AccountCreate(page) => page.handle_event(event, tr, sd),
+            Page::AccountImport(page) => page.handle_event(event, tr, sd),
 
-            Page::Assets(page) => page.handle_event(event, tr),
-            Page::Config(page) => page.handle_event(event, tr),
-            Page::SendMessage(page) => page.handle_event(event, tr),
-            Page::SignMessage(page) => page.handle_event(event, tr),
-            Page::Transaction(page) => page.handle_event(event, tr),
+            Page::Assets(page) => page.handle_event(event, tr, sd),
+            Page::Config(page) => page.handle_event(event, tr, sd),
+            Page::SendMessage(page) => page.handle_event(event, tr, sd),
+            Page::SignMessage(page) => page.handle_event(event, tr, sd),
+            Page::Transaction(page) => page.handle_event(event, tr, sd),
         }
     }
 

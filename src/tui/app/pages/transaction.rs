@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 
@@ -15,6 +15,7 @@ impl Component for TransactionPage {
         &mut self,
         _event: &Event,
         _transmitter: &mpsc::Sender<Event>,
+        _shutdown_signal: &Arc<AtomicBool>,
     ) -> crate::Result<HandleResult> {
         Ok(HandleResult::default())
     }

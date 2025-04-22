@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::widgets::Widget;
@@ -31,6 +31,7 @@ impl Component for AddressBookCreatePage {
         &mut self,
         event: &Event,
         _transmitter: &mpsc::Sender<Event>,
+        _shutdown_signal: &Arc<AtomicBool>,
     ) -> crate::Result<HandleResult> {
         let cursor_max = 2;
 

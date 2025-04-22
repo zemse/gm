@@ -1,4 +1,7 @@
-use std::{io, sync::mpsc};
+use std::{
+    io,
+    sync::{atomic::AtomicBool, mpsc, Arc},
+};
 
 use alloy::primitives::Address;
 use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
@@ -47,13 +50,20 @@ impl App {
         Ok(())
     }
 
+    pub async fn exit_threads(&mut self) {
+        for page in &mut self.context {
+            page.exit_threads().await;
+        }
+    }
+
     pub fn handle_event(
         &mut self,
         event: super::events::Event,
         tr: &mpsc::Sender<Event>,
+        sd: &Arc<AtomicBool>,
     ) -> crate::Result<()> {
         if let Some(page) = self.current_page_mut() {
-            let result = page.handle_event(&event, tr)?;
+            let result = page.handle_event(&event, tr, sd)?;
             for _ in 0..result.page_pops {
                 self.context.pop();
             }

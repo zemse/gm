@@ -1,4 +1,7 @@
-use std::{fmt::Display, sync::mpsc};
+use std::{
+    fmt::Display,
+    sync::{atomic::AtomicBool, mpsc, Arc},
+};
 
 use alloy::primitives::Address;
 use crossterm::event::{KeyCode, KeyEventKind};
@@ -60,6 +63,7 @@ impl Component for AccountPage {
         &mut self,
         event: &Event,
         transmitter: &mpsc::Sender<Event>,
+        _shutdown_signal: &Arc<AtomicBool>,
     ) -> crate::Result<HandleResult> {
         let cursor_max = self.list.len();
 

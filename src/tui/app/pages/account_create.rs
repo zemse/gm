@@ -1,4 +1,8 @@
-use std::{sync::mpsc, thread, time::Duration};
+use std::{
+    sync::{atomic::AtomicBool, mpsc, Arc},
+    thread::{self, JoinHandle},
+    time::Duration,
+};
 
 use alloy::primitives::{address, Address};
 use crossterm::event::KeyCode;
@@ -30,8 +34,10 @@ pub struct AccountCreatePage {
     pub cursor: usize,
     pub mask: [Option<u8>; 40],
     pub error: Option<String>,
+    pub hash_rate_thread: Option<JoinHandle<()>>,
     pub hash_rate: HashRateResult,
     pub mining: bool,
+    pub vanity_thread: Option<JoinHandle<()>>,
     pub vanity_result: Option<(Address, usize, Duration)>,
     pub mnemonic_result: Option<Address>,
 }
@@ -42,8 +48,10 @@ impl Default for AccountCreatePage {
             cursor: 0,
             mask: [None; 40],
             error: None,
+            hash_rate_thread: None,
             hash_rate: HashRateResult::None,
             mining: false,
+            vanity_thread: None,
             vanity_result: None,
             mnemonic_result: None,
         }
@@ -75,10 +83,20 @@ impl AccountCreatePage {
 }
 
 impl Component for AccountCreatePage {
+    async fn exit_threads(&mut self) {
+        if let Some(thread) = self.hash_rate_thread.take() {
+            thread.join().unwrap();
+        }
+        if let Some(thread) = self.vanity_thread.take() {
+            thread.join().unwrap();
+        }
+    }
+
     fn handle_event(
         &mut self,
         event: &Event,
         transmitter: &mpsc::Sender<Event>,
+        shutdown_signal: &Arc<AtomicBool>,
     ) -> crate::Result<HandleResult> {
         let result = HandleResult::default();
 
@@ -131,13 +149,15 @@ impl Component for AccountCreatePage {
                         self.mining = true;
                         let tr = transmitter.clone();
                         let (mask_a, mask_b) = self.mask_a_b();
-                        thread::spawn(move || {
-                            let result = mine_wallet(mask_a, mask_b, None);
+                        let shutdown_signal = shutdown_signal.clone();
+                        let vanity_thread = thread::spawn(move || {
+                            let result = mine_wallet(mask_a, mask_b, None, shutdown_signal);
                             if let Ok((Some(key), counter, duration)) = result {
                                 tr.send(Event::VanityResult(key, counter, duration))
                                     .unwrap();
                             }
                         });
+                        self.vanity_thread = Some(vanity_thread);
                     }
                 }
                 _ => {}
@@ -162,9 +182,15 @@ impl Component for AccountCreatePage {
             self.hash_rate = HashRateResult::Pending;
 
             let tr = transmitter.clone();
-            thread::spawn(move || {
+            let shutdown_signal = shutdown_signal.clone();
+            let hash_rate_thread = thread::spawn(move || {
                 let address_one = address!("0xffffffffffffffffffffffffffffffffffffffff");
-                let result = mine_wallet(Address::ZERO, address_one, Some(Duration::from_secs(1)));
+                let result = mine_wallet(
+                    Address::ZERO,
+                    address_one,
+                    Some(Duration::from_secs(1)),
+                    shutdown_signal,
+                );
                 match result {
                     Ok((_, counter, duration)) => {
                         let hash_rate = counter as f64 / duration.as_secs_f64();
@@ -175,6 +201,7 @@ impl Component for AccountCreatePage {
                     }
                 }
             });
+            self.hash_rate_thread = Some(hash_rate_thread);
         }
 
         Ok(result)

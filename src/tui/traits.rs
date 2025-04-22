@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
 use ratatui::{
     layout::Rect,
@@ -50,10 +50,13 @@ pub trait Component {
         None
     }
 
+    async fn exit_threads(&mut self) {}
+
     fn handle_event(
         &mut self,
         event: &Event,
         transmitter: &mpsc::Sender<Event>,
+        shutdown_signal: &Arc<AtomicBool>,
     ) -> crate::Result<HandleResult>;
 
     fn render_component(
