@@ -348,15 +348,17 @@ mod macos {
 
 #[cfg(target_os = "linux")]
 mod linux_insecure {
-    use crate::disk::{DiskInterface, InsecurePrivateKeyStore};
 
     use super::*;
+    use crate::disk::DiskInterface;
+    use crate::utils::account::{linux_insecure::InsecurePrivateKeyStore, Secret};
+    use crate::utils::account::{AccountManager, AccountUtils};
 
     pub fn create_privatekey_wallet() -> Address {
         let (private_key_bytes, _signer, address) = gen_wallet();
 
         let mut store = InsecurePrivateKeyStore::load();
-        store.add(address, private_key_bytes);
+        store.add(address, Secret::PrivateKey(private_key_bytes));
         store.save();
 
         // println!("Wallet created with address: {}", address);
@@ -387,17 +389,12 @@ mod linux_insecure {
 
     pub fn load_wallet(address: Address) -> Result<PrivateKeySigner, Error> {
         println!("Unlocking wallet {:?}", address);
-        let store = InsecurePrivateKeyStore::load();
-        let key = store
-            .find_by_address(&address)
-            .expect("must find key in store");
-        Ok(SigningKey::from_slice(key.as_slice()).map(PrivateKeySigner::from_signing_key)?)
+        AccountManager::load_wallet(&address)
     }
 
     pub fn store_wallet(address: &Address, key: &FieldBytes) {
         // linux version
-        let mut store = InsecurePrivateKeyStore::load();
-        store.add(*address, *key);
-        store.save();
+
+        AccountManager::store_private_key(key, *address).unwrap();
     }
 }

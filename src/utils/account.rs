@@ -344,8 +344,8 @@ mod macos {
     }
 }
 
-// #[cfg(target_os = "linux")]
-mod linux_insecure {
+#[cfg(target_os = "linux")]
+pub mod linux_insecure {
     use crate::disk::{DiskInterface, FileFormat};
 
     use super::*;
