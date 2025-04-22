@@ -1,6 +1,6 @@
 use std::{fmt, fmt::Debug, fs, path::PathBuf};
 
-use alloy::{hex, primitives::Address, signers::k256::FieldBytes};
+use alloy::primitives::Address;
 use directories::BaseDirs;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -201,39 +201,5 @@ impl Config {
 impl fmt::Display for AddressBookEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} ({})", self.name, self.address)
-    }
-}
-
-// TODO remove this once we have implemented a secure store for linux
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct InsecurePrivateKeyStore {
-    pub keys: Vec<(Address, String)>,
-}
-
-impl DiskInterface for InsecurePrivateKeyStore {
-    const FILE_NAME: &'static str = "insecure_private_key_store";
-    const FORMAT: FileFormat = FileFormat::TOML;
-}
-
-impl InsecurePrivateKeyStore {
-    pub fn add(&mut self, address: Address, key: FieldBytes) {
-        self.keys.push((address, hex::encode_prefixed(key)));
-        self.save();
-    }
-
-    pub fn find_by_address(&self, address: &Address) -> Option<FieldBytes> {
-        self.keys.iter().find_map(|(stored_address, key)| {
-            if stored_address == address {
-                hex::decode(key)
-                    .ok()
-                    .map(|d| *FieldBytes::from_slice(d.as_slice()))
-            } else {
-                None
-            }
-        })
-    }
-
-    pub fn list(self) -> Vec<Address> {
-        self.keys.into_iter().map(|(address, _)| address).collect()
     }
 }

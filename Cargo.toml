@@ -23,7 +23,8 @@ qrcode = "0.12"
 indicatif = "0.17"
 
 # Ethereum
-alloy = { version = "0.11", features = ["full", "rlp"] }
+alloy = { version = "0.11", features = ["full", "rlp", "signer-mnemonic"] }
+coins-bip39 = "0.12.0"
 rand = "0.8"
 
 # macOS

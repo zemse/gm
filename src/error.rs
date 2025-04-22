@@ -1,10 +1,13 @@
 use std::fmt::Display;
 
+use alloy::primitives::Address;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
     AddressBook(String),
+    SecretNotFound(Address),
     InternalError(String),
     ParseFloatError(std::num::ParseFloatError),
     IoError(std::io::Error),
@@ -20,6 +23,9 @@ pub enum Error {
     SerdeJson(serde_json::Error),
     MpscRecvError(std::sync::mpsc::RecvError),
     MpscSendError(std::sync::mpsc::SendError<crate::tui::Event>),
+    MnemonicError(coins_bip39::MnemonicError),
+    AlloyLocalSignerError(alloy::signers::local::LocalSignerError),
+    FromUtf8Error(std::string::FromUtf8Error),
 }
 
 impl Display for Error {
@@ -113,5 +119,23 @@ impl From<std::sync::mpsc::RecvError> for Error {
 impl From<std::sync::mpsc::SendError<crate::tui::Event>> for Error {
     fn from(e: std::sync::mpsc::SendError<crate::tui::Event>) -> Self {
         Error::MpscSendError(e)
+    }
+}
+
+impl From<coins_bip39::MnemonicError> for Error {
+    fn from(e: coins_bip39::MnemonicError) -> Self {
+        Error::MnemonicError(e)
+    }
+}
+
+impl From<alloy::signers::local::LocalSignerError> for Error {
+    fn from(e: alloy::signers::local::LocalSignerError) -> Self {
+        Error::AlloyLocalSignerError(e)
+    }
+}
+
+impl From<std::string::FromUtf8Error> for Error {
+    fn from(e: std::string::FromUtf8Error) -> Self {
+        Error::FromUtf8Error(e)
     }
 }

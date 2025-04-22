@@ -2,6 +2,7 @@ use std::sync::mpsc;
 
 use account::AccountPage;
 use account_create::AccountCreatePage;
+use account_import::AccountImportPage;
 use address_book::AddressBookPage;
 use address_book_create::AddressBookCreatePage;
 use address_book_display::AddressBookDisplayPage;
@@ -20,6 +21,7 @@ use crate::tui::{
 
 pub mod account;
 pub mod account_create;
+pub mod account_import;
 pub mod address_book;
 pub mod address_book_create;
 pub mod address_book_display;
@@ -37,6 +39,7 @@ pub enum Page {
 
     Account(AccountPage),
     AccountCreate(AccountCreatePage),
+    AccountImport(AccountImportPage),
 
     AddressBook(AddressBookPage),
     AddressBookCreate(AddressBookCreatePage),
@@ -75,6 +78,7 @@ impl Component for Page {
 
             Page::Account(page) => page.reload(),
             Page::AccountCreate(page) => page.reload(),
+            Page::AccountImport(page) => page.reload(),
 
             Page::Assets(page) => page.reload(),
             Page::Config(page) => page.reload(),
@@ -99,6 +103,7 @@ impl Component for Page {
 
             Page::Account(page) => page.handle_event(event, tr),
             Page::AccountCreate(page) => page.handle_event(event, tr),
+            Page::AccountImport(page) => page.handle_event(event, tr),
 
             Page::Assets(page) => page.handle_event(event, tr),
             Page::Config(page) => page.handle_event(event, tr),
@@ -126,6 +131,7 @@ impl Component for Page {
 
             Page::Account(page) => page.render_component(area, buf),
             Page::AccountCreate(page) => page.render_component(area, buf),
+            Page::AccountImport(page) => page.render_component(area, buf),
 
             Page::Assets(page) => page.render_component(area, buf),
             Page::Config(page) => page.render_component(area, buf),
