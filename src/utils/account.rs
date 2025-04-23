@@ -6,7 +6,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::error::Error;
 use alloy::{
     hex,
     primitives::{address, Address, U256},
@@ -237,7 +236,7 @@ mod macos {
 
             keychain()
                 .add_generic_password(&mnemonic_service, &address.to_string(), phrase.as_bytes())
-                .map_err(Error::AppleSecurityFrameworkError)?;
+                .map_err(crate::Error::AppleSecurityFrameworkError)?;
 
             Ok(())
         }
@@ -251,7 +250,7 @@ mod macos {
                     &address.to_string(),
                     hex::encode(private_key).as_bytes(),
                 )
-                .map_err(Error::AppleSecurityFrameworkError)?;
+                .map_err(crate::Error::AppleSecurityFrameworkError)?;
 
             Ok(())
         }
