@@ -87,6 +87,9 @@ mod test {
 
     #[test]
     fn test_split_string() {
-        assert_eq!(split_string("hello what is up", 3).len(), 3);
+        assert_eq!(
+            split_string("hello what is up", 6),
+            vec!["hello ", "what i", "s up"]
+        );
     }
 }
