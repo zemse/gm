@@ -1,7 +1,7 @@
 use std::{
     sync::{atomic::AtomicBool, mpsc, Arc},
     thread::{self, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use alloy::primitives::{address, Address};
@@ -11,7 +11,7 @@ use ratatui::{
     layout::{Offset, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::Widget,
+    widgets::{ Gauge, Widget},
 };
 
 use crate::{
@@ -37,6 +37,7 @@ pub struct AccountCreatePage {
     pub hash_rate_thread: Option<JoinHandle<()>>,
     pub hash_rate: HashRateResult,
     pub mining: bool,
+    pub started_mining_at: Instant,
     pub vanity_thread: Option<JoinHandle<()>>,
     pub vanity_result: Option<(Address, usize, Duration)>,
     pub mnemonic_result: Option<Address>,
@@ -51,6 +52,7 @@ impl Default for AccountCreatePage {
             hash_rate_thread: None,
             hash_rate: HashRateResult::None,
             mining: false,
+            started_mining_at: Instant::now(),
             vanity_thread: None,
             vanity_result: None,
             mnemonic_result: None,
@@ -147,6 +149,7 @@ impl Component for AccountCreatePage {
 
                     if !self.mining {
                         self.mining = true;
+                        self.started_mining_at = Instant::now();
                         let tr = transmitter.clone();
                         let (mask_a, mask_b) = self.mask_a_b();
                         let shutdown_signal = shutdown_signal.clone();
@@ -282,6 +285,24 @@ impl Component for AccountCreatePage {
 
         if self.mining {
             "Mining...".render(area.offset(Offset { x: 0, y: 12 }), buf);
+            if let HashRateResult::Some(hash_rate) = self.hash_rate {
+                let count = self.mask_count();
+                let est_attempts = 16_usize.pow(count as u32);
+                let est_time = est_attempts as f64 / hash_rate as f64;
+                let elapsed_time = self.started_mining_at.elapsed();
+                // let est_time = Duration::from_secs(est_time as u64);
+                format!(
+                    "Remaining time: {}",
+                    humantime::format_duration(Duration::from_secs(
+                        est_time as u64 - elapsed_time.as_secs()
+                    ))
+                )
+                .render(area.offset(Offset { x: 0, y: 16 }), buf);
+                Gauge::default()
+                    .gauge_style(Style::new().white().on_black())
+                    .percent((elapsed_time.as_secs() * 100 / est_time as u64) as u16)
+                    .render(Rect::new(area.x, 16, area.width, 1), buf);
+            }
         } else if let Some((addr, counter, duration)) = self.vanity_result {
             format!(
                 "Vanity mined the address: {}, took {} to perform {} iters",
