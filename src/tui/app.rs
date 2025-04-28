@@ -12,7 +12,7 @@ use ratatui::{
     widgets::{Block, BorderType, Widget},
     DefaultTerminal,
 };
-use widgets::{footer::Footer, sidebar::Sidebar, title::Title};
+use widgets::{footer::Footer, popup_ok::PopupOk, sidebar::Sidebar, title::Title};
 
 use crate::disk::{Config, DiskInterface};
 
@@ -24,23 +24,35 @@ use super::{
 pub mod pages;
 pub mod widgets;
 
+// Shared among all pages
+// pub struct SharedState {
+//     cursor_freeze: bool,
+// }
+
 pub struct App {
     pub exit: bool,
+    pub current_account: Option<Address>,
     pub context: Vec<Page>,
     pub eth_price: Option<String>,
     pub testnet_mode: bool,
-    pub current_account: Option<Address>,
+    pub fatal_error: Option<String>,
+    // pub shared_state: SharedState,
 }
 
 impl Default for App {
     fn default() -> Self {
         let config = Config::load();
+
         Self {
             exit: false,
-            context: vec![Page::MainMenu(MainMenuPage::default())],
             eth_price: None,
             testnet_mode: config.testnet_mode,
-            current_account: Config::current_account_optn(),
+            current_account: config.current_account,
+            fatal_error: None,
+            // shared_state: SharedState {
+            //     cursor_freeze: false,
+            // },
+            context: vec![Page::MainMenu(MainMenuPage::default())],
         }
     }
 }
@@ -95,18 +107,27 @@ impl App {
                     #[allow(clippy::single_match)]
                     match key_event.code {
                         KeyCode::Char(char) => {
+                            // TODO can we quit using q as well?
                             // if char == 'q' && self.navigation.text_input().is_none() {
                             //     self.exit = true;
                             // }
-
                             if char == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
                                 self.exit = true;
                             }
+                            if char == 'e' && key_event.modifiers == KeyModifiers::CONTROL {
+                                self.fatal_error = Some("test error".to_string());
+                                // self.shared_state.cursor_freeze = true;
+                            }
                         }
                         KeyCode::Esc => {
-                            self.context.pop();
-                            if self.context.is_empty() {
-                                self.exit = true;
+                            if self.fatal_error.is_some() {
+                                self.fatal_error = None;
+                                // self.shared_state.cursor_freeze = false;
+                            } else {
+                                self.context.pop();
+                                if self.context.is_empty() {
+                                    self.exit = true;
+                                }
                             }
                         }
                         _ => {}
@@ -133,8 +154,6 @@ impl App {
         self.context.last_mut()
     }
 }
-
-// impl_Widget_from_Component!(App);
 
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer)
@@ -181,5 +200,13 @@ impl Widget for &App {
             }
             .render(footer_area, buf);
         }
+
+        if let Some(fatal_error) = &self.fatal_error {
+            PopupOk {
+                title: "Fatal Error",
+                message: fatal_error,
+            }
+            .render(area, buf);
+        };
     }
 }

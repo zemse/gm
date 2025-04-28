@@ -82,16 +82,3 @@ pub trait Component {
         area
     }
 }
-
-// macro_rules! impl_Widget_from_Component {
-//     ($t:ty) => {
-//         impl ratatui::widgets::Widget for &$t {
-//             fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-//             where
-//                 Self: Sized,
-//             {
-//                 self.render_component(area, buf);
-//             }
-//         }
-//     };
-// }
