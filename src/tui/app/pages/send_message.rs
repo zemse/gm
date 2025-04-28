@@ -10,6 +10,7 @@ use crate::tui::{
 };
 use crate::Result;
 
+#[derive(Default)]
 pub struct SendMessagePage {
     pub to: String,
     pub message: String,
@@ -18,17 +19,6 @@ pub struct SendMessagePage {
     pub status: Option<String>,
 }
 
-impl Default for SendMessagePage {
-    fn default() -> Self {
-        Self {
-            to: String::new(),
-            message: String::new(),
-            cursor: 0,
-            error: None,
-            status: None,
-        }
-    }
-}
 
 impl Component for SendMessagePage {
     fn handle_event(
