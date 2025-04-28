@@ -6,7 +6,10 @@ use ratatui::widgets::Widget;
 use crate::{
     disk::{AddressBook, AddressBookEntry, DiskInterface},
     tui::{
-        app::widgets::form::{Form, FormItem},
+        app::widgets::{
+            form::{Form, FormItem},
+            input_box::InputBox,
+        },
         events::Event,
         traits::{Component, HandleResult},
     },
@@ -33,22 +36,13 @@ impl Component for AddressBookCreatePage {
         _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
     ) -> crate::Result<HandleResult> {
-        let cursor_max = 2;
+        InputBox::handle_events(self.text_input_mut(), event)?;
 
+        let cursor_max = 2;
         let mut handle_result = HandleResult::default();
         if let Event::Input(key_event) = event {
             if key_event.kind == KeyEventKind::Press {
                 match key_event.code {
-                    KeyCode::Char(char) => {
-                        if let Some(text_input) = self.text_input_mut() {
-                            text_input.push(char);
-                        }
-                    }
-                    KeyCode::Backspace => {
-                        if let Some(text_input) = self.text_input_mut() {
-                            text_input.pop();
-                        }
-                    }
                     KeyCode::Up => {
                         self.cursor = (self.cursor + cursor_max - 1) % cursor_max;
                     }

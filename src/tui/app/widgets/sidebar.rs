@@ -1,10 +1,11 @@
-use ratatui::{style::Stylize, text::Line, widgets::Widget};
+use ratatui::{layout::Offset, style::Stylize, text::Line, widgets::Widget};
 
-pub struct Right<'a> {
+pub struct Sidebar<'a> {
     pub eth_price: &'a Option<String>,
+    pub testnet_mode: &'a bool,
 }
 
-impl Widget for Right<'_> {
+impl Widget for Sidebar<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,
@@ -17,5 +18,8 @@ impl Widget for Right<'_> {
         Line::from(format!("EthPrice: {eth_price}"))
             .bold()
             .render(area, buf);
+        Line::from(format!("Testnet Mode: {}", self.testnet_mode))
+            .bold()
+            .render(area.offset(Offset { x: 0, y: 1 }), buf);
     }
 }
