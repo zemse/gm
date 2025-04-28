@@ -19,7 +19,6 @@ pub struct SendMessagePage {
     pub status: Option<String>,
 }
 
-
 impl Component for SendMessagePage {
     fn handle_event(
         &mut self,
