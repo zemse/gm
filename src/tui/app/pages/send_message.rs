@@ -1,15 +1,14 @@
 use crossterm::event::{KeyCode, KeyEventKind};
-use std::sync::{Arc, atomic::AtomicBool};
-use std::sync::mpsc;
 use ratatui::widgets::Widget;
+use std::sync::mpsc;
+use std::sync::{atomic::AtomicBool, Arc};
 
-
-use crate::Result;
 use crate::tui::{
+    app::widgets::form::{Form, FormItem}, // <- Using your custom form system
     events::Event,
     traits::{Component, HandleResult},
-    app::widgets::form::{Form, FormItem}, // <- Using your custom form system
 };
+use crate::Result;
 
 pub struct SendMessagePage {
     pub to: String,
@@ -71,8 +70,12 @@ impl Component for SendMessagePage {
                         _ => {}
                     },
                     KeyCode::Backspace => match self.cursor {
-                        0 => { self.to.pop(); }
-                        1 => { self.message.pop(); }
+                        0 => {
+                            self.to.pop();
+                        }
+                        1 => {
+                            self.message.pop();
+                        }
                         _ => {}
                     },
                     _ => {}
@@ -111,7 +114,7 @@ impl Component for SendMessagePage {
                 FormItem::Button {
                     focus: self.cursor == 3,
                     label: &"Send Message".to_string(),
-                }
+                },
             ],
         }
         .render(area, buf);
