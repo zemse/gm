@@ -12,9 +12,9 @@ use ratatui::{
     widgets::{Block, BorderType, Widget},
     DefaultTerminal,
 };
-use widgets::{footer::Footer, right::Right, title::Title};
+use widgets::{footer::Footer, sidebar::Sidebar, title::Title};
 
-use crate::disk::Config;
+use crate::disk::{Config, DiskInterface};
 
 use super::{
     events::Event,
@@ -28,15 +28,18 @@ pub struct App {
     pub exit: bool,
     pub context: Vec<Page>,
     pub eth_price: Option<String>,
+    pub testnet_mode: bool,
     pub current_account: Option<Address>,
 }
 
 impl Default for App {
     fn default() -> Self {
+        let config = Config::load();
         Self {
             exit: false,
             context: vec![Page::MainMenu(MainMenuPage::default())],
             eth_price: None,
+            testnet_mode: config.testnet_mode,
             current_account: Config::current_account_optn(),
         }
     }
@@ -56,6 +59,11 @@ impl App {
         }
     }
 
+    pub fn reload(&mut self) {
+        let config = Config::load();
+        self.testnet_mode = config.testnet_mode;
+    }
+
     pub fn handle_event(
         &mut self,
         event: super::events::Event,
@@ -68,6 +76,7 @@ impl App {
                 self.context.pop();
             }
             if result.reload {
+                self.reload();
                 if let Some(page) = self.current_page_mut() {
                     page.reload();
                 }
@@ -155,8 +164,9 @@ impl Widget for &App {
 
                 page.render_component_with_block(left_area, buf, Block::bordered());
 
-                Right {
+                Sidebar {
                     eth_price: &self.eth_price,
+                    testnet_mode: &self.testnet_mode,
                 }
                 .render_with_block(
                     right_area,

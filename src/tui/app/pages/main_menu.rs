@@ -78,7 +78,9 @@ impl Component for MainMenuPage {
                         Action::SendMessage { .. } => {
                             result.page_inserts.push(Page::SendMessage(SendMessagePage))
                         }
-                        Action::Config { .. } => result.page_inserts.push(Page::Config(ConfigPage)),
+                        Action::Config { .. } => result
+                            .page_inserts
+                            .push(Page::Config(ConfigPage::default())),
                     },
                     _ => {}
                 }
