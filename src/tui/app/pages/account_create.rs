@@ -11,7 +11,7 @@ use ratatui::{
     layout::{Offset, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{ Gauge, Widget},
+    widgets::{Gauge, Widget},
 };
 
 use crate::{
@@ -290,14 +290,24 @@ impl Component for AccountCreatePage {
                 let est_attempts = 16_usize.pow(count as u32);
                 let est_time = est_attempts as f64 / hash_rate as f64;
                 let elapsed_time = self.started_mining_at.elapsed();
-                // let est_time = Duration::from_secs(est_time as u64);
-                format!(
-                    "Remaining time: {}",
-                    humantime::format_duration(Duration::from_secs(
-                        est_time as u64 - elapsed_time.as_secs()
-                    ))
-                )
-                .render(area.offset(Offset { x: 0, y: 16 }), buf);
+                let remaining_time = est_time - elapsed_time.as_secs_f64();
+
+                if remaining_time.is_sign_negative() {
+                    format!(
+                        "Searched for: {}.\
+                        The expected time has passed, but a match could happen any moment now.",
+                        humantime::format_duration(
+                            Duration::from_secs(remaining_time.abs() as u64)
+                        )
+                    )
+                    .render(area.offset(Offset { x: 0, y: 16 }), buf);
+                } else {
+                    format!(
+                        "Remaining time: {}",
+                        humantime::format_duration(Duration::from_secs(remaining_time as u64))
+                    )
+                    .render(area.offset(Offset { x: 0, y: 16 }), buf);
+                }
                 Gauge::default()
                     .gauge_style(Style::new().white().on_black())
                     .percent((elapsed_time.as_secs() * 100 / est_time as u64) as u16)
