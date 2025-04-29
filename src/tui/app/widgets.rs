@@ -3,6 +3,7 @@ pub mod filter_select;
 pub mod footer;
 pub mod form;
 pub mod input_box;
-pub mod right;
+pub mod popup_ok;
 pub mod select;
+pub mod sidebar;
 pub mod title;

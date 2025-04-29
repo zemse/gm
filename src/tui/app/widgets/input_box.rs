@@ -1,17 +1,37 @@
 use std::cmp::min;
 
+use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Offset, Rect},
     text::Span,
     widgets::{Block, Widget},
 };
 
-use crate::tui::traits::WidgetHeight;
+use crate::tui::{traits::WidgetHeight, Event};
 
 pub struct InputBox<'a> {
     pub focus: bool,
     pub label: &'a String,
     pub text: &'a String,
+}
+
+impl InputBox<'_> {
+    pub fn handle_events(input: Option<&mut String>, event: &Event) -> crate::Result<()> {
+        if let Some(text_input) = input {
+            if let Event::Input(key_event) = event {
+                match key_event.code {
+                    KeyCode::Char(char) => {
+                        text_input.push(char);
+                    }
+                    KeyCode::Backspace => {
+                        text_input.pop();
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Widget for InputBox<'_> {

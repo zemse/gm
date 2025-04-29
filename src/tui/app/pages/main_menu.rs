@@ -75,10 +75,12 @@ impl Component for MainMenuPage {
                         Action::SignMessage { .. } => {
                             result.page_inserts.push(Page::SignMessage(SignMessagePage))
                         }
-                        Action::SendMessage { .. } => {
-                            result.page_inserts.push(Page::SendMessage(SendMessagePage))
-                        }
-                        Action::Config { .. } => result.page_inserts.push(Page::Config(ConfigPage)),
+                        Action::SendMessage { .. } => result
+                            .page_inserts
+                            .push(Page::SendMessage(SendMessagePage::default())),
+                        Action::Config { .. } => result
+                            .page_inserts
+                            .push(Page::Config(ConfigPage::default())),
                     },
                     _ => {}
                 }

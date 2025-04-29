@@ -6,10 +6,16 @@ use super::{button::Button, input_box::InputBox};
 
 pub enum FormItem<'a> {
     Heading(&'a str),
+    Text(Option<&'a String>),
     InputBox {
         focus: bool,
         label: &'a String,
         text: &'a String,
+    },
+    BooleanInput {
+        focus: bool,
+        label: &'a String,
+        value: &'a bool,
     },
     Button {
         focus: bool,
@@ -35,8 +41,29 @@ impl Widget for Form<'_> {
                     Line::from(heading).bold().render(area, buf);
                     area.y += 2;
                 }
+                FormItem::Text(text) => {
+                    if let Some(text) = text {
+                        area.y += 1;
+                        text.render(area, buf);
+                        area.y += 1;
+                    }
+                }
                 FormItem::InputBox { focus, label, text } => {
                     let widget = InputBox { focus, label, text };
+                    let height_used = widget.height_used(area); // to see height based on width
+                    widget.render(area, buf);
+                    area.y += height_used;
+                }
+                FormItem::BooleanInput {
+                    focus,
+                    label,
+                    value,
+                } => {
+                    let widget = InputBox {
+                        focus,
+                        label,
+                        text: &value.to_string(),
+                    };
                     let height_used = widget.height_used(area); // to see height based on width
                     widget.render(area, buf);
                     area.y += height_used;
