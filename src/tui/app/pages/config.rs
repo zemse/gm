@@ -6,9 +6,12 @@ use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use crate::{
     disk::{Config, DiskInterface},
     tui::{
-        app::widgets::{
-            form::{Form, FormItem},
-            input_box::InputBox,
+        app::{
+            widgets::{
+                form::{Form, FormItem},
+                input_box::InputBox,
+            },
+            SharedState,
         },
         events::Event,
         traits::{Component, HandleResult},
@@ -90,7 +93,7 @@ impl Component for ConfigPage {
         Ok(handle_result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, _: &SharedState) -> Rect
     where
         Self: Sized,
     {

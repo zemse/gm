@@ -14,29 +14,35 @@ use ratatui::{
 };
 use widgets::{footer::Footer, popup_ok::PopupOk, sidebar::Sidebar, title::Title};
 
-use crate::disk::{Config, DiskInterface};
+use crate::{
+    disk::{Config, DiskInterface},
+    utils::assets::Asset,
+};
 
 use super::{
-    events::Event,
+    events::{self, Event},
     traits::{BorderedWidget, Component},
 };
 
 pub mod pages;
 pub mod widgets;
 
-// Shared among all pages
-// pub struct SharedState {
-//     cursor_freeze: bool,
-// }
+pub struct SharedState<'a> {
+    pub assets: &'a Option<Vec<Asset>>,
+}
 
 pub struct App {
     pub exit: bool,
     pub current_account: Option<Address>,
     pub context: Vec<Page>,
     pub eth_price: Option<String>,
+    pub assets: Option<Vec<Asset>>,
     pub testnet_mode: bool,
     pub fatal_error: Option<String>,
-    // pub shared_state: SharedState,
+
+    pub input_thread: Option<std::thread::JoinHandle<()>>,
+    pub eth_price_thread: Option<tokio::task::JoinHandle<()>>,
+    pub assets_thread: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl Default for App {
@@ -49,10 +55,11 @@ impl Default for App {
             testnet_mode: config.testnet_mode,
             current_account: config.current_account,
             fatal_error: None,
-            // shared_state: SharedState {
-            //     cursor_freeze: false,
-            // },
+            assets: None,
             context: vec![Page::MainMenu(MainMenuPage::default())],
+            input_thread: None,
+            eth_price_thread: None,
+            assets_thread: None,
         }
     }
 }
@@ -65,7 +72,37 @@ impl App {
         Ok(())
     }
 
+    pub fn init_threads(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
+        let tr_input = tr.clone();
+        let shutdown_signal = sd.clone();
+        self.input_thread = Some(std::thread::spawn(move || {
+            events::input::watch_input_events(tr_input, shutdown_signal);
+        }));
+
+        let tr_eth_price = tr.clone();
+        let shutdown_signal = sd.clone();
+        self.eth_price_thread = Some(tokio::spawn(async move {
+            events::eth_price::watch_eth_price_change(tr_eth_price, shutdown_signal).await
+        }));
+
+        let tr_assets = tr.clone();
+        let shutdown_signal = sd.clone();
+        self.assets_thread = Some(tokio::spawn(async move {
+            events::assets::watch_assets(tr_assets, shutdown_signal).await
+        }));
+    }
+
     pub async fn exit_threads(&mut self) {
+        if let Some(thread) = self.input_thread.take() {
+            thread.join().unwrap();
+        }
+        if let Some(thread) = self.eth_price_thread.take() {
+            thread.await.unwrap();
+        }
+        if let Some(thread) = self.assets_thread.take() {
+            thread.await.unwrap();
+        }
+
         for page in &mut self.context {
             page.exit_threads().await;
         }
@@ -140,6 +177,7 @@ impl App {
             Event::AccountChange(address) => {
                 self.current_account = Some(address);
             }
+            Event::AssetsUpdate(assets) => self.assets = Some(assets),
             _ => {}
         };
 
@@ -173,15 +211,29 @@ impl Widget for &App {
             }
             .render(title_area, buf);
 
+            let app_shared_state = SharedState {
+                assets: &self.assets,
+            };
+
             // Body render
             if page.is_full_screen() {
-                page.render_component_with_block(body_area, buf, Block::bordered());
+                page.render_component_with_block(
+                    body_area,
+                    buf,
+                    Block::bordered(),
+                    &app_shared_state,
+                );
             } else {
                 let horizontal_layout =
                     Layout::horizontal([Constraint::Percentage(70), Constraint::Percentage(30)]);
                 let [left_area, right_area] = horizontal_layout.areas(body_area);
 
-                page.render_component_with_block(left_area, buf, Block::bordered());
+                page.render_component_with_block(
+                    left_area,
+                    buf,
+                    Block::bordered(),
+                    &app_shared_state,
+                );
 
                 Sidebar {
                     eth_price: &self.eth_price,

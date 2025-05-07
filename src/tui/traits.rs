@@ -5,7 +5,10 @@ use ratatui::{
     widgets::{Block, Widget},
 };
 
-use super::{app::pages::Page, events::Event};
+use super::{
+    app::{pages::Page, SharedState},
+    events::Event,
+};
 
 pub trait BorderedWidget {
     fn render_with_block(
@@ -63,6 +66,7 @@ pub trait Component {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
+        shared_state: &SharedState,
     ) -> Rect
     where
         Self: Sized;
@@ -72,13 +76,14 @@ pub trait Component {
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         block: Block<'_>,
+        shared_state: &SharedState,
     ) -> Rect
     where
         Self: Sized,
     {
         let inner_area = block.inner(area);
         block.render(area, buf);
-        self.render_component(inner_area, buf);
+        self.render_component(inner_area, buf, shared_state);
         area
     }
 }

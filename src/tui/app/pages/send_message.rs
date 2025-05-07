@@ -3,6 +3,7 @@ use ratatui::widgets::Widget;
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 
+use crate::tui::app::SharedState;
 use crate::tui::{
     app::widgets::form::{Form, FormItem}, // <- Using your custom form system
     events::Event,
@@ -79,6 +80,7 @@ impl Component for SendMessagePage {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
+        _: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,

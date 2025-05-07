@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::{
     tui::{
-        app::widgets::input_box::InputBox,
+        app::{widgets::input_box::InputBox, SharedState},
         events::Event,
         traits::{Component, HandleResult},
     },
@@ -73,7 +73,7 @@ impl Component for AccountImportPage {
         Ok(result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, _: &SharedState) -> Rect
     where
         Self: Sized,
     {

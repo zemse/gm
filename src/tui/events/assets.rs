@@ -1,5 +1,3 @@
-use super::Event;
-use serde::Deserialize;
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -10,7 +8,11 @@ use std::{
     time::Duration,
 };
 
-pub async fn watch_eth_price_change(transmitter: Sender<Event>, shutdown_signal: Arc<AtomicBool>) {
+use crate::utils::assets::get_all_assets;
+
+use super::Event;
+
+pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Arc<AtomicBool>) {
     // Query interval is the API query delay, however to prevent blocking at
     // the thread::sleep, which will cause delayed processing of shutdown_signal.
     // To prevent this, we check shutdown_signal at shorter intervals while
@@ -22,27 +24,13 @@ pub async fn watch_eth_price_change(transmitter: Sender<Event>, shutdown_signal:
     while !shutdown_signal.load(Ordering::Relaxed) {
         if counter >= query_interval_milli {
             // Send GET request
-            if let Ok(price) = query_eth_price().await {
-                transmitter.send(Event::EthPriceUpdate(price)).unwrap();
-            }
+            let assets = get_all_assets().await;
+            transmitter.send(Event::AssetsUpdate(assets)).unwrap();
+
             counter = 0;
         }
 
         counter += thread_sleep_duration_milli;
         thread::sleep(Duration::from_millis(thread_sleep_duration_milli));
     }
-}
-
-#[derive(Deserialize)]
-struct BinanceResponse {
-    #[allow(dead_code)]
-    symbol: String,
-    price: String,
-}
-
-async fn query_eth_price() -> Result<String, reqwest::Error> {
-    let url = "https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT";
-    let response = reqwest::get(url).await?;
-    let json = response.json::<BinanceResponse>().await?;
-    Ok(json.price)
 }

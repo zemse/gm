@@ -2,13 +2,19 @@ use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 
-use crate::tui::{
-    events::Event,
-    traits::{Component, HandleResult},
+use crate::{
+    tui::{
+        app::{widgets::select::Select, SharedState},
+        events::Event,
+        traits::{Component, HandleResult},
+    },
+    utils::cursor::Cursor,
 };
 
 #[derive(Default)]
-pub struct AssetsPage;
+pub struct AssetsPage {
+    cursor: Cursor,
+}
 
 impl Component for AssetsPage {
     fn handle_event(
@@ -20,11 +26,20 @@ impl Component for AssetsPage {
         Ok(HandleResult::default())
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
     where
         Self: Sized,
     {
         "assets page".render(area, buf);
+
+        if let Some(list) = shared_state.assets.as_ref() {
+            Select {
+                list,
+                cursor: &self.cursor,
+            }
+            .render(area, buf);
+        }
+
         area
     }
 }

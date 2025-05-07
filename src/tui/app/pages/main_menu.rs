@@ -6,7 +6,7 @@ use ratatui::widgets::Widget;
 use crate::{
     actions::Action,
     tui::{
-        app::widgets::select::Select,
+        app::{widgets::select::Select, SharedState},
         events::Event,
         traits::{Component, HandleResult},
     },
@@ -60,7 +60,9 @@ impl Component for MainMenuPage {
                                 .page_inserts
                                 .push(Page::AddressBook(AddressBookPage::default()));
                         }
-                        Action::Assets => result.page_inserts.push(Page::Assets(AssetsPage)),
+                        Action::Assets => result
+                            .page_inserts
+                            .push(Page::Assets(AssetsPage::default())),
                         Action::Account { .. } => {
                             result
                                 .page_inserts
@@ -91,6 +93,7 @@ impl Component for MainMenuPage {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
+        _: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,

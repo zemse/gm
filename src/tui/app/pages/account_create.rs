@@ -16,6 +16,7 @@ use ratatui::{
 
 use crate::{
     tui::{
+        app::SharedState,
         events::Event,
         traits::{Component, HandleResult},
     },
@@ -210,7 +211,7 @@ impl Component for AccountCreatePage {
         Ok(result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, _: &SharedState) -> Rect
     where
         Self: Sized,
     {

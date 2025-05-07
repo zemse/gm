@@ -19,6 +19,8 @@ use crate::tui::{
     traits::{Component, HandleResult},
 };
 
+use super::SharedState;
+
 pub mod account;
 pub mod account_create;
 pub mod account_import;
@@ -139,27 +141,28 @@ impl Component for Page {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
+        shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
     {
         match self {
-            Page::MainMenu(page) => page.render_component(area, buf),
-            Page::Setup(page) => page.render_component(area, buf),
+            Page::MainMenu(page) => page.render_component(area, buf, shared_state),
+            Page::Setup(page) => page.render_component(area, buf, shared_state),
 
-            Page::AddressBook(page) => page.render_component(area, buf),
-            Page::AddressBookCreate(page) => page.render_component(area, buf),
-            Page::AddressBookDisplay(page) => page.render_component(area, buf),
+            Page::AddressBook(page) => page.render_component(area, buf, shared_state),
+            Page::AddressBookCreate(page) => page.render_component(area, buf, shared_state),
+            Page::AddressBookDisplay(page) => page.render_component(area, buf, shared_state),
 
-            Page::Account(page) => page.render_component(area, buf),
-            Page::AccountCreate(page) => page.render_component(area, buf),
-            Page::AccountImport(page) => page.render_component(area, buf),
+            Page::Account(page) => page.render_component(area, buf, shared_state),
+            Page::AccountCreate(page) => page.render_component(area, buf, shared_state),
+            Page::AccountImport(page) => page.render_component(area, buf, shared_state),
 
-            Page::Assets(page) => page.render_component(area, buf),
-            Page::Config(page) => page.render_component(area, buf),
-            Page::SendMessage(page) => page.render_component(area, buf),
-            Page::SignMessage(page) => page.render_component(area, buf),
-            Page::Transaction(page) => page.render_component(area, buf),
+            Page::Assets(page) => page.render_component(area, buf, shared_state),
+            Page::Config(page) => page.render_component(area, buf, shared_state),
+            Page::SendMessage(page) => page.render_component(area, buf, shared_state),
+            Page::SignMessage(page) => page.render_component(area, buf, shared_state),
+            Page::Transaction(page) => page.render_component(area, buf, shared_state),
         }
     }
 }

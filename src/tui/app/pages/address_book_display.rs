@@ -6,7 +6,10 @@ use ratatui::widgets::Widget;
 use crate::{
     disk::{AddressBook, AddressBookEntry, DiskInterface},
     tui::{
-        app::widgets::form::{Form, FormItem},
+        app::{
+            widgets::form::{Form, FormItem},
+            SharedState,
+        },
         events::Event,
         traits::{Component, HandleResult},
     },
@@ -101,6 +104,7 @@ impl Component for AddressBookDisplayPage {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
+        _: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,

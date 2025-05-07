@@ -3,6 +3,7 @@ use std::sync::{atomic::AtomicBool, mpsc, Arc};
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 
 use crate::tui::{
+    app::SharedState,
     events::Event,
     traits::{Component, HandleResult},
 };
@@ -20,7 +21,7 @@ impl Component for SetupPage {
         Ok(HandleResult::default())
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, _: &SharedState) -> Rect
     where
         Self: Sized,
     {

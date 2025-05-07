@@ -10,7 +10,7 @@ use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use crate::{
     disk::{Config, DiskInterface},
     tui::{
-        app::widgets::select::Select,
+        app::{widgets::select::Select, SharedState},
         events::Event,
         traits::{Component, HandleResult},
     },
@@ -106,7 +106,7 @@ impl Component for AccountPage {
         Ok(result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, _: &SharedState) -> Rect
     where
         Self: Sized,
     {

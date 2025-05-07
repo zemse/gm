@@ -1,4 +1,5 @@
 pub mod account;
+pub mod assets;
 pub mod cursor;
 
 pub trait Inquire<DefaultValue = ()>
