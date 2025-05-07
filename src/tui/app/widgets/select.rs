@@ -1,14 +1,19 @@
 use std::fmt::Display;
 
 use ratatui::{
+    layout::{Constraint, Layout},
     style::{Color, Modifier, Style},
     text::Line,
     widgets::{List, ListItem, Widget},
 };
 
+use crate::utils::cursor::Cursor;
+
+use super::scroll_bar::CustomScrollBar;
+
 pub struct Select<'a, T: Display> {
     pub list: &'a Vec<T>,
-    pub cursor: Option<&'a usize>,
+    pub cursor: &'a Cursor,
 }
 
 impl<T: Display> Widget for Select<'_, T> {
@@ -16,24 +21,50 @@ impl<T: Display> Widget for Select<'_, T> {
     where
         Self: Sized,
     {
-        let idx = self.cursor;
-        let items: Vec<ListItem> = self
-            .list
-            .iter()
-            .enumerate()
-            .map(|(i, member)| {
-                let content = Line::from(format!("{member}"));
-                let style = if idx == Some(&i) {
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD | Modifier::REVERSED)
-                } else {
-                    Style::default()
-                };
-                ListItem::new(content).style(style)
-            })
-            .collect();
+        let capacity = area.height as usize;
+        let page_number = self.cursor.current / capacity;
+        let idx = self.cursor.current % capacity;
 
-        List::new(items).render(area, buf);
+        let render_item = |(i, member)| {
+            let content = Line::from(format!("{member}"));
+            let style = if idx == i {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+            } else {
+                Style::default()
+            };
+            ListItem::new(content).style(style)
+        };
+
+        if capacity < self.list.len() {
+            let display_items = self
+                .list
+                .chunks(capacity)
+                .nth(page_number)
+                .unwrap()
+                .iter()
+                .enumerate()
+                .map(render_item)
+                .collect::<Vec<ListItem>>();
+
+            let horizontal_layout = Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]);
+            let [list_area, scroll_area] = horizontal_layout.areas(area);
+            List::new(display_items).render(list_area, buf);
+            CustomScrollBar {
+                cursor: self.cursor.current,
+                capacity,
+                max: self.list.len(),
+            }
+            .render(scroll_area, buf);
+        } else {
+            let display_items = self
+                .list
+                .iter()
+                .enumerate()
+                .map(render_item)
+                .collect::<Vec<ListItem>>();
+            List::new(display_items).render(area, buf);
+        }
     }
 }

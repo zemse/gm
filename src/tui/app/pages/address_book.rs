@@ -11,6 +11,7 @@ use crate::{
         events::Event,
         traits::{Component, HandleResult},
     },
+    utils::cursor::Cursor,
 };
 
 use super::{
@@ -20,7 +21,7 @@ use super::{
 pub struct AddressBookPage {
     full_list: Vec<AddressBookActions>,
     search_string: String,
-    cursor: usize,
+    cursor: Cursor,
 }
 
 impl Default for AddressBookPage {
@@ -28,7 +29,7 @@ impl Default for AddressBookPage {
         Self {
             full_list: AddressBookActions::get_menu(),
             search_string: String::new(),
-            cursor: 0,
+            cursor: Cursor::default(),
         }
     }
 }
@@ -56,6 +57,7 @@ impl Component for AddressBookPage {
             .collect();
 
         let cursor_max = list.len();
+        self.cursor.handle(event, cursor_max);
 
         let mut result = HandleResult::default();
         if let Event::Input(key_event) = event {
@@ -71,13 +73,7 @@ impl Component for AddressBookPage {
                             text_input.pop();
                         }
                     }
-                    KeyCode::Up => {
-                        self.cursor = (self.cursor + cursor_max - 1) % cursor_max;
-                    }
-                    KeyCode::Down => {
-                        self.cursor = (self.cursor + 1) % cursor_max;
-                    }
-                    KeyCode::Enter => result.page_inserts.push(match &list[self.cursor] {
+                    KeyCode::Enter => result.page_inserts.push(match &list[self.cursor.current] {
                         AddressBookActions::Create { address, name } => {
                             Page::AddressBookCreate(AddressBookCreatePage {
                                 cursor: 0,
@@ -117,7 +113,7 @@ impl Component for AddressBookPage {
     {
         FilterSelect {
             full_list: &self.full_list,
-            cursor: Some(&self.cursor),
+            cursor: &self.cursor,
             search_string: &self.search_string,
         }
         .render(area, buf);

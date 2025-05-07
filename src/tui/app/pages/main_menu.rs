@@ -10,6 +10,7 @@ use crate::{
         events::Event,
         traits::{Component, HandleResult},
     },
+    utils::cursor::Cursor,
 };
 
 use super::{
@@ -19,7 +20,7 @@ use super::{
 };
 
 pub struct MainMenuPage {
-    cursor: usize,
+    cursor: Cursor,
     list: Vec<Action>,
 }
 
@@ -27,7 +28,7 @@ impl Default for MainMenuPage {
     fn default() -> Self {
         Self {
             list: Action::get_menu(),
-            cursor: 0,
+            cursor: Cursor::default(),
         }
     }
 }
@@ -45,18 +46,14 @@ impl Component for MainMenuPage {
         _shutdown_signal: &Arc<AtomicBool>,
     ) -> crate::Result<HandleResult> {
         let cursor_max = self.list.len();
+        self.cursor.handle(event, cursor_max);
 
         let mut result = HandleResult::default();
         if let Event::Input(key_event) = event {
             if key_event.kind == KeyEventKind::Press {
+                #[allow(clippy::single_match)]
                 match key_event.code {
-                    KeyCode::Up => {
-                        self.cursor = (self.cursor + cursor_max - 1) % cursor_max;
-                    }
-                    KeyCode::Down => {
-                        self.cursor = (self.cursor + 1) % cursor_max;
-                    }
-                    KeyCode::Enter => match &self.list[self.cursor] {
+                    KeyCode::Enter => match &self.list[self.cursor.current] {
                         Action::Setup => todo!(),
                         Action::AddressBook { .. } => {
                             result
@@ -100,7 +97,7 @@ impl Component for MainMenuPage {
     {
         Select {
             list: &self.list,
-            cursor: Some(&self.cursor),
+            cursor: &self.cursor,
         }
         .render(area, buf);
 
