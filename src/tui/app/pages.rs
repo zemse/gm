@@ -35,6 +35,7 @@ pub mod setup;
 pub mod sign_message;
 pub mod transaction;
 
+#[allow(clippy::large_enum_variant)]
 pub enum Page {
     MainMenu(MainMenuPage),
     Setup(SetupPage),

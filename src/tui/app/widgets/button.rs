@@ -7,12 +7,12 @@ use ratatui::{
 
 use crate::tui::traits::BorderedWidget;
 
-pub struct Button<'a> {
+pub struct Button {
     pub focus: bool,
-    pub label: &'a String,
+    pub label: &'static str,
 }
 
-impl Widget for Button<'_> {
+impl Widget for Button {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,
@@ -24,7 +24,7 @@ impl Widget for Button<'_> {
             y: area.y,
         };
 
-        Line::from(self.label.clone()).render_with_block(
+        Line::from(self.label).render_with_block(
             button_area,
             buf,
             Block::bordered().style(if self.focus {

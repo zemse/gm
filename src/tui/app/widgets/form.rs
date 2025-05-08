@@ -1,81 +1,185 @@
-use ratatui::{style::Stylize, text::Line, widgets::Widget};
+use crossterm::event::{KeyCode, KeyEventKind};
+use ratatui::{style::Stylize, widgets::Widget};
 
-use crate::tui::traits::WidgetHeight;
+use crate::tui::{traits::WidgetHeight, Event};
 
 use super::{button::Button, input_box::InputBox};
 
-pub enum FormItem<'a> {
-    Heading(&'a str),
-    Text(Option<&'a String>),
+pub enum FormItem {
+    Heading(&'static str),
     InputBox {
-        focus: bool,
-        label: &'a String,
-        text: &'a String,
+        label: &'static str,
+        text: String,
+        empty_text: Option<&'static str>,
     },
     BooleanInput {
-        focus: bool,
-        label: &'a String,
-        value: &'a bool,
+        label: &'static str,
+        value: bool,
     },
     Button {
-        focus: bool,
-        label: &'a String,
+        label: &'static str,
     },
-    Error {
-        label: &'a Option<&'a String>,
-    },
+    DisplayText(String),
+    ErrorText(String),
 }
 
-pub struct Form<'a> {
-    pub items: Vec<FormItem<'a>>,
+pub struct Form {
+    pub cursor: usize,
+    pub items: Vec<FormItem>,
 }
 
-impl Widget for Form<'_> {
+impl Form {
+    pub fn get_input_text(&self, idx: usize) -> &String {
+        match &self.items[idx] {
+            FormItem::InputBox { text, .. } => text,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_boolean_value(&self, idx: usize) -> bool {
+        match &self.items[idx] {
+            FormItem::BooleanInput { value, .. } => *value,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_display_text_mut(&mut self, idx: usize) -> &mut String {
+        match &mut self.items[idx] {
+            FormItem::DisplayText(text, ..) => text,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_error_text_mut(&mut self, idx: usize) -> &mut String {
+        match &mut self.items[idx] {
+            FormItem::ErrorText(text, ..) => text,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn is_button(&self) -> bool {
+        matches!(self.items[self.cursor], FormItem::Button { .. })
+    }
+
+    pub fn handle_event<F>(&mut self, event: &Event, mut on_button: F) -> crate::Result<()>
+    where
+        F: FnMut(&'static str, &mut Self),
+    {
+        if let Event::Input(key_event) = event {
+            if key_event.kind == KeyEventKind::Press {
+                match key_event.code {
+                    KeyCode::Up => loop {
+                        self.cursor = (self.cursor + self.items.len() - 1) % self.items.len();
+
+                        match &self.items[self.cursor] {
+                            FormItem::InputBox { .. } => break,
+                            FormItem::BooleanInput { .. } => break,
+                            FormItem::Button { .. } => break,
+                            _ => {}
+                        }
+                    },
+                    KeyCode::Down | KeyCode::Tab => loop {
+                        self.cursor = (self.cursor + 1) % self.items.len();
+
+                        match &self.items[self.cursor] {
+                            FormItem::InputBox { .. } => break,
+                            FormItem::BooleanInput { .. } => break,
+                            FormItem::Button { .. } => break,
+                            _ => {}
+                        }
+                    },
+                    KeyCode::Enter => {
+                        if !self.is_button() {
+                            loop {
+                                self.cursor = (self.cursor + 1) % self.items.len();
+
+                                match &self.items[self.cursor] {
+                                    FormItem::InputBox { .. } => break,
+                                    FormItem::BooleanInput { .. } => break,
+                                    FormItem::Button { .. } => break,
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+
+                    _ => {}
+                }
+
+                match &mut self.items[self.cursor] {
+                    FormItem::InputBox { text, .. } => {
+                        InputBox::handle_events(text, event)?;
+                    }
+                    FormItem::BooleanInput { value, .. } => {
+                        if matches!(
+                            key_event.code,
+                            KeyCode::Char(_) | KeyCode::Left | KeyCode::Right | KeyCode::Backspace
+                        ) {
+                            *value = !*value
+                        }
+                    }
+                    FormItem::Button { label } => {
+                        if matches!(key_event.code, KeyCode::Enter) {
+                            on_button(label, self)
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Widget for &Form {
     fn render(self, mut area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,
     {
-        for item in self.items {
+        for (i, item) in self.items.iter().enumerate() {
             match item {
                 FormItem::Heading(heading) => {
-                    Line::from(heading).bold().render(area, buf);
+                    heading.bold().render(area, buf);
                     area.y += 2;
                 }
-                FormItem::Text(text) => {
-                    if let Some(text) = text {
-                        area.y += 1;
-                        text.render(area, buf);
-                        area.y += 1;
-                    }
-                }
-                FormItem::InputBox { focus, label, text } => {
-                    let widget = InputBox { focus, label, text };
-                    let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf);
-                    area.y += height_used;
-                }
-                FormItem::BooleanInput {
-                    focus,
+                FormItem::InputBox {
                     label,
-                    value,
+                    text,
+                    empty_text,
                 } => {
                     let widget = InputBox {
-                        focus,
+                        focus: self.cursor == i,
                         label,
-                        text: &value.to_string(),
+                        text,
+                        empty_text: *empty_text,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
                     widget.render(area, buf);
                     area.y += height_used;
                 }
-                FormItem::Button { focus, label } => {
-                    Button { focus, label }.render(area, buf);
+                FormItem::BooleanInput { label, value } => {
+                    let widget = InputBox {
+                        focus: self.cursor == i,
+                        label,
+                        text: &value.to_string(),
+                        empty_text: None,
+                    };
+                    let height_used = widget.height_used(area); // to see height based on width
+                    widget.render(area, buf);
+                    area.y += height_used;
+                }
+                FormItem::Button { label } => {
+                    Button {
+                        focus: self.cursor == i,
+                        label,
+                    }
+                    .render(area, buf);
                     area.y += 3;
                 }
-                FormItem::Error { label } => {
-                    if let Some(label) = label {
-                        area.y += 1; // leave a line before the error text
-                        label.render(area, buf);
+                FormItem::DisplayText(text) | FormItem::ErrorText(text) => {
+                    if !text.is_empty() {
+                        area.y += 1;
+                        text.render(area, buf);
                         area.y += 1;
                     }
                 }

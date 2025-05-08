@@ -79,8 +79,9 @@ impl Component for AccountImportPage {
     {
         InputBox {
             focus: true,
-            label: &"Private key or Mnemonic phrase".to_string(),
+            label: "Private key or Mnemonic phrase",
             text: &self.input,
+            empty_text: None,
         }
         .render(area, buf);
 

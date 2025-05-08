@@ -1,7 +1,7 @@
-use crossterm::event::{KeyCode, KeyEventKind};
-use ratatui::widgets::Widget;
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
+
+use ratatui::widgets::Widget;
 
 use crate::tui::app::SharedState;
 use crate::tui::{
@@ -11,69 +11,46 @@ use crate::tui::{
 };
 use crate::Result;
 
-#[derive(Default)]
 pub struct SendMessagePage {
-    pub to: String,
-    pub message: String,
-    pub cursor: usize,
-    pub error: Option<String>,
-    pub status: Option<String>,
+    pub form: Form,
+}
+
+impl Default for SendMessagePage {
+    fn default() -> Self {
+        Self {
+            form: Form {
+                cursor: 1,
+                items: vec![
+                    FormItem::Heading("Send a Message"),
+                    FormItem::InputBox {
+                        label: "To",
+                        text: String::new(),
+                        empty_text: Some("<press SPACE to select from address book>"),
+                    },
+                    FormItem::InputBox {
+                        label: "Message",
+                        text: String::new(),
+                        empty_text: None,
+                    },
+                    FormItem::Button {
+                        label: "Send Message",
+                    },
+                ],
+            },
+        }
+    }
 }
 
 impl Component for SendMessagePage {
     fn handle_event(
         &mut self,
         event: &Event,
-        _transmitter: &mpsc::Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _tr: &mpsc::Sender<Event>,
+        _sd: &Arc<AtomicBool>,
     ) -> Result<HandleResult> {
-        let result = HandleResult::default();
+        self.form.handle_event(event, |_label, _form| {})?;
 
-        if let Event::Input(key_event) = event {
-            if key_event.kind == KeyEventKind::Press {
-                match key_event.code {
-                    KeyCode::Tab | KeyCode::Down => {
-                        self.cursor = (self.cursor + 1) % 4;
-                    }
-                    KeyCode::Up => {
-                        self.cursor = (self.cursor + 3) % 4;
-                    }
-                    KeyCode::Enter => match self.cursor {
-                        2 => {
-                            self.status = Some("Opened Address Book".into());
-                            self.error = None;
-                        }
-                        3 => {
-                            if self.to.trim().is_empty() || self.message.trim().is_empty() {
-                                self.error = Some("Recipient and message cannot be empty.".into());
-                                self.status = None;
-                            } else {
-                                self.status = Some("Message sent!".into());
-                                self.error = None;
-                            }
-                        }
-                        _ => {}
-                    },
-                    KeyCode::Char(c) => match self.cursor {
-                        0 => self.to.push(c),
-                        1 => self.message.push(c),
-                        _ => {}
-                    },
-                    KeyCode::Backspace => match self.cursor {
-                        0 => {
-                            self.to.pop();
-                        }
-                        1 => {
-                            self.message.pop();
-                        }
-                        _ => {}
-                    },
-                    _ => {}
-                }
-            }
-        }
-
-        Ok(result)
+        Ok(HandleResult::default())
     }
 
     fn render_component(
@@ -85,30 +62,7 @@ impl Component for SendMessagePage {
     where
         Self: Sized,
     {
-        Form {
-            items: vec![
-                FormItem::Heading("Send a Message"),
-                FormItem::InputBox {
-                    focus: self.cursor == 0,
-                    label: &"To".to_string(),
-                    text: &self.to,
-                },
-                FormItem::InputBox {
-                    focus: self.cursor == 1,
-                    label: &"Message".to_string(),
-                    text: &self.message,
-                },
-                FormItem::Button {
-                    focus: self.cursor == 2,
-                    label: &"Select From Address Book".to_string(),
-                },
-                FormItem::Button {
-                    focus: self.cursor == 3,
-                    label: &"Send Message".to_string(),
-                },
-            ],
-        }
-        .render(area, buf);
+        self.form.render(area, buf);
 
         area
     }

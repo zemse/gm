@@ -75,24 +75,20 @@ impl Component for AddressBookPage {
                     }
                     KeyCode::Enter => result.page_inserts.push(match &list[self.cursor.current] {
                         AddressBookActions::Create { address, name } => {
-                            Page::AddressBookCreate(AddressBookCreatePage {
-                                cursor: 0,
-                                name: name.clone().unwrap_or_default(),
-                                address: address.map(|a| a.to_string()).unwrap_or_default(),
-                                error: None,
-                            })
+                            Page::AddressBookCreate(AddressBookCreatePage::new(
+                                name.clone().unwrap_or_default(),
+                                address.map(|a| a.to_string()).unwrap_or_default(),
+                            ))
                         }
                         AddressBookActions::View { id, address, name } => {
                             let (id, entry) = AddressBook::load()
                                 .find(id, address, &name.as_ref())
                                 .expect("entry not found");
-                            Page::AddressBookDisplay(AddressBookDisplayPage {
-                                cursor: 0,
+                            Page::AddressBookDisplay(AddressBookDisplayPage::new(
                                 id,
-                                name: entry.name,
-                                address: entry.address.to_string(),
-                                error: None,
-                            })
+                                entry.name,
+                                entry.address.to_string(),
+                            ))
                         }
                     }),
                     _ => {}

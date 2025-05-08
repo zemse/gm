@@ -7,30 +7,41 @@ use ratatui::{
     widgets::{Block, Widget},
 };
 
-use crate::tui::{traits::WidgetHeight, Event};
+use crate::tui::{
+    traits::{HandleResult, WidgetHeight},
+    Event,
+};
 
 pub struct InputBox<'a> {
     pub focus: bool,
-    pub label: &'a String,
+    pub label: &'static str,
     pub text: &'a String,
+    pub empty_text: Option<&'static str>,
 }
 
 impl InputBox<'_> {
-    pub fn handle_events(input: Option<&mut String>, event: &Event) -> crate::Result<()> {
-        if let Some(text_input) = input {
-            if let Event::Input(key_event) = event {
-                match key_event.code {
-                    KeyCode::Char(char) => {
+    pub fn handle_events(text_input: &mut String, event: &Event) -> crate::Result<HandleResult> {
+        let result = HandleResult::default();
+
+        if let Event::Input(key_event) = event {
+            match key_event.code {
+                KeyCode::Char(char) => {
+                    if text_input.is_empty() && char == ' ' {
+                        // result
+                        //     .page_inserts
+                        //     .push(Page::AddressBookDisplay(AddressBookDisplayPage { id: 0 }));
+                    } else {
                         text_input.push(char);
                     }
-                    KeyCode::Backspace => {
-                        text_input.pop();
-                    }
-                    _ => {}
                 }
+                KeyCode::Backspace => {
+                    text_input.pop();
+                }
+                _ => {}
             }
         }
-        Ok(())
+
+        Ok(result)
     }
 }
 
@@ -47,20 +58,24 @@ impl Widget for InputBox<'_> {
             height: (2 + lines.len()) as u16,
         };
 
-        let block = Block::bordered().title(self.label.clone());
+        let block = Block::bordered().title(self.label);
         let inner_area = block.inner(area_used);
         block.render(area_used, buf);
 
         if self.focus {
-            Span::from("|").render(
-                Rect {
-                    x: inner_area.x + lines.last().unwrap().len() as u16,
-                    y: inner_area.y + lines.len() as u16 - 1,
-                    width: 1,
-                    height: 1,
-                },
-                buf,
-            );
+            if self.text.is_empty() && self.empty_text.is_some() {
+                self.empty_text.unwrap().render(inner_area, buf);
+            } else {
+                Span::from("|").render(
+                    Rect {
+                        x: inner_area.x + lines.last().unwrap().len() as u16,
+                        y: inner_area.y + lines.len() as u16 - 1,
+                        width: 1,
+                        height: 1,
+                    },
+                    buf,
+                );
+            }
         }
 
         for (idx, line) in lines.into_iter().enumerate() {

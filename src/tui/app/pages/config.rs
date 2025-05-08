@@ -1,16 +1,12 @@
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
-use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 
 use crate::{
     disk::{Config, DiskInterface},
     tui::{
         app::{
-            widgets::{
-                form::{Form, FormItem},
-                input_box::InputBox,
-            },
+            widgets::form::{Form, FormItem},
             SharedState,
         },
         events::Event,
@@ -19,9 +15,7 @@ use crate::{
 };
 
 pub struct ConfigPage {
-    pub cursor: usize,
-    pub config: Config,
-    pub display: Option<String>,
+    pub form: Form,
 }
 
 impl Default for ConfigPage {
@@ -31,64 +25,49 @@ impl Default for ConfigPage {
             config.alchemy_api_key = Some("".to_string());
         }
         Self {
-            cursor: 0,
-            config,
-            display: None,
+            form: Form {
+                cursor: 0,
+                items: vec![
+                    FormItem::Heading("Configuration"),
+                    FormItem::InputBox {
+                        label: "Alchemy API key",
+                        text: config.alchemy_api_key.unwrap_or_default(),
+                        empty_text: None,
+                    },
+                    FormItem::BooleanInput {
+                        label: "Testnet Mode",
+                        value: config.testnet_mode,
+                    },
+                    FormItem::DisplayText(String::new()),
+                ],
+            },
         }
     }
 }
 impl Component for ConfigPage {
-    fn text_input_mut(&mut self) -> Option<&mut String> {
-        match self.cursor {
-            0 => self.config.alchemy_api_key.as_mut(),
-            _ => None,
-        }
-    }
-
     fn handle_event(
         &mut self,
         event: &Event,
         _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
     ) -> crate::Result<HandleResult> {
-        InputBox::handle_events(self.text_input_mut(), event)?;
+        // InputBox::handle_events(self.text_input_mut(), event)?;
 
-        let cursor_max = 2;
         let mut handle_result = HandleResult::default();
-        if let Event::Input(key_event) = event {
-            self.display = None;
 
-            if key_event.kind == KeyEventKind::Press {
-                if self.cursor == 1 {
-                    match key_event.code {
-                        KeyCode::Char(_)
-                        | KeyCode::Left
-                        | KeyCode::Right
-                        | KeyCode::Tab
-                        | KeyCode::Backspace => {
-                            self.config.testnet_mode = !self.config.testnet_mode;
-                        }
-                        _ => {}
-                    }
-                }
+        self.form.handle_event(event, |label, form| {
+            if label == "Alchemy API key" {
+                handle_result.reload = true;
 
-                match key_event.code {
-                    KeyCode::Up => {
-                        self.cursor = (self.cursor + cursor_max - 1) % cursor_max;
-                    }
-                    KeyCode::Down => {
-                        self.cursor = (self.cursor + 1) % cursor_max;
-                    }
-                    KeyCode::Enter => {
-                        self.config.save();
-                        self.display = Some("Configuration saved".to_string());
-                        handle_result.reload = true;
-                    }
-                    KeyCode::Tab => self.cursor += 1,
-                    _ => {}
-                }
+                let mut config = Config::load();
+                // config.alchemy_api_key = Some(self.form.get_input_text(1).clone());
+                config.testnet_mode = form.get_boolean_value(2);
+                config.save();
             }
-        }
+        })?;
+
+        let display_text = self.form.get_display_text_mut(3);
+        *display_text = "Configuration saved".to_string();
 
         Ok(handle_result)
     }
@@ -97,23 +76,7 @@ impl Component for ConfigPage {
     where
         Self: Sized,
     {
-        Form {
-            items: vec![
-                FormItem::Heading("Configuration"),
-                FormItem::InputBox {
-                    focus: self.cursor == 0,
-                    label: &"Alchemy API key".to_string(),
-                    text: self.config.alchemy_api_key.as_ref().unwrap(),
-                },
-                FormItem::BooleanInput {
-                    focus: self.cursor == 1,
-                    label: &"Testnet Mode".to_string(),
-                    value: &self.config.testnet_mode,
-                },
-                FormItem::Text(self.display.as_ref()),
-            ],
-        }
-        .render(area, buf);
+        self.form.render(area, buf);
         // self.display.render(area, buf);
         area
     }
