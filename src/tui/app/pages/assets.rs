@@ -30,14 +30,18 @@ impl Component for AssetsPage {
     where
         Self: Sized,
     {
-        "assets page".render(area, buf);
-
         if let Some(list) = shared_state.assets.as_ref() {
-            Select {
-                list,
-                cursor: &self.cursor,
+            if list.is_empty() {
+                "no assets on the address".render(area, buf);
+            } else {
+                Select {
+                    list,
+                    cursor: &self.cursor,
+                }
+                .render(area, buf);
             }
-            .render(area, buf);
+        } else {
+            "loading assets...".render(area, buf);
         }
 
         area
