@@ -41,8 +41,15 @@ pub trait WidgetHeight {
 
 #[derive(Default)]
 pub struct HandleResult {
+    // Number of pages to go back, usually 1.
     pub page_pops: usize,
+    // Page to insert into the context stack.
     pub page_inserts: Vec<Page>,
+    // Number of [ESC] key presses to ignore. This is to enable the current page
+    // wants to handle the [ESC] key.
+    pub esc_ignores: usize,
+    // Regenerate the data for the current page, this is used when we expect
+    // that the external state is updated and we need to reflect that in the UI.
     pub reload: bool,
 }
 

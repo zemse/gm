@@ -9,10 +9,11 @@ use pages::{main_menu::MainMenuPage, Page};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
+    style::Color,
     widgets::{Block, BorderType, Widget},
     DefaultTerminal,
 };
-use widgets::{footer::Footer, popup_ok::PopupOk, sidebar::Sidebar, title::Title};
+use widgets::{footer::Footer, popup::Popup, sidebar::Sidebar, title::Title};
 
 use crate::{
     disk::{Config, DiskInterface},
@@ -119,7 +120,7 @@ impl App {
         tr: &mpsc::Sender<Event>,
         sd: &Arc<AtomicBool>,
     ) -> crate::Result<()> {
-        if let Some(page) = self.current_page_mut() {
+        let esc_ignores = if let Some(page) = self.current_page_mut() {
             let result = page.handle_event(&event, tr, sd)?;
             for _ in 0..result.page_pops {
                 self.context.pop();
@@ -131,7 +132,10 @@ impl App {
                 }
             }
             self.context.extend(result.page_inserts);
-        }
+            result.esc_ignores
+        } else {
+            0
+        };
 
         if self.context.is_empty() {
             self.exit = true;
@@ -160,7 +164,7 @@ impl App {
                             if self.fatal_error.is_some() {
                                 self.fatal_error = None;
                                 // self.shared_state.cursor_freeze = false;
-                            } else {
+                            } else if esc_ignores == 0 {
                                 self.context.pop();
                                 if self.context.is_empty() {
                                     self.exit = true;
@@ -254,11 +258,17 @@ impl Widget for &App {
         }
 
         if let Some(fatal_error) = &self.fatal_error {
-            PopupOk {
-                title: "Fatal Error",
-                message: fatal_error,
+            Popup {
+                bg_color: Some(Color::Red),
             }
             .render(area, buf);
+
+            let popup_inner_area = Popup::inner_area(area);
+
+            let block = Block::bordered().title("Fatal Error");
+            fatal_error
+                .to_owned()
+                .render_with_block(popup_inner_area, buf, block);
         };
     }
 }

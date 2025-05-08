@@ -23,6 +23,17 @@ pub enum FormItem {
     ErrorText(String),
 }
 
+impl FormItem {
+    pub fn label(&self) -> Option<&'static str> {
+        match self {
+            FormItem::InputBox { label, .. } => Some(label),
+            FormItem::BooleanInput { label, .. } => Some(label),
+            FormItem::Button { label } => Some(label),
+            _ => None,
+        }
+    }
+}
+
 pub struct Form {
     pub cursor: usize,
     pub items: Vec<FormItem>,
@@ -31,6 +42,13 @@ pub struct Form {
 impl Form {
     pub fn get_input_text(&self, idx: usize) -> &String {
         match &self.items[idx] {
+            FormItem::InputBox { text, .. } => text,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_input_text_mut(&mut self, idx: usize) -> &mut String {
+        match &mut self.items[idx] {
             FormItem::InputBox { text, .. } => text,
             _ => unreachable!(),
         }
@@ -57,7 +75,11 @@ impl Form {
         }
     }
 
-    pub fn is_button(&self) -> bool {
+    pub fn is_focused(&self, label: &str) -> bool {
+        self.items[self.cursor].label() == Some(label)
+    }
+
+    pub fn is_button_focused(&self) -> bool {
         matches!(self.items[self.cursor], FormItem::Button { .. })
     }
 
@@ -89,7 +111,7 @@ impl Form {
                         }
                     },
                     KeyCode::Enter => {
-                        if !self.is_button() {
+                        if !self.is_button_focused() {
                             loop {
                                 self.cursor = (self.cursor + 1) % self.items.len();
 
