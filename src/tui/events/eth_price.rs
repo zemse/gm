@@ -21,11 +21,13 @@ pub async fn watch_eth_price_change(transmitter: Sender<Event>, shutdown_signal:
     let mut counter = query_interval_milli;
     while !shutdown_signal.load(Ordering::Relaxed) {
         if counter >= query_interval_milli {
-            // Send GET request
-            match query_eth_price().await {
-                Ok(price) => transmitter.send(Event::EthPriceUpdate(price)).unwrap(),
-                Err(error) => transmitter.send(Event::EthPriceError(error)).unwrap(),
-            }
+            // Send result back to main thread. If main thread has already
+            // shutdown, then we will get error. Since our event is not
+            // critical, we do not store it to disk.
+            let _ = match query_eth_price().await {
+                Ok(price) => transmitter.send(Event::EthPriceUpdate(price)),
+                Err(error) => transmitter.send(Event::EthPriceError(error)),
+            };
             counter = 0;
         }
 

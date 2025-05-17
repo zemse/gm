@@ -13,7 +13,10 @@ pub fn watch_input_events(tx: mpsc::Sender<super::Event>, shutdown_signal: Arc<A
         #[allow(clippy::single_match)]
         match crossterm::event::read().unwrap() {
             crossterm::event::Event::Key(key_event) => {
-                tx.send(super::Event::Input(key_event)).unwrap();
+                // Send result back to main thread. If main thread has already
+                // shutdown, then we will get error. Since our event is not
+                // critical, we do not store it to disk.
+                let _ = tx.send(super::Event::Input(key_event));
                 // When we want to quit from our main thread, we want to
                 // gracefully quit the this thread, however it is blocked on the
                 // `event::read()` above. It needs a key press to be able to

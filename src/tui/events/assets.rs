@@ -23,14 +23,13 @@ pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Arc<Atomi
     let mut counter = query_interval_milli;
     while !shutdown_signal.load(Ordering::Relaxed) {
         if counter >= query_interval_milli {
-            // Send GET request
-            match get_all_assets().await {
-                Ok(assets) => transmitter.send(Event::AssetsUpdate(assets)).unwrap(),
-                Err(error) => transmitter
-                    .send(Event::AssetsUpdateError(error.to_string()))
-                    .unwrap(),
-            }
-
+            // Send result back to main thread. If main thread has already
+            // shutdown, then we will get error. Since our event is not
+            // critical, we do not store it to disk.
+            let _ = match get_all_assets().await {
+                Ok(assets) => transmitter.send(Event::AssetsUpdate(assets)),
+                Err(error) => transmitter.send(Event::AssetsUpdateError(error.to_string())),
+            };
             counter = 0;
         }
 
