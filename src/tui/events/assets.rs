@@ -24,8 +24,12 @@ pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Arc<Atomi
     while !shutdown_signal.load(Ordering::Relaxed) {
         if counter >= query_interval_milli {
             // Send GET request
-            let assets = get_all_assets().await;
-            transmitter.send(Event::AssetsUpdate(assets)).unwrap();
+            match get_all_assets().await {
+                Ok(assets) => transmitter.send(Event::AssetsUpdate(assets)).unwrap(),
+                Err(error) => transmitter
+                    .send(Event::AssetsUpdateError(error.to_string()))
+                    .unwrap(),
+            }
 
             counter = 0;
         }

@@ -22,8 +22,9 @@ pub async fn watch_eth_price_change(transmitter: Sender<Event>, shutdown_signal:
     while !shutdown_signal.load(Ordering::Relaxed) {
         if counter >= query_interval_milli {
             // Send GET request
-            if let Ok(price) = query_eth_price().await {
-                transmitter.send(Event::EthPriceUpdate(price)).unwrap();
+            match query_eth_price().await {
+                Ok(price) => transmitter.send(Event::EthPriceUpdate(price)).unwrap(),
+                Err(error) => transmitter.send(Event::EthPriceError(error)).unwrap(),
             }
             counter = 0;
         }

@@ -4,6 +4,8 @@ use alloy::{primitives::Address, signers::k256::ecdsa::SigningKey};
 
 use crate::utils::assets::Asset;
 
+use reqwest::Error as ReqwestError;
+
 pub mod assets;
 pub mod eth_price;
 pub mod input;
@@ -11,11 +13,13 @@ pub mod input;
 pub enum Event {
     Input(crossterm::event::KeyEvent),
     EthPriceUpdate(String),
+    EthPriceError(ReqwestError),
     AccountChange(Address),
     HashRateResult(f64),
     HashRateError(String),
     VanityResult(SigningKey, usize, Duration),
     AssetsUpdate(Vec<Asset>),
+    AssetsUpdateError(String),
 }
 
 impl Event {

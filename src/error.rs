@@ -26,6 +26,7 @@ pub enum Error {
     MnemonicError(coins_bip39::MnemonicError),
     AlloyLocalSignerError(alloy::signers::local::LocalSignerError),
     FromUtf8Error(std::string::FromUtf8Error),
+    RpcError(alloy::transports::RpcError<alloy::transports::TransportErrorKind>),
 }
 
 impl Display for Error {
@@ -137,5 +138,11 @@ impl From<alloy::signers::local::LocalSignerError> for Error {
 impl From<std::string::FromUtf8Error> for Error {
     fn from(e: std::string::FromUtf8Error) -> Self {
         Error::FromUtf8Error(e)
+    }
+}
+
+impl From<alloy::transports::RpcError<alloy::transports::TransportErrorKind>> for Error {
+    fn from(e: alloy::transports::RpcError<alloy::transports::TransportErrorKind>) -> Self {
+        Error::RpcError(e)
     }
 }

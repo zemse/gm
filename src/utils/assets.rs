@@ -74,7 +74,7 @@ impl Display for Asset {
     }
 }
 
-pub async fn get_all_assets() -> Vec<Asset> {
+pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
     let config = Config::load();
     let wallet_address = config.current_account.expect("must have a wallet address");
 
@@ -84,8 +84,7 @@ pub async fn get_all_assets() -> Vec<Asset> {
         wallet_address,
         networks.get_alchemy_network_names(config.testnet_mode),
     )
-    .await
-    .unwrap()
+    .await?
     .into_iter()
     .map(|entry| Asset {
         wallet_address,
@@ -127,7 +126,7 @@ pub async fn get_all_assets() -> Vec<Asset> {
     for network in networks.get_iter(config.testnet_mode) {
         let provider = network.get_provider();
 
-        let balance = provider.get_balance(wallet_address).await.unwrap();
+        let balance = provider.get_balance(wallet_address).await?;
         if !balance.is_zero() {
             let price = if let Some(price_ticker) = &network.price_ticker {
                 if price_ticker == "ETH" {
@@ -159,5 +158,5 @@ pub async fn get_all_assets() -> Vec<Asset> {
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    balances
+    Ok(balances)
 }

@@ -36,6 +36,7 @@ pub struct App {
     pub exit: bool,
     pub current_account: Option<Address>,
     pub context: Vec<Page>,
+    pub online: Option<bool>,
     pub eth_price: Option<String>,
     pub assets: Option<Vec<Asset>>,
     pub testnet_mode: bool,
@@ -52,12 +53,13 @@ impl Default for App {
 
         Self {
             exit: false,
-            eth_price: None,
-            testnet_mode: config.testnet_mode,
             current_account: config.current_account,
-            fatal_error: None,
-            assets: None,
             context: vec![Page::MainMenu(MainMenuPage::default())],
+            online: None,
+            eth_price: None,
+            assets: None,
+            testnet_mode: config.testnet_mode,
+            fatal_error: None,
             input_thread: None,
             eth_price_thread: None,
             assets_thread: None,
@@ -177,6 +179,12 @@ impl App {
             }
             Event::EthPriceUpdate(eth_price) => {
                 self.eth_price = Some(eth_price);
+                self.online = Some(true);
+            }
+            Event::EthPriceError(error) => {
+                if error.is_connect() {
+                    self.online = Some(false);
+                }
             }
             Event::AccountChange(address) => {
                 self.current_account = Some(address);
@@ -212,6 +220,7 @@ impl Widget for &App {
         if let Some(page) = self.current_page() {
             Title {
                 current_account: self.current_account.as_ref(),
+                online: self.online,
             }
             .render(title_area, buf);
 
@@ -240,6 +249,7 @@ impl Widget for &App {
                 );
 
                 Sidebar {
+                    online: &self.online,
                     eth_price: &self.eth_price,
                     testnet_mode: &self.testnet_mode,
                 }
