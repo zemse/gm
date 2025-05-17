@@ -258,7 +258,8 @@ mod macos {
         fn get_account_list() -> Vec<Address> {
             let mut search = ItemSearchOptions::default();
             search.class(ItemClass::generic_password());
-            search.limit(100);
+            // TODO configure this as this search misses some keys if user has more keychain items.
+            search.limit(1000);
             search.load_attributes(true);
 
             let mut accounts = vec![];
@@ -339,6 +340,20 @@ mod macos {
                 retmap.insert(format!("{keycfstr}"), val);
             }
             retmap
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use crate::utils::account::AccountUtils;
+
+        #[test]
+        #[ignore]
+        fn see_all_accounts() {
+            let list = super::Macos::get_account_list();
+
+            println!("{list:#?}");
+            panic!();
         }
     }
 }
