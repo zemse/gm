@@ -5,7 +5,7 @@ use std::{
 
 use alloy::primitives::Address;
 use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
-use pages::{main_menu::MainMenuPage, Page};
+use pages::{main_menu::MainMenuPage, trade::TradePage, Page};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
@@ -160,6 +160,9 @@ impl App {
                             if char == 'e' && key_event.modifiers == KeyModifiers::CONTROL {
                                 self.fatal_error = Some("test error".to_string());
                                 // self.shared_state.cursor_freeze = true;
+                            }
+                            if char == 't' && key_event.modifiers == KeyModifiers::CONTROL {
+                                self.context.push(Page::Trade(TradePage));
                             }
                         }
                         KeyCode::Esc => {
