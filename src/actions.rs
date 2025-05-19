@@ -6,6 +6,7 @@ pub mod send_message;
 pub mod setup;
 pub mod sign_message;
 pub mod transaction;
+pub mod receive_payment;
 
 use crate::utils::{Handle, Inquire};
 
@@ -65,6 +66,10 @@ pub enum Action {
         // Network to use
         network: Option<Network>,
     },
+
+    #[command(alias = "recv")]
+    /// Receive payment
+       ReceivePayment,
 
     #[command(alias = "cfg")]
     Config {
@@ -181,9 +186,17 @@ impl Handle for Action {
                 send_message::handle_send_message(to, msg, network);
             }
 
+            Action::ReceivePayment => {
+
+                let req = 
+                crate::actions::receive_payment::PaymentRequest::from_user_input();
+                println!("🔗 {}", req.generate_link());               
+            }
+
             Action::Config { action } => {
                 ConfigActions::handle_optn_inquire(action, ());
             }
+
         }
     }
 }
