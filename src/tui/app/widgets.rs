@@ -1,4 +1,5 @@
 pub mod button;
+pub mod candle_chart;
 pub mod filter_select;
 pub mod footer;
 pub mod form;
