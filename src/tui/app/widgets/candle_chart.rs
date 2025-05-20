@@ -1,75 +1,96 @@
+use std::fmt::Display;
+
 use chrono::{DateTime, Local, TimeZone};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::style::{Color, Style};
 use ratatui::widgets::Widget;
 
 #[derive(Debug, Default)]
 pub struct CandleChart {
-    pub candles: Vec<Candle>,
-    pub start_timestamp_g: i64,
-    pub end_timestamp_g: i64,
-    pub g_max: f64,
-    pub g_min: f64,
-    pub interval: Interval,
-    pub zoom: f64,
-    pub cursor: i64,
-    pub y_axis_width: u16,
+    candles: Vec<Candle>,
+    start_timestamp_g: i64,
+    end_timestamp_g: i64,
+    g_max: f64,
+    g_min: f64,
+    interval: Interval,
+    zoom: f64,
+    cursor: i64,
+    y_axis_width: u16,
 }
 impl CandleChart {
-    pub fn candles(&mut self, candles: Vec<Candle>) {
-        let mut candles_new: Vec<Candle> = candles;
-        self.start_timestamp_g = candles_new
-            .iter()
-            .map(|c| c.start_timestamp)
-            .min()
-            .unwrap_or(0);
-        self.end_timestamp_g = candles_new
-            .iter()
-            .map(|c| c.end_timestamp)
-            .max()
-            .unwrap_or(0);
-        candles_new.sort_by_key(|c| c.start_timestamp);
-        candles_new.reverse();
-        self.g_max = candles_new
+    pub fn new(mut candles: Vec<Candle>, interval: Interval) -> Self {
+        let start_timestamp_g = candles.iter().map(|c| c.start_timestamp).min().unwrap_or(0);
+        let end_timestamp_g = candles.iter().map(|c| c.end_timestamp).max().unwrap_or(0);
+        candles.sort_by_key(|c| c.start_timestamp);
+        candles.reverse();
+        let g_max = candles
             .iter()
             .map(|c| c.high)
             .reduce(f64::max)
             .unwrap_or(0.0);
-        self.g_min = candles_new
+        let g_min = candles
             .iter()
             .map(|c| c.low)
             .reduce(f64::min)
             .unwrap_or(0.0);
-        self.zoom = 1.0;
-        self.candles = candles_new;
-        self.cursor = self.end_timestamp_g;
-        self.y_axis_width = std::cmp::max(
-            numeric_format(self.g_max).len(),
-            numeric_format(self.g_min).len(),
-        ) as u16
-            + 4;
+        let zoom = 1.0;
+        let cursor = end_timestamp_g;
+        let y_axis_width =
+            std::cmp::max(numeric_format(g_max).len(), numeric_format(g_min).len()) as u16 + 4;
+
+        Self {
+            candles,
+            start_timestamp_g,
+            end_timestamp_g,
+            g_max,
+            g_min,
+            interval,
+            zoom,
+            cursor,
+            y_axis_width,
+        }
     }
-    pub fn zoom_in(&mut self) {
+    pub fn handle_event(&mut self, key_event: &KeyEvent) -> crate::Result<()> {
+        if key_event.kind == KeyEventKind::Press {
+            match key_event.code {
+                KeyCode::Up => {
+                    self.zoom_in();
+                }
+                KeyCode::Down => self.zoom_out(),
+                KeyCode::Right => {
+                    self.move_right();
+                }
+                KeyCode::Left => {
+                    self.move_left();
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+    fn zoom_in(&mut self) {
         if self.zoom + 1.0 >= 60.0 {
             self.zoom = 60.0;
         } else {
             self.zoom += 1.0;
         }
     }
-    pub fn zoom_out(&mut self) {
+    fn zoom_out(&mut self) {
         if self.zoom - 1.0 <= 1.0 {
             self.zoom = 1.0;
         } else {
             self.zoom -= 1.0;
         }
     }
-    pub fn move_right(&mut self) {
+    fn move_right(&mut self) {
         if self.cursor + self.interval as i64 >= self.end_timestamp_g {
             self.cursor = self.end_timestamp_g
         } else {
             self.cursor += self.interval as i64;
         }
     }
-    pub fn move_left(&mut self) {
+    fn move_left(&mut self) {
         let chart_width = crossterm::terminal::size().unwrap_or((0, 0)).0 - self.y_axis_width;
         let start_timestamp =
             self.cursor - ((chart_width as i64 * self.interval as i64) as f64 / self.zoom) as i64;
@@ -80,14 +101,8 @@ impl CandleChart {
             self.cursor -= self.interval as i64;
         }
     }
-    pub fn interval(&self) -> Interval {
-        self.interval
-    }
-    pub fn set_interval(&mut self, interval: Interval) {
-        self.interval = interval;
-    }
 }
-impl Widget for CandleChart {
+impl Widget for &CandleChart {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,
@@ -361,6 +376,18 @@ pub enum Interval {
     OneHour = 60 * 60 * 1000,
     OneWeek = 60 * 60 * 24 * 7 * 1000,
     OneMonth = 60 * 60 * 24 * 30 * 1000,
+}
+impl Display for Interval {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let interval = match self {
+            Interval::OneSecond => "1s",
+            Interval::FifteenMinutes => "15m",
+            Interval::OneHour => "1h",
+            Interval::OneWeek => "1w",
+            Interval::OneMonth => "1M",
+        };
+        write!(f, "{}", interval)
+    }
 }
 impl Interval {
     fn render_precision(&self) -> Precision {
