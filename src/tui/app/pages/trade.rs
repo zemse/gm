@@ -38,7 +38,7 @@ impl Component for TradePage {
                         if i32::from_str(&num.to_string()).is_ok()
                             && (1..=5).contains(&i32::from_str(&num.to_string()).unwrap()) =>
                     {
-                        let (interval, name) = match num {
+                        let (interval, _name) = match num {
                             '1' => (Interval::OneSecond, "1s"),
                             '2' => (Interval::FifteenMinutes, "15m"),
                             '3' => (Interval::OneHour, "1h"),

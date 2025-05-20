@@ -66,7 +66,7 @@ impl CandleChart {
         if self.cursor + self.interval as i64 >= self.end_timestamp_g {
             self.cursor = self.end_timestamp_g
         } else {
-            self.cursor = self.cursor + self.interval as i64;
+            self.cursor += self.interval as i64;
         }
     }
     pub fn move_left(&mut self) {
@@ -77,7 +77,7 @@ impl CandleChart {
             self.cursor =
                 start_timestamp + ((chart_width as i64 / self.zoom as i64) * self.interval as i64);
         } else {
-            self.cursor = self.cursor - self.interval as i64;
+            self.cursor -= self.interval as i64;
         }
     }
     pub fn interval(&self) -> Interval {
@@ -252,7 +252,7 @@ impl Widget for CandleChart {
             x_axis_strings.into_iter().map(String::from_iter).collect();
         for (y, string) in x_axis_strings.iter().enumerate() {
             buf.set_string(
-                area.x + 0,
+                area.x,
                 area.y + y_height + y as u16,
                 string,
                 Style::default(),
@@ -356,7 +356,7 @@ enum Precision {
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum Interval {
     #[default]
-    OneSecond = 1 * 1000,
+    OneSecond = 1000,
     FifteenMinutes = 15 * 60 * 1000,
     OneHour = 60 * 60 * 1000,
     OneWeek = 60 * 60 * 24 * 7 * 1000,
