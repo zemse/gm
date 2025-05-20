@@ -162,7 +162,7 @@ impl App {
                                 // self.shared_state.cursor_freeze = true;
                             }
                             if char == 't' && key_event.modifiers == KeyModifiers::CONTROL {
-                                self.context.push(Page::Trade(TradePage));
+                                self.context.push(Page::Trade(TradePage::default()));
                             }
                         }
                         KeyCode::Esc => {

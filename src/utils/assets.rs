@@ -76,7 +76,9 @@ impl Display for Asset {
 
 pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
     let config = Config::load();
-    let wallet_address = config.current_account.expect("must have a wallet address");
+    let wallet_address = config.current_account.ok_or(crate::Error::InternalError(
+        "Could not find wallet address in config".to_string(),
+    ))?;
 
     let mut networks = NetworkStore::load();
 
