@@ -11,40 +11,48 @@ pub struct CandleChart {
     start_timestamp_g: i64,
     end_timestamp_g: i64,
     interval: Interval,
-    pub zoom: f64,
-    pub cursor: i64,
+    zoom: f64,
+    cursor: i64,
     y_axis_width: u16,
 }
 impl CandleChart {
-    pub fn new(mut candles: Vec<Candle>, interval: Interval) -> Self {
-        let start_timestamp_g = candles.iter().map(|c| c.start_timestamp).min().unwrap_or(0);
-        let end_timestamp_g = candles.iter().map(|c| c.end_timestamp).max().unwrap_or(0);
-        candles.sort_by_key(|c| c.start_timestamp);
-        candles.reverse();
-        let g_max = candles
+    pub fn update(&mut self, mut new_candles: Vec<Candle>, interval: Interval) {
+        let prev_end_timestamp_g = self.end_timestamp_g;
+
+        self.start_timestamp_g = new_candles
+            .iter()
+            .map(|c| c.start_timestamp)
+            .min()
+            .unwrap_or(0);
+        self.end_timestamp_g = new_candles
+            .iter()
+            .map(|c| c.end_timestamp)
+            .max()
+            .unwrap_or(0);
+        new_candles.sort_by_key(|c| c.start_timestamp);
+        new_candles.reverse();
+
+        let g_max = new_candles
             .iter()
             .map(|c| c.high)
             .reduce(f64::max)
             .unwrap_or(0.0);
-        let g_min = candles
+        let g_min = new_candles
             .iter()
             .map(|c| c.low)
             .reduce(f64::min)
             .unwrap_or(0.0);
-        let zoom = 1.0;
-        let cursor = end_timestamp_g;
-        let y_axis_width =
-            std::cmp::max(numeric_format(g_max).len(), numeric_format(g_min).len()) as u16 + 4;
 
-        Self {
-            candles,
-            start_timestamp_g,
-            end_timestamp_g,
-            interval,
-            zoom,
-            cursor,
-            y_axis_width,
+        if interval != self.interval || self.candles.is_empty() {
+            self.zoom = 1.0;
+            self.cursor = self.end_timestamp_g;
         }
+
+        self.candles = new_candles;
+        self.interval = interval;
+
+        self.y_axis_width =
+            std::cmp::max(numeric_format(g_max).len(), numeric_format(g_min).len()) as u16 + 4;
     }
     pub fn handle_event(&mut self, key_event: &KeyEvent) -> crate::Result<()> {
         if key_event.kind == KeyEventKind::Press {

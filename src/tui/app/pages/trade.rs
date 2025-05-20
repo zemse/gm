@@ -70,16 +70,13 @@ impl Component for TradePage {
                 }
             }
             Event::CandlesUpdate(candles, interval) => {
-                let old = self.candle_chart.as_ref().map(|c| (c.cursor, c.zoom));
-                let mut candle_chart = CandleChart::new(candles.clone(), *interval);
-                if self.interval == *interval {
-                    if let Some((old_cursor, old_zoom)) = old {
-                        // Restore the cursor position if update received for the same interval
-                        candle_chart.cursor = old_cursor;
-                        candle_chart.zoom = old_zoom;
-                    }
+                if self.candle_chart.is_none() {
+                    self.candle_chart = Some(CandleChart::default())
                 }
-                self.candle_chart = Some(candle_chart);
+
+                if let Some(candle_chart) = self.candle_chart.as_mut() {
+                    candle_chart.update(candles.clone(), *interval)
+                }
                 self.interval = *interval;
             }
             _ => {}
