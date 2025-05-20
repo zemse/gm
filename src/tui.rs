@@ -26,7 +26,8 @@ pub async fn run() -> crate::Result<()> {
         app.draw(&mut terminal)?;
 
         // make any changes to Controller state
-        app.handle_event(event_rc.recv()?, &event_tr, &shutdown)?;
+        app.handle_event(event_rc.recv()?, &event_tr, &shutdown)
+            .await?;
     }
 
     // signal all the threads to exit

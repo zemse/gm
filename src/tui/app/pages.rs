@@ -64,6 +64,7 @@ impl Page {
         #[allow(clippy::match_like_matches_macro)]
         match self {
             Page::AddressBookDisplay(_) => true,
+            Page::Trade(_) => true,
             _ => false,
         }
     }

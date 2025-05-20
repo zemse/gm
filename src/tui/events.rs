@@ -6,6 +6,8 @@ use crate::utils::assets::Asset;
 
 use reqwest::Error as ReqwestError;
 
+use super::app::widgets::candle_chart::{Candle, Interval};
+
 pub mod assets;
 pub mod eth_price;
 pub mod input;
@@ -20,6 +22,7 @@ pub enum Event {
     VanityResult(SigningKey, usize, Duration),
     AssetsUpdate(Vec<Asset>),
     AssetsUpdateError(String),
+    CandlesUpdate(Vec<Candle>, Interval),
 }
 
 impl Event {
