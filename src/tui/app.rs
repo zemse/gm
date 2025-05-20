@@ -116,7 +116,7 @@ impl App {
         self.testnet_mode = config.testnet_mode;
     }
 
-    pub fn handle_event(
+    pub async fn handle_event(
         &mut self,
         event: super::events::Event,
         tr: &mpsc::Sender<Event>,
@@ -170,7 +170,10 @@ impl App {
                                 self.fatal_error = None;
                                 // self.shared_state.cursor_freeze = false;
                             } else if esc_ignores == 0 {
-                                self.context.pop();
+                                let page = self.context.pop();
+                                if let Some(mut page) = page {
+                                    page.exit_threads().await;
+                                }
                                 if self.context.is_empty() {
                                     self.exit = true;
                                 }

@@ -1,7 +1,6 @@
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::widgets::Widget;
 use std::str::FromStr;
-use std::thread;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 
@@ -23,6 +22,7 @@ impl Component for TradePage {
     async fn exit_threads(&mut self) {
         if let Some(thread) = self.api_thread.take() {
             thread.abort();
+            let _ = thread.await;
         }
     }
 
@@ -159,7 +159,7 @@ fn start_api_thread(
                 },
                 Err(e) => eprintln!("HTTP request failed: {:?}", e),
             }
-            thread::sleep(query_duration.unwrap_or(Duration::from_secs(5)));
+            tokio::time::sleep(query_duration.unwrap_or(Duration::from_secs(5))).await;
         }
     })
 }
