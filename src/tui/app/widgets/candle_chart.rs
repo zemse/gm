@@ -490,7 +490,7 @@ fn numeric_format(value: f64) -> String {
     let scale = 3;
     format!("{0:>precision$.scale$}", value)
 }
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Candle {
     pub start_timestamp: i64,
     pub open: f64,
