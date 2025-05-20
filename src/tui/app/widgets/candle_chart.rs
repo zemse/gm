@@ -46,6 +46,8 @@ impl CandleChart {
         if interval != self.interval || self.candles.is_empty() {
             self.zoom = 1.0;
             self.cursor = self.end_timestamp_g;
+        } else if self.cursor == prev_end_timestamp_g {
+            self.cursor = self.end_timestamp_g;
         }
 
         self.candles = new_candles;
