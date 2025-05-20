@@ -91,6 +91,7 @@ impl CandleChart {
         }
     }
     fn move_left(&mut self) {
+        // TODO widget area might be smaller than terminal size
         let chart_width = crossterm::terminal::size().unwrap_or((0, 0)).0 - self.y_axis_width;
         let start_timestamp =
             self.cursor - ((chart_width as i64 * self.interval as i64) as f64 / self.zoom) as i64;
