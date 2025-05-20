@@ -63,7 +63,6 @@ impl Component for TradePage {
                                 // Start a new thread to fetch the candles
                                 self.api_thread =
                                     Some(start_api_thread(interval, transmitter, None));
-                                self.interval = interval;
                             }
                         }
                         _ => {}
@@ -71,7 +70,17 @@ impl Component for TradePage {
                 }
             }
             Event::CandlesUpdate(candles, interval) => {
-                self.candle_chart = Some(CandleChart::new(candles.clone(), *interval));
+                let old = self.candle_chart.as_ref().map(|c| (c.cursor, c.zoom));
+                let mut candle_chart = CandleChart::new(candles.clone(), *interval);
+                if self.interval == *interval {
+                    if let Some((old_cursor, old_zoom)) = old {
+                        // Restore the cursor position if update received for the same interval
+                        candle_chart.cursor = old_cursor;
+                        candle_chart.zoom = old_zoom;
+                    }
+                }
+                self.candle_chart = Some(candle_chart);
+                self.interval = *interval;
             }
             _ => {}
         }

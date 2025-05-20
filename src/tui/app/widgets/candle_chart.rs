@@ -11,8 +11,8 @@ pub struct CandleChart {
     start_timestamp_g: i64,
     end_timestamp_g: i64,
     interval: Interval,
-    zoom: f64,
-    cursor: i64,
+    pub zoom: f64,
+    pub cursor: i64,
     y_axis_width: u16,
 }
 impl CandleChart {
