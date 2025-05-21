@@ -13,7 +13,7 @@ impl Widget for Footer<'_> {
         let footer_text = if *self.exit {
             "exiting please wait..."
         } else if *self.is_main_menu {
-            "press control c or [ESC] to exit"
+            "press control c or [ESC] to quit"
         // } else if self.navigation.is_text_input_user_typing() {
         //     "press control c to quit | press [ESC] to clear text input"
         } else {
