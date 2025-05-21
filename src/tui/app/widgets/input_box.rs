@@ -1,6 +1,6 @@
 use std::cmp::min;
 
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{
     layout::{Offset, Rect},
     text::Span,
@@ -26,10 +26,22 @@ impl InputBox<'_> {
         if let Event::Input(key_event) = event {
             match key_event.code {
                 KeyCode::Char(char) => {
+                    // Handle space key on empty state
                     if text_input.is_empty() && char == ' ' {
-                        // result
-                        //     .page_inserts
-                        //     .push(Page::AddressBookDisplay(AddressBookDisplayPage { id: 0 }));
+                        // Ignore leading spaces
+                    } else
+                    // Handle command + delete on macOS
+                    if char == 'u' && key_event.modifiers == KeyModifiers::CONTROL {
+                        text_input.clear();
+                    } else
+                    // Handle option + delete on macOS
+                    if char == 'w' && key_event.modifiers == KeyModifiers::CONTROL {
+                        loop {
+                            let char = text_input.pop();
+                            if char.is_none() || char == Some(' ') {
+                                break;
+                            }
+                        }
                     } else {
                         text_input.push(char);
                     }
