@@ -1,10 +1,15 @@
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
+use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{buffer::Buffer, layout::Rect, style::Stylize, text::Line, widgets::Widget};
 
 use crate::{
+    disk::{Config, DiskInterface},
     tui::{
-        app::{Focus, SharedState},
+        app::{
+            pages::{trade::TradePage, Page},
+            Focus, SharedState,
+        },
         traits::{Component, HandleResult},
         Event,
     },
@@ -25,11 +30,32 @@ impl Component for Sidebar {
         event: &crate::tui::Event,
         _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
-        _shared_state: &SharedState,
+        shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
         self.cursor.handle(event, 2);
 
-        Ok(HandleResult::default())
+        let mut result = HandleResult::default();
+
+        if let Event::Input(key_event) = event {
+            if key_event.kind == KeyEventKind::Press {
+                #[allow(clippy::single_match)]
+                match key_event.code {
+                    KeyCode::Enter => match self.cursor.current {
+                        0 => result.page_inserts.push(Page::Trade(TradePage::default())),
+                        1 => {
+                            let mut config = Config::load();
+                            config.testnet_mode = !shared_state.testnet_mode;
+                            config.save();
+                            result.reload = true;
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect

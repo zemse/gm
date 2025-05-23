@@ -24,7 +24,7 @@ use crate::{
 
 use super::{
     events::{self, Event},
-    traits::{BorderedWidget, Component},
+    traits::{BorderedWidget, Component, HandleResult},
 };
 
 pub mod pages;
@@ -150,39 +150,52 @@ impl App {
         self.shared_state.testnet_mode = config.testnet_mode;
     }
 
+    fn process_result(&mut self, result: crate::Result<HandleResult>) -> crate::Result<usize> {
+        let result = match result {
+            Ok(res) => res,
+            Err(error) => {
+                self.fatal_error = Some(format!("{error:?}"));
+                return Err(error);
+            }
+        };
+        for _ in 0..result.page_pops {
+            self.context.pop();
+        }
+        if result.reload {
+            self.reload();
+            if let Some(page) = self.current_page_mut() {
+                page.reload();
+            }
+        }
+        if !result.page_inserts.is_empty() {
+            // In case we are in the sidebar, we should switch to left side.
+            self.shared_state.focus = Focus::Main;
+        }
+        self.context.extend(result.page_inserts);
+        Ok(result.esc_ignores)
+    }
+
     pub async fn handle_event(
         &mut self,
         event: super::events::Event,
         tr: &mpsc::Sender<Event>,
         sd: &Arc<AtomicBool>,
     ) -> crate::Result<()> {
-        if self.fatal_error.is_none() && self.shared_state.focus == Focus::Sidebar {
-            self.sidebar
-                .handle_event(&event, tr, sd, &self.shared_state)?;
-        }
-
-        let esc_ignores = if self.fatal_error.is_none()
+        let mut esc_ignores = if self.fatal_error.is_none()
             && self.shared_state.focus == Focus::Main
             && let Some(page) = self.context.last_mut()
         {
-            let result = match page.handle_event(&event, tr, sd, &self.shared_state) {
-                Ok(res) => res,
-                Err(error) => {
-                    self.fatal_error = Some(format!("{error:?}"));
-                    return Err(error);
-                }
-            };
-            for _ in 0..result.page_pops {
-                self.context.pop();
-            }
-            if result.reload {
-                self.reload();
-                if let Some(page) = self.current_page_mut() {
-                    page.reload();
-                }
-            }
-            self.context.extend(result.page_inserts);
-            result.esc_ignores
+            let result = page.handle_event(&event, tr, sd, &self.shared_state);
+            self.process_result(result)?
+        } else {
+            0
+        };
+
+        esc_ignores += if self.fatal_error.is_none() && self.shared_state.focus == Focus::Sidebar {
+            let handle_result = self
+                .sidebar
+                .handle_event(&event, tr, sd, &self.shared_state);
+            self.process_result(handle_result)?
         } else {
             0
         };
@@ -204,7 +217,10 @@ impl App {
                         }
                         KeyCode::Right => {
                             if self.shared_state.focus == Focus::Main
-                                && !matches!(self.context.last(), Some(Page::AccountCreate(_)))
+                                && !matches!(
+                                    self.context.last(),
+                                    Some(Page::AccountCreate(_)) | Some(Page::Trade(_))
+                                )
                             {
                                 self.shared_state.focus = Focus::Sidebar;
                             }

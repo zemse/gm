@@ -102,8 +102,10 @@ impl Component for TradePage {
     {
         if let Some(candle_chart) = &self.candle_chart {
             candle_chart.render(area, buf);
-        } else {
+        } else if self.api_thread.is_some() {
             "Loading chart...".render(area, buf);
+        } else {
+            "Initializing..".render(area, buf);
         }
 
         area

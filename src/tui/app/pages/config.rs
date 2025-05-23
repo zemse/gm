@@ -61,7 +61,7 @@ impl Component for ConfigPage {
                 handle_result.reload = true;
 
                 let mut config = Config::load();
-                // config.alchemy_api_key = Some(self.form.get_input_text(1).clone());
+                config.alchemy_api_key = Some(form.get_input_text(1).clone());
                 config.testnet_mode = form.get_boolean_value(2);
                 config.save();
             }
