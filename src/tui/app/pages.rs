@@ -14,6 +14,8 @@ use setup::SetupPage;
 use sign_message::SignMessagePage;
 use trade::TradePage;
 use transaction::TransactionPage;
+use receive_payment::ReceivePaymentPage;
+
 
 use crate::tui::{
     events::Event,
@@ -36,6 +38,8 @@ pub mod setup;
 pub mod sign_message;
 pub mod trade;
 pub mod transaction;
+pub mod receive_payment;
+
 
 #[allow(clippy::large_enum_variant)]
 pub enum Page {
@@ -55,6 +59,8 @@ pub enum Page {
     SendMessage(SendMessagePage),
     SignMessage(SignMessagePage),
     Transaction(TransactionPage),
+    ReceivePayment(ReceivePaymentPage),
+
 
     Trade(TradePage),
 }
@@ -94,6 +100,8 @@ impl Component for Page {
             Page::SignMessage(page) => page.exit_threads().await,
             Page::Transaction(page) => page.exit_threads().await,
 
+            Page::ReceivePayment(page) => page.exit_threads().await,
+
             Page::Trade(page) => page.exit_threads().await,
         }
     }
@@ -116,6 +124,8 @@ impl Component for Page {
             Page::SendMessage(page) => page.reload(),
             Page::SignMessage(page) => page.reload(),
             Page::Transaction(page) => page.reload(),
+            Page::ReceivePayment(page) => page.reload(),
+
 
             Page::Trade(page) => page.reload(),
         }
@@ -145,6 +155,8 @@ impl Component for Page {
             Page::SendMessage(page) => page.handle_event(event, tr, sd, ss),
             Page::SignMessage(page) => page.handle_event(event, tr, sd, ss),
             Page::Transaction(page) => page.handle_event(event, tr, sd, ss),
+            Page::ReceivePayment(page) => page.handle_event(event, tr, sd,ss),
+
 
             Page::Trade(page) => page.handle_event(event, tr, sd, ss),
         }
@@ -176,6 +188,8 @@ impl Component for Page {
             Page::SendMessage(page) => page.render_component(area, buf, shared_state),
             Page::SignMessage(page) => page.render_component(area, buf, shared_state),
             Page::Transaction(page) => page.render_component(area, buf, shared_state),
+
+            Page::ReceivePayment(page) => page.render_component(area, buf, shared_state),
 
             Page::Trade(page) => page.render_component(area, buf, shared_state),
         }
