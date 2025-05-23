@@ -92,8 +92,6 @@ impl App {
         self.eth_price_thread = Some(tokio::spawn(async move {
             events::eth_price::watch_eth_price_change(tr_eth_price, shutdown_signal).await
         }));
-
-        // self.set_online(tr, sd);
     }
 
     fn set_online(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
@@ -189,7 +187,6 @@ impl App {
                             }
                             if char == 'e' && key_event.modifiers == KeyModifiers::CONTROL {
                                 self.fatal_error = Some("test error".to_string());
-                                // self.shared_state.cursor_freeze = true;
                             }
                             if char == 't' && key_event.modifiers == KeyModifiers::CONTROL {
                                 self.context.push(Page::Trade(TradePage::default()));
@@ -198,7 +195,6 @@ impl App {
                         KeyCode::Esc => {
                             if self.fatal_error.is_some() {
                                 self.fatal_error = None;
-                                // self.shared_state.cursor_freeze = false;
                             } else if esc_ignores == 0 {
                                 let page = self.context.pop();
                                 if let Some(mut page) = page {

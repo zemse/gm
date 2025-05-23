@@ -19,11 +19,16 @@ pub struct AssetsPage {
 impl Component for AssetsPage {
     fn handle_event(
         &mut self,
-        _event: &Event,
+        event: &Event,
         _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
-        _shared_state: &SharedState,
+        shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
+        self.cursor.handle(
+            event,
+            shared_state.assets.as_ref().map(|a| a.len()).unwrap_or(1),
+        );
+
         Ok(HandleResult::default())
     }
 
