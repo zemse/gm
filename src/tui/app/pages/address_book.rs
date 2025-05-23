@@ -49,6 +49,7 @@ impl Component for AddressBookPage {
         event: &Event,
         _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
+        _shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
         let list: Vec<&AddressBookActions> = self
             .full_list

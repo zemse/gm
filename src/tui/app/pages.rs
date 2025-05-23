@@ -126,26 +126,27 @@ impl Component for Page {
         event: &Event,
         tr: &mpsc::Sender<Event>,
         sd: &Arc<AtomicBool>,
+        ss: &SharedState,
     ) -> crate::Result<HandleResult> {
         match self {
-            Page::MainMenu(page) => page.handle_event(event, tr, sd),
-            Page::Setup(page) => page.handle_event(event, tr, sd),
+            Page::MainMenu(page) => page.handle_event(event, tr, sd, ss),
+            Page::Setup(page) => page.handle_event(event, tr, sd, ss),
 
-            Page::AddressBook(page) => page.handle_event(event, tr, sd),
-            Page::AddressBookCreate(page) => page.handle_event(event, tr, sd),
-            Page::AddressBookDisplay(page) => page.handle_event(event, tr, sd),
+            Page::AddressBook(page) => page.handle_event(event, tr, sd, ss),
+            Page::AddressBookCreate(page) => page.handle_event(event, tr, sd, ss),
+            Page::AddressBookDisplay(page) => page.handle_event(event, tr, sd, ss),
 
-            Page::Account(page) => page.handle_event(event, tr, sd),
-            Page::AccountCreate(page) => page.handle_event(event, tr, sd),
-            Page::AccountImport(page) => page.handle_event(event, tr, sd),
+            Page::Account(page) => page.handle_event(event, tr, sd, ss),
+            Page::AccountCreate(page) => page.handle_event(event, tr, sd, ss),
+            Page::AccountImport(page) => page.handle_event(event, tr, sd, ss),
 
-            Page::Assets(page) => page.handle_event(event, tr, sd),
-            Page::Config(page) => page.handle_event(event, tr, sd),
-            Page::SendMessage(page) => page.handle_event(event, tr, sd),
-            Page::SignMessage(page) => page.handle_event(event, tr, sd),
-            Page::Transaction(page) => page.handle_event(event, tr, sd),
+            Page::Assets(page) => page.handle_event(event, tr, sd, ss),
+            Page::Config(page) => page.handle_event(event, tr, sd, ss),
+            Page::SendMessage(page) => page.handle_event(event, tr, sd, ss),
+            Page::SignMessage(page) => page.handle_event(event, tr, sd, ss),
+            Page::Transaction(page) => page.handle_event(event, tr, sd, ss),
 
-            Page::Trade(page) => page.handle_event(event, tr, sd),
+            Page::Trade(page) => page.handle_event(event, tr, sd, ss),
         }
     }
 

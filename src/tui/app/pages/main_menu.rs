@@ -44,6 +44,7 @@ impl Component for MainMenuPage {
         event: &Event,
         _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
+        _shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
         let cursor_max = self.list.len();
         self.cursor.handle(event, cursor_max);

@@ -5,6 +5,7 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 
 use crate::tui::app::widgets::candle_chart::{Candle, Interval};
+use crate::tui::app::SharedState;
 use crate::tui::{
     app::widgets::candle_chart::CandleChart,
     traits::{Component, HandleResult},
@@ -31,6 +32,7 @@ impl Component for TradePage {
         event: &crate::tui::Event,
         transmitter: &std::sync::mpsc::Sender<crate::tui::Event>,
         _shutdown_signal: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+        _shared_state: &SharedState,
     ) -> crate::Result<crate::tui::traits::HandleResult> {
         match event {
             Event::Input(key_event) => {

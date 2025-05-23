@@ -50,6 +50,7 @@ impl Component for ConfigPage {
         event: &Event,
         _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
+        _shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
         // InputBox::handle_events(self.text_input_mut(), event)?;
 

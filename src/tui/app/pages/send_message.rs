@@ -62,6 +62,7 @@ impl Component for SendMessagePage {
         event: &Event,
         _tr: &mpsc::Sender<Event>,
         _sd: &Arc<AtomicBool>,
+        _shared_state: &SharedState,
     ) -> Result<HandleResult> {
         let mut result = HandleResult::default();
 

@@ -67,6 +67,7 @@ pub trait Component {
         event: &Event,
         transmitter: &mpsc::Sender<Event>,
         shutdown_signal: &Arc<AtomicBool>,
+        shared_state: &SharedState,
     ) -> crate::Result<HandleResult>;
 
     fn render_component(

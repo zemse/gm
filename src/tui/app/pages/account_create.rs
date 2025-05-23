@@ -100,6 +100,7 @@ impl Component for AccountCreatePage {
         event: &Event,
         transmitter: &mpsc::Sender<Event>,
         shutdown_signal: &Arc<AtomicBool>,
+        _shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
         let result = HandleResult::default();
 

@@ -30,6 +30,7 @@ impl Component for AccountImportPage {
         event: &Event,
         _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
+        _shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
         let mut result = HandleResult::default();
 

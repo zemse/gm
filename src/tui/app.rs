@@ -30,8 +30,8 @@ use super::{
 pub mod pages;
 pub mod widgets;
 
-pub struct SharedState<'a> {
-    pub assets: &'a Option<Vec<Asset>>,
+pub struct SharedState {
+    pub assets: Option<Vec<Asset>>,
 }
 
 pub struct App {
@@ -40,9 +40,10 @@ pub struct App {
     pub context: Vec<Page>,
     pub online: Option<bool>,
     pub eth_price: Option<String>,
-    pub assets: Option<Vec<Asset>>,
     pub testnet_mode: bool,
     pub fatal_error: Option<String>,
+
+    pub shared_state: SharedState,
 
     pub input_thread: Option<std::thread::JoinHandle<()>>,
     pub eth_price_thread: Option<tokio::task::JoinHandle<()>>,
@@ -59,9 +60,11 @@ impl Default for App {
             context: vec![Page::MainMenu(MainMenuPage::default())],
             online: None,
             eth_price: None,
-            assets: None,
             testnet_mode: config.testnet_mode,
             fatal_error: None,
+
+            shared_state: SharedState { assets: None },
+
             input_thread: None,
             eth_price_thread: None,
             assets_thread: None,
@@ -142,9 +145,9 @@ impl App {
         sd: &Arc<AtomicBool>,
     ) -> crate::Result<()> {
         let esc_ignores = if self.fatal_error.is_none()
-            && let Some(page) = self.current_page_mut()
+            && let Some(page) = self.context.last_mut()
         {
-            let result = match page.handle_event(&event, tr, sd) {
+            let result = match page.handle_event(&event, tr, sd, &self.shared_state) {
                 Ok(res) => res,
                 Err(error) => {
                     self.fatal_error = Some(format!("{error:?}"));
@@ -230,7 +233,7 @@ impl App {
             }
 
             // Assets API
-            Event::AssetsUpdate(assets) => self.assets = Some(assets),
+            Event::AssetsUpdate(assets) => self.shared_state.assets = Some(assets),
             Event::AssetsUpdateError(error) => self.fatal_error = Some(error),
 
             // Candles API
@@ -276,17 +279,13 @@ impl Widget for &App {
             }
             .render(title_area, buf);
 
-            let app_shared_state = SharedState {
-                assets: &self.assets,
-            };
-
             // Body render
             if page.is_full_screen() {
                 page.render_component_with_block(
                     body_area,
                     buf,
                     Block::bordered(),
-                    &app_shared_state,
+                    &self.shared_state,
                 );
             } else {
                 let horizontal_layout =
@@ -297,7 +296,7 @@ impl Widget for &App {
                     left_area,
                     buf,
                     Block::bordered(),
-                    &app_shared_state,
+                    &self.shared_state,
                 );
 
                 Sidebar {
