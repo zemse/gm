@@ -161,9 +161,13 @@ fn start_api_thread(
                             parsed.into_iter().map(|kline| kline.into()).collect();
                         let _ = tr.send(Event::CandlesUpdate(candles, interval));
                     }
-                    Err(e) => eprintln!("Failed to parse response: {:?}", e),
+                    Err(e) => {
+                        let _ = tr.send(Event::CandlesUpdateError(e));
+                    }
                 },
-                Err(e) => eprintln!("HTTP request failed: {:?}", e),
+                Err(e) => {
+                    let _ = tr.send(Event::CandlesUpdateError(e));
+                }
             }
             tokio::time::sleep(query_duration.unwrap_or(Duration::from_secs(5))).await;
         }

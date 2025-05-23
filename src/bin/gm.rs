@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 use clap::Parser;
 use figlet_rs::FIGfont;
 use gm_lib::{actions::Action, disk::Config, network::NetworkStore, tui, utils::Handle};

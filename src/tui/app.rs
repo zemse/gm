@@ -10,13 +10,15 @@ use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
     style::Color,
-    widgets::{Block, BorderType, Widget},
+    text::Text,
+    widgets::{Block, BorderType, Paragraph, Widget, Wrap},
     DefaultTerminal,
 };
 use widgets::{footer::Footer, popup::Popup, sidebar::Sidebar, title::Title};
 
 use crate::{
     disk::{Config, DiskInterface},
+    error::FmtError,
     utils::assets::Asset,
 };
 
@@ -88,11 +90,28 @@ impl App {
             events::eth_price::watch_eth_price_change(tr_eth_price, shutdown_signal).await
         }));
 
-        let tr_assets = tr.clone();
-        let shutdown_signal = sd.clone();
-        self.assets_thread = Some(tokio::spawn(async move {
-            events::assets::watch_assets(tr_assets, shutdown_signal).await
-        }));
+        // self.set_online(tr, sd);
+    }
+
+    fn set_online(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
+        if self.assets_thread.is_none() {
+            let tr_assets = tr.clone();
+            let shutdown_signal = sd.clone();
+            self.assets_thread = Some(tokio::spawn(async move {
+                events::assets::watch_assets(tr_assets, shutdown_signal).await
+            }));
+        }
+
+        self.online = Some(true);
+    }
+
+    async fn set_offline(&mut self) {
+        self.online = Some(false);
+
+        if let Some(thread) = self.assets_thread.take() {
+            thread.abort();
+            let _ = thread.await;
+        }
     }
 
     pub async fn exit_threads(&mut self) {
@@ -122,8 +141,16 @@ impl App {
         tr: &mpsc::Sender<Event>,
         sd: &Arc<AtomicBool>,
     ) -> crate::Result<()> {
-        let esc_ignores = if let Some(page) = self.current_page_mut() {
-            let result = page.handle_event(&event, tr, sd)?;
+        let esc_ignores = if self.fatal_error.is_none()
+            && let Some(page) = self.current_page_mut()
+        {
+            let result = match page.handle_event(&event, tr, sd) {
+                Ok(res) => res,
+                Err(error) => {
+                    self.fatal_error = Some(format!("{error:?}"));
+                    return Err(error);
+                }
+            };
             for _ in 0..result.page_pops {
                 self.context.pop();
             }
@@ -183,19 +210,38 @@ impl App {
                     }
                 }
             }
-            Event::EthPriceUpdate(eth_price) => {
-                self.eth_price = Some(eth_price);
-                self.online = Some(true);
-            }
-            Event::EthPriceError(error) => {
-                if error.is_connect() {
-                    self.online = Some(false);
-                }
-            }
+
             Event::AccountChange(address) => {
                 self.current_account = Some(address);
             }
+
+            // ETH Price API
+            Event::EthPriceUpdate(eth_price) => {
+                self.eth_price = Some(eth_price);
+                self.set_online(tr, sd);
+            }
+            Event::EthPriceError(error) => {
+                if error.is_connect() {
+                    // ETH Price is the main API for understanding if we are connected to internet
+                    self.set_offline().await;
+                } else {
+                    self.fatal_error = Some(error.fmt_err())
+                }
+            }
+
+            // Assets API
             Event::AssetsUpdate(assets) => self.assets = Some(assets),
+            Event::AssetsUpdateError(error) => self.fatal_error = Some(error),
+
+            // Candles API
+            Event::CandlesUpdateError(error) => {
+                if error.is_connect() {
+                    self.fatal_error = Some(format!("Please ensure internet access\n{error:?}"))
+                } else {
+                    self.fatal_error = Some(error.to_string())
+                }
+            }
+
             _ => {}
         };
 
@@ -282,7 +328,8 @@ impl Widget for &App {
             let popup_inner_area = Popup::inner_area(area);
 
             let block = Block::bordered().title("Fatal Error");
-            fatal_error
+            Paragraph::new(Text::raw(fatal_error))
+                .wrap(Wrap { trim: false })
                 .to_owned()
                 .render_with_block(popup_inner_area, buf, block);
         };

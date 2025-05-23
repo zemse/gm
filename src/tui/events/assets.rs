@@ -4,11 +4,10 @@ use std::{
         mpsc::Sender,
         Arc,
     },
-    thread,
     time::Duration,
 };
 
-use crate::utils::assets::get_all_assets;
+use crate::{error::FmtError, utils::assets::get_all_assets};
 
 use super::Event;
 
@@ -28,12 +27,12 @@ pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Arc<Atomi
             // critical, we do not store it to disk.
             let _ = match get_all_assets().await {
                 Ok(assets) => transmitter.send(Event::AssetsUpdate(assets)),
-                Err(error) => transmitter.send(Event::AssetsUpdateError(error.to_string())),
+                Err(error) => transmitter.send(Event::AssetsUpdateError(error.fmt_err())),
             };
             counter = 0;
         }
 
         counter += thread_sleep_duration_milli;
-        thread::sleep(Duration::from_millis(thread_sleep_duration_milli));
+        tokio::time::sleep(Duration::from_millis(thread_sleep_duration_milli)).await;
     }
 }

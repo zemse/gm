@@ -29,6 +29,35 @@ pub enum Error {
     RpcError(alloy::transports::RpcError<alloy::transports::TransportErrorKind>),
 }
 
+impl Error {
+    pub fn is_connect_reqwest(&self) -> bool {
+        match self {
+            Self::ReqwestError(error) => error.is_connect(),
+            _ => false,
+        }
+    }
+}
+
+impl FmtError for Error {
+    fn fmt_err(&self) -> String {
+        if self.is_connect_reqwest() {
+            format!("Please check your internet connection - {self:?}")
+        } else {
+            self.to_string()
+        }
+    }
+}
+
+impl FmtError for reqwest::Error {
+    fn fmt_err(&self) -> String {
+        if self.is_connect() {
+            format!("Please check your internet connection - {self:?}")
+        } else {
+            self.to_string()
+        }
+    }
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -145,4 +174,8 @@ impl From<alloy::transports::RpcError<alloy::transports::TransportErrorKind>> fo
     fn from(e: alloy::transports::RpcError<alloy::transports::TransportErrorKind>) -> Self {
         Error::RpcError(e)
     }
+}
+
+pub trait FmtError {
+    fn fmt_err(&self) -> String;
 }

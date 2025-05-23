@@ -14,15 +14,21 @@ pub mod input;
 
 pub enum Event {
     Input(crossterm::event::KeyEvent),
+
     EthPriceUpdate(String),
     EthPriceError(ReqwestError),
+
     AccountChange(Address),
+
     HashRateResult(f64),
     HashRateError(String),
     VanityResult(SigningKey, usize, Duration),
+
     AssetsUpdate(Vec<Asset>),
     AssetsUpdateError(String),
+
     CandlesUpdate(Vec<Candle>, Interval),
+    CandlesUpdateError(ReqwestError),
 }
 
 impl Event {
