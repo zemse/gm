@@ -30,17 +30,26 @@ use super::{
 pub mod pages;
 pub mod widgets;
 
+#[derive(PartialEq)]
+pub enum Focus {
+    Main,
+    Sidebar,
+}
+
 pub struct SharedState {
+    pub online: Option<bool>,
     pub assets: Option<Vec<Asset>>,
+    pub testnet_mode: bool,
+    pub current_account: Option<Address>,
+    pub eth_price: Option<String>,
+    pub focus: Focus,
 }
 
 pub struct App {
-    pub exit: bool,
-    pub current_account: Option<Address>,
     pub context: Vec<Page>,
-    pub online: Option<bool>,
-    pub eth_price: Option<String>,
-    pub testnet_mode: bool,
+    pub sidebar: Sidebar,
+
+    pub exit: bool,
     pub fatal_error: Option<String>,
 
     pub shared_state: SharedState,
@@ -55,15 +64,20 @@ impl Default for App {
         let config = Config::load();
 
         Self {
-            exit: false,
-            current_account: config.current_account,
             context: vec![Page::MainMenu(MainMenuPage::default())],
-            online: None,
-            eth_price: None,
-            testnet_mode: config.testnet_mode,
+            sidebar: Sidebar::default(),
+
+            exit: false,
             fatal_error: None,
 
-            shared_state: SharedState { assets: None },
+            shared_state: SharedState {
+                assets: None,
+                current_account: config.current_account,
+                online: None,
+                eth_price: None,
+                testnet_mode: config.testnet_mode,
+                focus: Focus::Main,
+            },
 
             input_thread: None,
             eth_price_thread: None,
@@ -103,11 +117,11 @@ impl App {
             }));
         }
 
-        self.online = Some(true);
+        self.shared_state.online = Some(true);
     }
 
     async fn set_offline(&mut self) {
-        self.online = Some(false);
+        self.shared_state.online = Some(false);
 
         if let Some(thread) = self.assets_thread.take() {
             thread.abort();
@@ -133,7 +147,7 @@ impl App {
 
     pub fn reload(&mut self) {
         let config = Config::load();
-        self.testnet_mode = config.testnet_mode;
+        self.shared_state.testnet_mode = config.testnet_mode;
     }
 
     pub async fn handle_event(
@@ -142,7 +156,13 @@ impl App {
         tr: &mpsc::Sender<Event>,
         sd: &Arc<AtomicBool>,
     ) -> crate::Result<()> {
+        if self.fatal_error.is_none() && self.shared_state.focus == Focus::Sidebar {
+            self.sidebar
+                .handle_event(&event, tr, sd, &self.shared_state)?;
+        }
+
         let esc_ignores = if self.fatal_error.is_none()
+            && self.shared_state.focus == Focus::Main
             && let Some(page) = self.context.last_mut()
         {
             let result = match page.handle_event(&event, tr, sd, &self.shared_state) {
@@ -177,6 +197,18 @@ impl App {
                 if key_event.kind == KeyEventKind::Press {
                     #[allow(clippy::single_match)]
                     match key_event.code {
+                        KeyCode::Left => {
+                            if self.shared_state.focus == Focus::Sidebar {
+                                self.shared_state.focus = Focus::Main;
+                            }
+                        }
+                        KeyCode::Right => {
+                            if self.shared_state.focus == Focus::Main
+                                && !matches!(self.context.last(), Some(Page::AccountCreate(_)))
+                            {
+                                self.shared_state.focus = Focus::Sidebar;
+                            }
+                        }
                         KeyCode::Char(char) => {
                             // TODO can we quit using q as well?
                             // if char == 'q' && self.navigation.text_input().is_none() {
@@ -195,6 +227,8 @@ impl App {
                         KeyCode::Esc => {
                             if self.fatal_error.is_some() {
                                 self.fatal_error = None;
+                            } else if self.shared_state.focus == Focus::Sidebar {
+                                self.shared_state.focus = Focus::Main;
                             } else if esc_ignores == 0 {
                                 let page = self.context.pop();
                                 if let Some(mut page) = page {
@@ -211,12 +245,12 @@ impl App {
             }
 
             Event::AccountChange(address) => {
-                self.current_account = Some(address);
+                self.shared_state.current_account = Some(address);
             }
 
             // ETH Price API
             Event::EthPriceUpdate(eth_price) => {
-                self.eth_price = Some(eth_price);
+                self.shared_state.eth_price = Some(eth_price);
                 self.set_online(tr, sd);
             }
             Event::EthPriceError(error) => {
@@ -270,8 +304,8 @@ impl Widget for &App {
 
         if let Some(page) = self.current_page() {
             Title {
-                current_account: self.current_account.as_ref(),
-                online: self.online,
+                current_account: self.shared_state.current_account.as_ref(),
+                online: self.shared_state.online,
             }
             .render(title_area, buf);
 
@@ -295,15 +329,11 @@ impl Widget for &App {
                     &self.shared_state,
                 );
 
-                Sidebar {
-                    online: &self.online,
-                    eth_price: &self.eth_price,
-                    testnet_mode: &self.testnet_mode,
-                }
-                .render_with_block(
+                self.sidebar.render_component_with_block(
                     right_area,
                     buf,
                     Block::bordered().border_type(BorderType::Plain),
+                    &self.shared_state,
                 );
             }
 

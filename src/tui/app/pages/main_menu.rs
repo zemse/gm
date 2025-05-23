@@ -6,7 +6,7 @@ use ratatui::widgets::Widget;
 use crate::{
     actions::Action,
     tui::{
-        app::{widgets::select::Select, SharedState},
+        app::{widgets::select::Select, Focus, SharedState},
         events::Event,
         traits::{Component, HandleResult},
     },
@@ -94,7 +94,7 @@ impl Component for MainMenuPage {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
-        _: &SharedState,
+        shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
@@ -102,6 +102,7 @@ impl Component for MainMenuPage {
         Select {
             list: &self.list,
             cursor: &self.cursor,
+            focus: shared_state.focus == Focus::Main,
         }
         .render(area, buf);
 

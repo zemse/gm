@@ -14,6 +14,7 @@ pub struct FilterSelect<'a, T: Display> {
     pub full_list: &'a Vec<T>,
     pub cursor: &'a Cursor,
     pub search_string: &'a String,
+    pub focus: bool,
 }
 
 impl<T: Display> Widget for FilterSelect<'_, T> {
@@ -36,6 +37,7 @@ impl<T: Display> Widget for FilterSelect<'_, T> {
                 .filter(|item| item.to_string().contains(self.search_string))
                 .collect::<Vec<&T>>(),
             cursor: self.cursor,
+            focus: self.focus,
         }
         .render(list_area, buf);
     }

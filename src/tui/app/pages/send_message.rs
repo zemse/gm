@@ -1,7 +1,7 @@
 use crate::disk::{AddressBook, AddressBookEntry, DiskInterface};
 use crate::tui::app::widgets::filter_select::FilterSelect;
 use crate::tui::app::widgets::popup::Popup;
-use crate::tui::app::SharedState;
+use crate::tui::app::{Focus, SharedState};
 use crate::tui::{
     app::widgets::form::{Form, FormItem}, // <- Using your custom form system
     events::Event,
@@ -127,7 +127,7 @@ impl Component for SendMessagePage {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
-        _: &SharedState,
+        shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
@@ -149,6 +149,7 @@ impl Component for SendMessagePage {
                 full_list: address_book.list(),
                 cursor: &self.cursor,
                 search_string: &self.search_string,
+                focus: shared_state.focus == Focus::Main,
             }
             .render(block_inner_area, buf);
         }

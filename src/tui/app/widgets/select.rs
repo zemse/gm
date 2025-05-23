@@ -12,6 +12,7 @@ use crate::utils::cursor::Cursor;
 use super::scroll_bar::CustomScrollBar;
 
 pub struct Select<'a, T: Display> {
+    pub focus: bool,
     pub list: &'a Vec<T>,
     pub cursor: &'a Cursor,
 }
@@ -27,7 +28,7 @@ impl<T: Display> Widget for Select<'_, T> {
 
         let render_item = |(i, member)| {
             let content = Line::from(format!("{member}"));
-            let style = if idx == i {
+            let style = if idx == i && self.focus {
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD | Modifier::REVERSED)

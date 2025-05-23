@@ -7,7 +7,7 @@ use crate::{
     actions::address_book::AddressBookActions,
     disk::{AddressBook, DiskInterface},
     tui::{
-        app::{widgets::filter_select::FilterSelect, SharedState},
+        app::{widgets::filter_select::FilterSelect, Focus, SharedState},
         events::Event,
         traits::{Component, HandleResult},
     },
@@ -104,7 +104,7 @@ impl Component for AddressBookPage {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
-        _: &SharedState,
+        shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
@@ -113,6 +113,7 @@ impl Component for AddressBookPage {
             full_list: &self.full_list,
             cursor: &self.cursor,
             search_string: &self.search_string,
+            focus: shared_state.focus == Focus::Main,
         }
         .render(area, buf);
         area

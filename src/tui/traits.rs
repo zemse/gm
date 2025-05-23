@@ -1,9 +1,6 @@
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
-use ratatui::{
-    layout::Rect,
-    widgets::{Block, Widget},
-};
+use ratatui::widgets::{Block, Widget};
 
 use super::{
     app::{pages::Page, SharedState},
@@ -54,6 +51,7 @@ pub struct HandleResult {
 }
 
 pub trait Component {
+    // TODO rename to `reload` or `refresh_component`
     fn reload(&mut self) {}
 
     fn text_input_mut(&mut self) -> Option<&mut String> {
@@ -70,12 +68,14 @@ pub trait Component {
         shared_state: &SharedState,
     ) -> crate::Result<HandleResult>;
 
+    // Renders the component into the given area and returns the area that was
+    // actually used.
     fn render_component(
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         shared_state: &SharedState,
-    ) -> Rect
+    ) -> ratatui::prelude::Rect
     where
         Self: Sized;
 
@@ -85,7 +85,7 @@ pub trait Component {
         buf: &mut ratatui::prelude::Buffer,
         block: Block<'_>,
         shared_state: &SharedState,
-    ) -> Rect
+    ) -> ratatui::prelude::Rect
     where
         Self: Sized,
     {
