@@ -1,7 +1,7 @@
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
 use crossterm::event::{KeyCode, KeyEventKind};
-use ratatui::{buffer::Buffer, layout::Rect, style::Stylize, text::Line, widgets::Widget};
+use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 
 use crate::{
     disk::{Config, DiskInterface},
@@ -47,6 +47,7 @@ impl Component for Sidebar {
                             config.testnet_mode = !shared_state.testnet_mode;
                             config.save();
                             result.reload = true;
+                            result.refresh_assets = true;
                         }
                         _ => {}
                     },
@@ -71,10 +72,21 @@ impl Component for Sidebar {
             }
         };
 
+        let portfolio = if let Some(assets) = &shared_state.assets {
+            let portfolio = assets
+                .iter()
+                .fold(0.0, |acc, asset| acc + asset.usd_value().unwrap_or(0.0));
+
+            format!("Portfolio: ${portfolio}")
+        } else {
+            "Portfolio: Loading...".to_string()
+        };
+
         Select {
             list: &vec![
-                Line::from(format!("EthPrice: {eth_price}")).bold(),
-                Line::from(format!("Testnet Mode: {}", shared_state.testnet_mode)).bold(),
+                format!("EthPrice: {eth_price}"),
+                format!("Testnet Mode: {}", shared_state.testnet_mode),
+                portfolio,
             ],
             cursor: &self.cursor,
             focus: shared_state.focus == Focus::Sidebar,

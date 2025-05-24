@@ -48,6 +48,8 @@ pub struct HandleResult {
     // Regenerate the data for the current page, this is used when we expect
     // that the external state is updated and we need to reflect that in the UI.
     pub reload: bool,
+    // Clears data for assets and refetches them.
+    pub refresh_assets: bool,
 }
 
 pub trait Component {

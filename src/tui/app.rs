@@ -108,7 +108,7 @@ impl App {
         }));
     }
 
-    fn set_online(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
+    fn start_assets_thread(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
         if self.assets_thread.is_none() {
             let tr_assets = tr.clone();
             let shutdown_signal = sd.clone();
@@ -116,6 +116,17 @@ impl App {
                 events::assets::watch_assets(tr_assets, shutdown_signal).await
             }));
         }
+    }
+
+    async fn stop_assets_thread(&mut self) {
+        if let Some(thread) = self.assets_thread.take() {
+            thread.abort();
+            let _ = thread.await;
+        }
+    }
+
+    fn set_online(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
+        self.start_assets_thread(tr, sd);
 
         self.shared_state.online = Some(true);
     }
@@ -123,10 +134,7 @@ impl App {
     async fn set_offline(&mut self) {
         self.shared_state.online = Some(false);
 
-        if let Some(thread) = self.assets_thread.take() {
-            thread.abort();
-            let _ = thread.await;
-        }
+        self.stop_assets_thread().await;
     }
 
     pub async fn exit_threads(&mut self) {
@@ -150,7 +158,10 @@ impl App {
         self.shared_state.testnet_mode = config.testnet_mode;
     }
 
-    fn process_result(&mut self, result: crate::Result<HandleResult>) -> crate::Result<usize> {
+    async fn process_result(
+        &mut self,
+        result: crate::Result<HandleResult>,
+    ) -> crate::Result<usize> {
         let result = match result {
             Ok(res) => res,
             Err(error) => {
@@ -166,6 +177,10 @@ impl App {
             if let Some(page) = self.current_page_mut() {
                 page.reload();
             }
+        }
+        if result.refresh_assets {
+            self.shared_state.assets = None;
+            // TODO restart the assets thread to avoid the delay
         }
         if !result.page_inserts.is_empty() {
             // In case we are in the sidebar, we should switch to left side.
@@ -186,16 +201,16 @@ impl App {
             && let Some(page) = self.context.last_mut()
         {
             let result = page.handle_event(&event, tr, sd, &self.shared_state);
-            self.process_result(result)?
+            self.process_result(result).await?
         } else {
             0
         };
 
         esc_ignores += if self.fatal_error.is_none() && self.shared_state.focus == Focus::Sidebar {
-            let handle_result = self
+            let result = self
                 .sidebar
                 .handle_event(&event, tr, sd, &self.shared_state);
-            self.process_result(handle_result)?
+            self.process_result(result).await?
         } else {
             0
         };
