@@ -10,6 +10,7 @@ use crate::tui::{
 use crate::utils::assets::Asset;
 use crate::utils::cursor::Cursor;
 use crate::Result;
+use alloy::primitives::utils::parse_units;
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::style::Color;
 use ratatui::widgets::{Block, Widget};
@@ -57,6 +58,7 @@ impl Default for AssetTransferPage {
                         empty_text: None,
                         currency: None,
                     },
+                    FormItem::ErrorText(String::new()),
                     FormItem::Button { label: TRANSFER },
                 ],
             },
@@ -184,6 +186,23 @@ impl Component for AssetTransferPage {
         if event.is_key_pressed(KeyCode::Esc) {
             self.address_book = None;
             self.show_asset_popup = false;
+        }
+
+        // Check for amount to be greateer than balance
+        if let Some(asset) = &self.asset {
+            let amount = self.form.get_input_text(3);
+            match parse_units(amount, asset.r#type.decimals) {
+                Err(e) => {
+                    *self.form.get_error_text_mut(4) = format!("Invalid amount: {e}");
+                }
+                Ok(amount) => {
+                    if amount.get_absolute() > asset.value {
+                        *self.form.get_error_text_mut(4) = "Amount exceeds balance".to_string();
+                    } else {
+                        self.form.get_error_text_mut(4).clear();
+                    }
+                }
+            }
         }
 
         Ok(result)
