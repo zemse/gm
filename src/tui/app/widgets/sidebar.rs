@@ -32,7 +32,8 @@ impl Component for Sidebar {
         _shutdown_signal: &Arc<AtomicBool>,
         shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
-        self.cursor.handle(event, 3);
+        self.cursor
+            .handle(event, if shared_state.testnet_mode { 2 } else { 3 });
 
         let mut result = HandleResult::default();
 
@@ -77,23 +78,28 @@ impl Component for Sidebar {
             }
         };
 
-        let portfolio = if let Some(assets) = &shared_state.assets {
-            let portfolio = assets
-                .iter()
-                .fold(0.0, |acc, asset| acc + asset.usd_value().unwrap_or(0.0));
+        let mut list = vec![
+            format!("EthPrice: {eth_price}"),
+            format!("Testnet Mode: {}", shared_state.testnet_mode),
+        ];
 
-            format!("Portfolio: ${portfolio}")
-        } else {
-            "Portfolio: Loading...".to_string()
-        };
+        if !shared_state.testnet_mode {
+            let portfolio = if let Some(assets) = &shared_state.assets {
+                let portfolio = assets
+                    .iter()
+                    .fold(0.0, |acc, asset| acc + asset.usd_value().unwrap_or(0.0));
+
+                format!("Portfolio: ${portfolio}")
+            } else {
+                "Portfolio: Loading...".to_string()
+            };
+
+            list.push(portfolio);
+        }
 
         Select {
             // @dev make sure to update event handlers
-            list: &vec![
-                format!("EthPrice: {eth_price}"),
-                format!("Testnet Mode: {}", shared_state.testnet_mode),
-                portfolio,
-            ],
+            list: &list,
             cursor: &self.cursor,
             focus: shared_state.focus == Focus::Sidebar,
         }
