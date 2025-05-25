@@ -30,6 +30,9 @@ pub async fn run() -> crate::Result<()> {
             .await?;
     }
 
+    // final render before exiting
+    app.draw(&mut terminal)?;
+
     // signal all the threads to exit
     shutdown.store(true, Ordering::Relaxed);
 
