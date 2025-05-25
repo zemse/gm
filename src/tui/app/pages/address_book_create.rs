@@ -27,11 +27,13 @@ impl AddressBookCreatePage {
                         label: "name",
                         text: name,
                         empty_text: None,
+                        currency: None,
                     },
                     FormItem::InputBox {
                         label: "address",
                         text: address,
                         empty_text: None,
+                        currency: None,
                     },
                     FormItem::Button { label: "Save" },
                     FormItem::ErrorText(String::new()),

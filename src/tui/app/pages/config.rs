@@ -33,6 +33,7 @@ impl Default for ConfigPage {
                         label: "Alchemy API key",
                         text: config.alchemy_api_key.unwrap_or_default(),
                         empty_text: None,
+                        currency: None,
                     },
                     FormItem::BooleanInput {
                         label: "Testnet Mode",

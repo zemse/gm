@@ -6,6 +6,7 @@ use account_import::AccountImportPage;
 use address_book::AddressBookPage;
 use address_book_create::AddressBookCreatePage;
 use address_book_display::AddressBookDisplayPage;
+use asset_transfer::AssetTransferPage;
 use assets::AssetsPage;
 use config::ConfigPage;
 use main_menu::MainMenuPage;
@@ -28,6 +29,7 @@ pub mod account_import;
 pub mod address_book;
 pub mod address_book_create;
 pub mod address_book_display;
+pub mod asset_transfer;
 pub mod assets;
 pub mod config;
 pub mod main_menu;
@@ -51,6 +53,8 @@ pub enum Page {
     AddressBookDisplay(AddressBookDisplayPage),
 
     Assets(AssetsPage),
+    AssetTransfer(AssetTransferPage),
+
     Config(ConfigPage),
     SendMessage(SendMessagePage),
     SignMessage(SignMessagePage),
@@ -89,6 +93,8 @@ impl Component for Page {
             Page::AccountImport(page) => page.exit_threads().await,
 
             Page::Assets(page) => page.exit_threads().await,
+            Page::AssetTransfer(page) => page.exit_threads().await,
+
             Page::Config(page) => page.exit_threads().await,
             Page::SendMessage(page) => page.exit_threads().await,
             Page::SignMessage(page) => page.exit_threads().await,
@@ -112,6 +118,8 @@ impl Component for Page {
             Page::AccountImport(page) => page.reload(),
 
             Page::Assets(page) => page.reload(),
+            Page::AssetTransfer(page) => page.reload(),
+
             Page::Config(page) => page.reload(),
             Page::SendMessage(page) => page.reload(),
             Page::SignMessage(page) => page.reload(),
@@ -141,6 +149,8 @@ impl Component for Page {
             Page::AccountImport(page) => page.handle_event(event, tr, sd, ss),
 
             Page::Assets(page) => page.handle_event(event, tr, sd, ss),
+            Page::AssetTransfer(page) => page.handle_event(event, tr, sd, ss),
+
             Page::Config(page) => page.handle_event(event, tr, sd, ss),
             Page::SendMessage(page) => page.handle_event(event, tr, sd, ss),
             Page::SignMessage(page) => page.handle_event(event, tr, sd, ss),
@@ -172,6 +182,8 @@ impl Component for Page {
             Page::AccountImport(page) => page.render_component(area, buf, shared_state),
 
             Page::Assets(page) => page.render_component(area, buf, shared_state),
+            Page::AssetTransfer(page) => page.render_component(area, buf, shared_state),
+
             Page::Config(page) => page.render_component(area, buf, shared_state),
             Page::SendMessage(page) => page.render_component(area, buf, shared_state),
             Page::SignMessage(page) => page.render_component(area, buf, shared_state),

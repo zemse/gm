@@ -17,6 +17,7 @@ pub struct InputBox<'a> {
     pub label: &'static str,
     pub text: &'a String,
     pub empty_text: Option<&'static str>,
+    pub currency: Option<&'a String>,
 }
 
 impl InputBox<'_> {
@@ -88,6 +89,19 @@ impl Widget for InputBox<'_> {
                     buf,
                 );
             }
+        }
+
+        if lines.len() == 1
+            && !lines.last().unwrap().is_empty()
+            && let Some(currency) = self.currency
+        {
+            Span::from(currency).render(
+                inner_area.offset(Offset {
+                    x: lines.last().unwrap().len() as i32 + 1,
+                    y: 0,
+                }),
+                buf,
+            );
         }
 
         for (idx, line) in lines.into_iter().enumerate() {

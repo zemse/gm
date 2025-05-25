@@ -38,11 +38,13 @@ impl Default for SendMessagePage {
                         label: TO,
                         text: String::new(),
                         empty_text: Some("<press SPACE to select from address book>"),
+                        currency: None,
                     },
                     FormItem::InputBox {
                         label: MESSAGE,
                         text: String::new(),
                         empty_text: None,
+                        currency: None,
                     },
                     FormItem::Button {
                         label: SEND_MESSAGE,

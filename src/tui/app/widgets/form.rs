@@ -11,10 +11,16 @@ pub enum FormItem {
         label: &'static str,
         text: String,
         empty_text: Option<&'static str>,
+        currency: Option<String>,
     },
     BooleanInput {
         label: &'static str,
         value: bool,
+    },
+    DisplayBox {
+        label: &'static str,
+        text: String,
+        empty_text: Option<&'static str>,
     },
     Button {
         label: &'static str,
@@ -28,6 +34,7 @@ impl FormItem {
         match self {
             FormItem::InputBox { label, .. } => Some(label),
             FormItem::BooleanInput { label, .. } => Some(label),
+            FormItem::DisplayBox { label, .. } => Some(label),
             FormItem::Button { label } => Some(label),
             _ => None,
         }
@@ -50,6 +57,7 @@ impl Form {
     pub fn get_input_text_mut(&mut self, idx: usize) -> &mut String {
         match &mut self.items[idx] {
             FormItem::InputBox { text, .. } => text,
+            FormItem::DisplayBox { text, .. } => text,
             _ => unreachable!(),
         }
     }
@@ -58,6 +66,13 @@ impl Form {
         match &self.items[idx] {
             FormItem::BooleanInput { value, .. } => *value,
             _ => unreachable!(),
+        }
+    }
+
+    pub fn get_currency_mut(&mut self, idx: usize) -> Option<&mut Option<String>> {
+        match &mut self.items[idx] {
+            FormItem::InputBox { currency, .. } => Some(currency),
+            _ => None,
         }
     }
 
@@ -94,9 +109,11 @@ impl Form {
                         self.cursor = (self.cursor + self.items.len() - 1) % self.items.len();
 
                         match &self.items[self.cursor] {
-                            FormItem::InputBox { .. } => break,
-                            FormItem::BooleanInput { .. } => break,
-                            FormItem::Button { .. } => break,
+                            FormItem::InputBox { .. }
+                            | FormItem::DisplayBox { .. }
+                            | FormItem::BooleanInput { .. }
+                            | FormItem::Button { .. } => break,
+
                             _ => {}
                         }
                     },
@@ -104,9 +121,10 @@ impl Form {
                         self.cursor = (self.cursor + 1) % self.items.len();
 
                         match &self.items[self.cursor] {
-                            FormItem::InputBox { .. } => break,
-                            FormItem::BooleanInput { .. } => break,
-                            FormItem::Button { .. } => break,
+                            FormItem::InputBox { .. }
+                            | FormItem::DisplayBox { .. }
+                            | FormItem::BooleanInput { .. }
+                            | FormItem::Button { .. } => break,
                             _ => {}
                         }
                     },
@@ -116,9 +134,10 @@ impl Form {
                                 self.cursor = (self.cursor + 1) % self.items.len();
 
                                 match &self.items[self.cursor] {
-                                    FormItem::InputBox { .. } => break,
-                                    FormItem::BooleanInput { .. } => break,
-                                    FormItem::Button { .. } => break,
+                                    FormItem::InputBox { .. }
+                                    | FormItem::DisplayBox { .. }
+                                    | FormItem::BooleanInput { .. }
+                                    | FormItem::Button { .. } => break,
                                     _ => {}
                                 }
                             }
@@ -131,6 +150,9 @@ impl Form {
                 match &mut self.items[self.cursor] {
                     FormItem::InputBox { text, .. } => {
                         InputBox::handle_events(text, event)?;
+                    }
+                    FormItem::DisplayBox { .. } => {
+                        // we don't have to handle this as parent component will do it
                     }
                     FormItem::BooleanInput { value, .. } => {
                         if matches!(
@@ -168,12 +190,30 @@ impl Widget for &Form {
                     label,
                     text,
                     empty_text,
+                    currency,
                 } => {
                     let widget = InputBox {
                         focus: self.cursor == i,
                         label,
                         text,
                         empty_text: *empty_text,
+                        currency: currency.as_ref(),
+                    };
+                    let height_used = widget.height_used(area); // to see height based on width
+                    widget.render(area, buf);
+                    area.y += height_used;
+                }
+                FormItem::DisplayBox {
+                    label,
+                    text,
+                    empty_text,
+                } => {
+                    let widget = InputBox {
+                        focus: self.cursor == i,
+                        label,
+                        text,
+                        empty_text: *empty_text,
+                        currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
                     widget.render(area, buf);
@@ -185,6 +225,7 @@ impl Widget for &Form {
                         label,
                         text: &value.to_string(),
                         empty_text: None,
+                        currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
                     widget.render(area, buf);

@@ -11,7 +11,7 @@ use crate::{
     network::NetworkStore,
 };
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum Price {
     #[default]
     Pending,
@@ -29,22 +29,40 @@ impl Price {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum TokenAddress {
+    Native,
+    Contract(Address),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct AssetType {
+    pub token_address: TokenAddress,
+    pub network: String,
+    pub symbol: String,
+    pub name: String,
+    pub decimals: u8,
+    pub price: Price,
+}
+
+impl Display for AssetType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.symbol, self.network)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Asset {
     #[allow(dead_code)]
-    wallet_address: Address,
-    token_address: Option<Address>,
-    network: String,
-    value: U256,
-    symbol: String,
-    name: String,
-    decimals: u8,
-    price: Price,
+    pub wallet_address: Address,
+    pub r#type: AssetType,
+    pub value: U256,
 }
 
 impl Asset {
     pub fn formatted_value(&self) -> f64 {
-        let temp_formatted = format_units(self.value, self.decimals).expect("format_units failed");
+        let temp_formatted =
+            format_units(self.value, self.r#type.decimals).expect("format_units failed");
 
         temp_formatted
             .parse::<f64>()
@@ -52,7 +70,8 @@ impl Asset {
     }
 
     pub fn usd_value(&self) -> Option<f64> {
-        self.price
+        self.r#type
+            .price
             .usd_price()
             .map(|usd_price| self.formatted_value() * usd_price)
     }
@@ -66,10 +85,14 @@ impl Display for Asset {
             write!(
                 f,
                 "{formatted_value} {} {} (${usd_value:.2})",
-                self.symbol, self.network
+                self.r#type.symbol, self.r#type.network
             )
         } else {
-            write!(f, "{formatted_value} {} {}", self.symbol, self.network)
+            write!(
+                f,
+                "{formatted_value} {} {}",
+                self.r#type.symbol, self.r#type.network
+            )
         }
     }
 }
@@ -90,36 +113,38 @@ pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
     .into_iter()
     .map(|entry| Asset {
         wallet_address,
-        token_address: Some(entry.token_address),
-        network: networks
-            .get_by_name(&entry.network)
-            .expect("must exist")
-            .name
-            .clone(),
+        r#type: AssetType {
+            token_address: TokenAddress::Contract(entry.token_address),
+            network: networks
+                .get_by_name(&entry.network)
+                .expect("must exist")
+                .name
+                .clone(),
+            symbol: entry.token_metadata.symbol,
+            name: entry.token_metadata.name,
+            decimals: entry.token_metadata.decimals,
+            price: entry
+                .token_prices
+                .first()
+                .map(|p| {
+                    assert_eq!(p.currency, "usd");
+                    Price::InUSD(p.value.parse().unwrap())
+                })
+                .unwrap_or(Price::Unknown),
+        },
         value: entry.token_balance,
-        symbol: entry.token_metadata.symbol,
-        name: entry.token_metadata.name,
-        decimals: entry.token_metadata.decimals,
-        price: entry
-            .token_prices
-            .first()
-            .map(|p| {
-                assert_eq!(p.currency, "usd");
-                Price::InUSD(p.value.parse().unwrap())
-            })
-            .unwrap_or(Price::Unknown),
     })
     .filter(|entry: &Asset| entry.usd_value().map(|v| v > 0.0).unwrap_or_default())
     .collect();
 
     for balance in &balances {
-        if let Some(token_address) = balance.token_address {
+        if let TokenAddress::Contract(token_address) = balance.r#type.token_address {
             networks.register_token(
-                &balance.network,
+                &balance.r#type.network,
                 token_address,
-                &balance.symbol,
-                &balance.name,
-                balance.decimals,
+                &balance.r#type.symbol,
+                &balance.r#type.name,
+                balance.r#type.decimals,
             );
         }
     }
@@ -143,13 +168,15 @@ pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
 
             balances.push(Asset {
                 wallet_address,
-                token_address: None,
-                network: network.name.clone(),
+                r#type: AssetType {
+                    token_address: TokenAddress::Native,
+                    network: network.name.clone(),
+                    symbol: network.symbol.clone().unwrap_or("ETH".to_string()),
+                    name: network.name.clone(),
+                    decimals: 18,
+                    price,
+                },
                 value: balance,
-                symbol: network.symbol.clone().unwrap_or("ETH".to_string()),
-                name: network.name.clone(),
-                decimals: 18,
-                price,
             });
         }
     }

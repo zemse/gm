@@ -83,6 +83,7 @@ impl Component for AccountImportPage {
             label: "Private key or Mnemonic phrase",
             text: &self.input,
             empty_text: None,
+            currency: None,
         }
         .render(area, buf);
 
