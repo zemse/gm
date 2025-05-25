@@ -9,6 +9,7 @@ pub enum Error {
     AddressBook(String),
     SecretNotFound(Address),
     InternalError(String),
+    InternalErrorStr(&'static str),
     ParseFloatError(std::num::ParseFloatError),
     IoError(std::io::Error),
     FromHexError(alloy::hex::FromHexError),

@@ -159,9 +159,13 @@ impl Alchemy {
 
             let response = response
                 .get("data")
-                .unwrap_or_else(|| panic!("'data' not present in response {response:?}"))
+                .ok_or(Error::InternalError(format!(
+                    "'data' not present in response {response:?}"
+                )))?
                 .get("tokens")
-                .unwrap_or_else(|| panic!("'tokens' not present in response {response:?}"));
+                .ok_or(Error::InternalError(format!(
+                    "'tokens' not present in response {response:?}"
+                )))?;
 
             let parsed: Vec<TokensByWalletEntry> = serde_json::from_value(response.clone())?;
             result.extend(parsed);
