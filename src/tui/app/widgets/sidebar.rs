@@ -7,7 +7,7 @@ use crate::{
     disk::{Config, DiskInterface},
     tui::{
         app::{
-            pages::{trade::TradePage, Page},
+            pages::{assets::AssetsPage, trade::TradePage, Page},
             Focus, SharedState,
         },
         traits::{Component, HandleResult},
@@ -32,7 +32,7 @@ impl Component for Sidebar {
         _shutdown_signal: &Arc<AtomicBool>,
         shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
-        self.cursor.handle(event, 2);
+        self.cursor.handle(event, 3);
 
         let mut result = HandleResult::default();
 
@@ -48,6 +48,11 @@ impl Component for Sidebar {
                             config.save();
                             result.reload = true;
                             result.refresh_assets = true;
+                        }
+                        2 => {
+                            result
+                                .page_inserts
+                                .push(Page::Assets(AssetsPage::default()));
                         }
                         _ => {}
                     },
@@ -83,6 +88,7 @@ impl Component for Sidebar {
         };
 
         Select {
+            // @dev make sure to update event handlers
             list: &vec![
                 format!("EthPrice: {eth_price}"),
                 format!("Testnet Mode: {}", shared_state.testnet_mode),
