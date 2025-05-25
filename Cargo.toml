@@ -50,3 +50,5 @@ rayon = "1.8"
 coins-bip32 = "0.12.0"
 humantime = "2.2.0"
 chrono = "0.4.41"
+clipboard = "0.4.6"
+
