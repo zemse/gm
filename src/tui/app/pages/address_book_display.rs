@@ -83,6 +83,7 @@ impl Component for AddressBookDisplayPage {
                     }
                 }
             }
+            Ok(())
         })?;
 
         Ok(handle_result)

@@ -70,7 +70,7 @@ impl Component for SendMessagePage {
 
         // Keyboard events focus on the form is there is no address book popup
         if self.address_book.is_none() {
-            self.form.handle_event(event, |_label, _form| {})?;
+            self.form.handle_event(event, |_label, _form| Ok(()))?;
         } else {
             // TODO refactor this code into FilterSelect module
             let list: Vec<&AddressBookEntry> = self

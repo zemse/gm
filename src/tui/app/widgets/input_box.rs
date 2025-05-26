@@ -1,5 +1,3 @@
-use std::cmp::min;
-
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{
     layout::{Offset, Rect},
@@ -7,9 +5,12 @@ use ratatui::{
     widgets::{Block, Widget},
 };
 
-use crate::tui::{
-    traits::{HandleResult, WidgetHeight},
-    Event,
+use crate::{
+    tui::{
+        traits::{HandleResult, WidgetHeight},
+        Event,
+    },
+    utils::text::split_string,
 };
 
 pub struct InputBox<'a> {
@@ -123,28 +124,9 @@ impl WidgetHeight for InputBox<'_> {
     }
 }
 
-fn split_string(s: &str, max_width: usize) -> Vec<&str> {
-    let mut lines = vec![];
-
-    let mut ptr = 0;
-    let s_len = s.len();
-    while ptr < s_len {
-        let next = min(ptr + max_width, s_len);
-        let s = s.get(ptr..next).expect("couldnt slice"); // can't go wrong
-        lines.push(s);
-        ptr = next;
-    }
-
-    if lines.is_empty() {
-        lines.push("");
-    }
-
-    lines
-}
-
 #[cfg(test)]
 mod test {
-    use crate::tui::app::widgets::input_box::split_string;
+    use crate::utils::text::split_string;
 
     #[test]
     fn test_split_string() {

@@ -1,6 +1,9 @@
 use std::time::Duration;
 
-use alloy::{primitives::Address, signers::k256::ecdsa::SigningKey};
+use alloy::{
+    primitives::{Address, FixedBytes},
+    signers::k256::ecdsa::SigningKey,
+};
 
 use crate::utils::assets::Asset;
 
@@ -29,6 +32,9 @@ pub enum Event {
 
     CandlesUpdate(Vec<Candle>, Interval),
     CandlesUpdateError(ReqwestError),
+
+    TxResult(FixedBytes<32>),
+    TxError(String),
 }
 
 impl Event {

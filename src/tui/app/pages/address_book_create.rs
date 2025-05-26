@@ -82,6 +82,7 @@ impl Component for AddressBookCreatePage {
                     }
                 }
             }
+            Ok(())
         })?;
 
         Ok(handle_result)

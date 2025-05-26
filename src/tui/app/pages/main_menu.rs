@@ -69,9 +69,9 @@ impl Component for MainMenuPage {
                                 .page_inserts
                                 .push(Page::Account(AccountPage::default()));
                         }
-                        Action::Transaction { .. } => {
-                            result.page_inserts.push(Page::Transaction(TransactionPage))
-                        }
+                        Action::Transaction { .. } => result
+                            .page_inserts
+                            .push(Page::Transaction(TransactionPage::default())),
                         Action::SignMessage { .. } => {
                             result.page_inserts.push(Page::SignMessage(SignMessagePage))
                         }

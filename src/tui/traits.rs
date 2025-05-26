@@ -17,23 +17,25 @@ pub trait BorderedWidget {
         Self: Sized;
 }
 
-impl<T: Widget> BorderedWidget for T {
-    fn render_with_block(
-        self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
-        block: Block<'_>,
-    ) where
-        Self: Sized,
-    {
-        let inner_area = block.inner(area);
-        block.render(area, buf);
-        self.render(inner_area, buf);
-    }
-}
-
 pub trait WidgetHeight {
     fn height_used(&self, area: ratatui::prelude::Rect) -> u16;
+}
+
+pub trait CustomRender<Args = ()> {
+    fn render(
+        &self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        args: Args,
+    ) -> ratatui::prelude::Rect;
+}
+
+pub trait RectUtil {
+    fn split_vertical(self, height: u16) -> [ratatui::prelude::Rect; 2];
+
+    fn rm_height(self, height: u16) -> ratatui::prelude::Rect;
+
+    fn change_height(self, height: u16) -> ratatui::prelude::Rect;
 }
 
 #[derive(Default)]

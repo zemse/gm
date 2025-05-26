@@ -1,4 +1,6 @@
 use crate::disk::{AddressBook, AddressBookEntry, DiskInterface};
+use crate::tui::app::pages::transaction::TransactionPage;
+use crate::tui::app::pages::Page;
 use crate::tui::app::widgets::filter_select::FilterSelect;
 use crate::tui::app::widgets::popup::Popup;
 use crate::tui::app::{Focus, SharedState};
@@ -7,10 +9,13 @@ use crate::tui::{
     events::Event,
     traits::{Component, HandleResult},
 };
-use crate::utils::assets::Asset;
+use crate::utils::assets::{Asset, TokenAddress};
 use crate::utils::cursor::Cursor;
 use crate::Result;
 use alloy::primitives::utils::parse_units;
+use alloy::primitives::{Bytes, TxKind, U256};
+use alloy::sol;
+use alloy::sol_types::SolCall;
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::style::Color;
 use ratatui::widgets::{Block, Widget};
@@ -102,7 +107,51 @@ impl Component for AssetTransferPage {
 
         if self.address_book.is_none() && !self.show_asset_popup {
             // Keyboard events focus on the form
-            self.form.handle_event(event, |_label, _form| {})?;
+            self.form.handle_event(event, |label, form| {
+                if label == TRANSFER {
+                    let to = form.get_input_text(1);
+                    let asset = self
+                        .asset
+                        .as_ref()
+                        .ok_or(crate::Error::InternalErrorStr("No asset selected"))?;
+                    let amount = parse_units(form.get_input_text(3), asset.r#type.decimals)?;
+
+                    sol! {
+                        interface IERC20 {
+                            function balanceOf(address owner) external view returns (uint256);
+                            function transfer(address to, uint256 amount) external returns (bool);
+                        }
+                    }
+
+                    let (to, calldata, value) = match asset.r#type.token_address {
+                        TokenAddress::Native => (
+                            TxKind::Call(to.parse()?),
+                            Bytes::new(),
+                            amount.get_absolute(),
+                        ),
+                        TokenAddress::Contract(address) => {
+                            let transfer_call = IERC20::transferCall {
+                                to: to.parse()?,
+                                amount: amount.get_absolute(),
+                            };
+
+                            let calldata = Bytes::from(transfer_call.abi_encode());
+
+                            (TxKind::Call(address), calldata, U256::ZERO)
+                        }
+                    };
+
+                    result
+                        .page_inserts
+                        .push(Page::Transaction(TransactionPage::new(
+                            &asset.r#type.network,
+                            to,
+                            calldata,
+                            value,
+                        )?))
+                }
+                Ok(())
+            })?;
         } else if let Some(address_book) = self.address_book.as_ref() {
             // Keyboard events go to the address book popup
             // TODO refactor this code into FilterSelect module

@@ -28,6 +28,10 @@ pub enum Error {
     AlloyLocalSignerError(alloy::signers::local::LocalSignerError),
     FromUtf8Error(std::string::FromUtf8Error),
     RpcError(alloy::transports::RpcError<alloy::transports::TransportErrorKind>),
+    UnitsError(alloy::primitives::utils::UnitsError),
+    AlloySignerError(alloy::signers::Error),
+    AlloyPendingTransactionError(alloy::providers::PendingTransactionError),
+    Abort(&'static str),
 }
 
 impl Error {
@@ -174,6 +178,24 @@ impl From<std::string::FromUtf8Error> for Error {
 impl From<alloy::transports::RpcError<alloy::transports::TransportErrorKind>> for Error {
     fn from(e: alloy::transports::RpcError<alloy::transports::TransportErrorKind>) -> Self {
         Error::RpcError(e)
+    }
+}
+
+impl From<alloy::primitives::utils::UnitsError> for Error {
+    fn from(e: alloy::primitives::utils::UnitsError) -> Self {
+        Error::UnitsError(e)
+    }
+}
+
+impl From<alloy::signers::Error> for Error {
+    fn from(e: alloy::signers::Error) -> Self {
+        Error::AlloySignerError(e)
+    }
+}
+
+impl From<alloy::providers::PendingTransactionError> for Error {
+    fn from(e: alloy::providers::PendingTransactionError) -> Self {
+        Error::AlloyPendingTransactionError(e)
     }
 }
 

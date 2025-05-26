@@ -100,7 +100,7 @@ impl Form {
 
     pub fn handle_event<F>(&mut self, event: &Event, mut on_button: F) -> crate::Result<()>
     where
-        F: FnMut(&'static str, &mut Self),
+        F: FnMut(&'static str, &mut Self) -> crate::Result<()>,
     {
         if let Event::Input(key_event) = event {
             if key_event.kind == KeyEventKind::Press {
@@ -164,7 +164,7 @@ impl Form {
                     }
                     FormItem::Button { label } => {
                         if matches!(key_event.code, KeyCode::Enter) {
-                            on_button(label, self)
+                            on_button(label, self)?
                         }
                     }
                     _ => {}

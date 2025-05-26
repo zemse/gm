@@ -66,6 +66,7 @@ impl Component for ConfigPage {
                 config.testnet_mode = form.get_boolean_value(2);
                 config.save();
             }
+            Ok(())
         })?;
 
         let display_text = self.form.get_display_text_mut(3);
