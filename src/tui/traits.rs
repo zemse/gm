@@ -31,9 +31,7 @@ pub trait CustomRender<Args = ()> {
 }
 
 pub trait RectUtil {
-    fn split_vertical(self, height: u16) -> [ratatui::prelude::Rect; 2];
-
-    fn rm_height(self, height: u16) -> ratatui::prelude::Rect;
+    fn consume_height(self, height: u16) -> ratatui::prelude::Rect;
 
     fn change_height(self, height: u16) -> ratatui::prelude::Rect;
 }

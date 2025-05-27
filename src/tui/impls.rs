@@ -63,34 +63,17 @@ impl<const N: usize> CustomRender<bool> for [String; N] {
             let segs = split_string(line, area.width as usize);
             for seg in segs {
                 seg.render(area, buf);
-                area = area.rm_height(1);
+                area = area.consume_height(1);
             }
 
-            area = area.rm_height(if leave_space { 2 } else { 1 });
+            area = area.consume_height(if leave_space { 2 } else { 1 });
         }
         full_area.change_height(full_area.height - area.height)
     }
 }
 
 impl RectUtil for Rect {
-    fn split_vertical(self, height: u16) -> [Rect; 2] {
-        [
-            Rect {
-                x: self.x,
-                y: height,
-                width: self.width,
-                height,
-            },
-            Rect {
-                x: self.x,
-                y: self.y + height,
-                width: self.width,
-                height: self.height - height,
-            },
-        ]
-    }
-
-    fn rm_height(self, height: u16) -> Rect {
+    fn consume_height(self, height: u16) -> Rect {
         Rect {
             x: self.x,
             y: self.y + height,

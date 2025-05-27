@@ -44,21 +44,21 @@ impl Error {
 }
 
 impl FmtError for Error {
-    fn fmt_err(&self) -> String {
+    fn fmt_err(&self, id: &str) -> String {
         if self.is_connect_reqwest() {
-            format!("Please check your internet connection - {self:?}")
+            format!("Please check your internet connection - {id}: {self:?}")
         } else {
-            self.to_string()
+            format!("{id}: {self:?}")
         }
     }
 }
 
 impl FmtError for reqwest::Error {
-    fn fmt_err(&self) -> String {
+    fn fmt_err(&self, id: &str) -> String {
         if self.is_connect() {
-            format!("Please check your internet connection - {self:?}")
+            format!("Please check your internet connection - {id}: {self:?}")
         } else {
-            self.to_string()
+            format!("{id}: {self:?}")
         }
     }
 }
@@ -200,5 +200,5 @@ impl From<alloy::providers::PendingTransactionError> for Error {
 }
 
 pub trait FmtError {
-    fn fmt_err(&self) -> String;
+    fn fmt_err(&self, id: &str) -> String;
 }

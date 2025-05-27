@@ -289,7 +289,7 @@ impl App {
                     // ETH Price is the main API for understanding if we are connected to internet
                     self.set_offline().await;
                 } else {
-                    self.fatal_error = Some(error.fmt_err())
+                    self.fatal_error = Some(error.fmt_err("EthPriceError"))
                 }
             }
 
@@ -299,12 +299,12 @@ impl App {
 
             // Candles API
             Event::CandlesUpdateError(error) => {
-                if error.is_connect() {
-                    self.fatal_error = Some(format!("Please ensure internet access\n{error:?}"))
-                } else {
-                    self.fatal_error = Some(error.to_string())
-                }
+                self.fatal_error = Some(error.fmt_err("CandlesUpdateError"));
             }
+
+            // Transaction API
+            Event::TxSubmitError(error) => self.fatal_error = Some(error),
+            Event::TxStatusError(error) => self.fatal_error = Some(error),
 
             _ => {}
         };

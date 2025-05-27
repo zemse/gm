@@ -9,12 +9,16 @@ use crate::utils::assets::Asset;
 
 use reqwest::Error as ReqwestError;
 
-use super::app::widgets::candle_chart::{Candle, Interval};
+use super::app::{
+    pages::transaction::TxStatus,
+    widgets::candle_chart::{Candle, Interval},
+};
 
 pub mod assets;
 pub mod eth_price;
 pub mod input;
 
+#[derive(Debug)]
 pub enum Event {
     Input(crossterm::event::KeyEvent),
 
@@ -33,8 +37,11 @@ pub enum Event {
     CandlesUpdate(Vec<Candle>, Interval),
     CandlesUpdateError(ReqwestError),
 
-    TxResult(FixedBytes<32>),
-    TxError(String),
+    TxSubmitResult(FixedBytes<32>),
+    TxSubmitError(String),
+
+    TxStatus(TxStatus),
+    TxStatusError(String),
 }
 
 impl Event {
