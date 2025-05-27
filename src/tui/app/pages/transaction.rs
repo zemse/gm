@@ -32,7 +32,7 @@ use crate::{
     },
 };
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub enum TxStatus {
     #[default]
     NotSent,
@@ -254,7 +254,7 @@ impl Component for TransactionPage {
                     #[allow(clippy::single_match)]
                     match key_event.code {
                         KeyCode::Enter => {
-                            if self.send_tx_thread.is_none() {
+                            if self.status == TxStatus::NotSent {
                                 // Handle sending transaction
                                 self.status = TxStatus::Signing;
                                 self.send_tx_thread =
