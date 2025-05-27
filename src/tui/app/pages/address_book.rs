@@ -1,25 +1,81 @@
-use std::sync::{atomic::AtomicBool, mpsc, Arc};
+use std::{
+    fmt::Display,
+    sync::{atomic::AtomicBool, mpsc, Arc},
+};
 
+use alloy::primitives::Address;
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::widgets::Widget;
 
 use crate::{
-    actions::address_book::AddressBookActions,
-    disk::{AddressBook, DiskInterface},
+    disk::{AddressBook, AddressBookEntry, DiskInterface},
     tui::{
         app::{widgets::filter_select::FilterSelect, Focus, SharedState},
         events::Event,
         traits::{Component, HandleResult},
     },
-    utils::cursor::Cursor,
+    utils::{
+        account::{AccountManager, AccountUtils},
+        cursor::Cursor,
+    },
 };
 
 use super::{
     address_book_create::AddressBookCreatePage, address_book_display::AddressBookDisplayPage, Page,
 };
 
+#[derive(Debug)]
+pub enum AddressBookMenuItem {
+    Create,
+    View(AddressBookEntry),
+    ViewAddressOnly(Address),
+}
+
+impl Display for AddressBookMenuItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AddressBookMenuItem::Create => write!(f, "Create new address book entry"),
+            AddressBookMenuItem::View(entry) => write!(f, "{} - {}", entry.name, entry.address),
+            AddressBookMenuItem::ViewAddressOnly(address) => {
+                write!(f, "Unsaved: {}", address)
+            }
+        }
+    }
+}
+
+impl AddressBookMenuItem {
+    pub fn get_menu() -> Vec<AddressBookMenuItem> {
+        let mut entries = vec![AddressBookMenuItem::Create];
+
+        // From address book
+        entries.extend(
+            AddressBook::load()
+                .list_owned()
+                .into_iter()
+                .map(AddressBookMenuItem::View)
+                .collect::<Vec<AddressBookMenuItem>>(),
+        );
+
+        // Self accounts that do not exist in the address book
+        entries.extend(
+            AccountManager::get_account_list()
+                .into_iter()
+                .filter(|address| {
+                    !entries.iter().any(|entry| match entry {
+                        AddressBookMenuItem::View(entry) => entry.address == *address,
+                        _ => false,
+                    })
+                })
+                .map(AddressBookMenuItem::ViewAddressOnly)
+                .collect::<Vec<AddressBookMenuItem>>(),
+        );
+
+        entries
+    }
+}
+
 pub struct AddressBookPage {
-    full_list: Vec<AddressBookActions>,
+    full_list: Vec<AddressBookMenuItem>,
     search_string: String,
     cursor: Cursor,
 }
@@ -27,7 +83,7 @@ pub struct AddressBookPage {
 impl Default for AddressBookPage {
     fn default() -> Self {
         Self {
-            full_list: AddressBookActions::get_menu(),
+            full_list: AddressBookMenuItem::get_menu(),
             search_string: String::new(),
             cursor: Cursor::default(),
         }
@@ -51,7 +107,7 @@ impl Component for AddressBookPage {
         _shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
-        let list: Vec<&AddressBookActions> = self
+        let list: Vec<&AddressBookMenuItem> = self
             .full_list
             .iter()
             .filter(|entry| format!("{entry}").contains(self.search_string.as_str()))
@@ -75,15 +131,12 @@ impl Component for AddressBookPage {
                         }
                     }
                     KeyCode::Enter => result.page_inserts.push(match &list[self.cursor.current] {
-                        AddressBookActions::Create { address, name } => {
-                            Page::AddressBookCreate(AddressBookCreatePage::new(
-                                name.clone().unwrap_or_default(),
-                                address.map(|a| a.to_string()).unwrap_or_default(),
-                            ))
-                        }
-                        AddressBookActions::View { id, address, name } => {
+                        AddressBookMenuItem::Create => Page::AddressBookCreate(
+                            AddressBookCreatePage::new(String::new(), String::new()),
+                        ),
+                        AddressBookMenuItem::View(entry) => {
                             let (id, entry) = AddressBook::load()
-                                .find(id, address, &name.as_ref())
+                                .find(&None, &Some(entry.address), &Some(&entry.name))
                                 .expect("entry not found");
                             Page::AddressBookDisplay(AddressBookDisplayPage::new(
                                 id,
@@ -91,6 +144,9 @@ impl Component for AddressBookPage {
                                 entry.address.to_string(),
                             ))
                         }
+                        AddressBookMenuItem::ViewAddressOnly(address) => Page::AddressBookCreate(
+                            AddressBookCreatePage::new(String::new(), address.to_string()),
+                        ),
                     }),
                     _ => {}
                 }

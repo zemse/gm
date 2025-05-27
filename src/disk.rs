@@ -153,6 +153,10 @@ impl AddressBook {
     pub fn list(&self) -> &Vec<AddressBookEntry> {
         &self.entries
     }
+
+    pub fn list_owned(self) -> Vec<AddressBookEntry> {
+        self.entries
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
