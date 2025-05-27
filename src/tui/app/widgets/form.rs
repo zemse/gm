@@ -12,6 +12,7 @@ pub trait FormItemIndex {
     fn index(self) -> usize;
 }
 
+#[derive(Clone, Debug)]
 pub enum FormWidget {
     Heading(&'static str),
     StaticText(&'static str),
@@ -124,17 +125,22 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
         }
     }
 
-    pub fn get_input_text(&self, idx: E) -> &String {
+    pub fn get_text(&self, idx: E) -> &String {
         match &self.items[idx.index()] {
             FormWidget::InputBox { text, .. } => text,
+            FormWidget::DisplayBox { text, .. } => text,
+            FormWidget::DisplayText(text) => text,
+            FormWidget::ErrorText(text) => text,
             _ => unreachable!(),
         }
     }
 
-    pub fn get_input_text_mut(&mut self, idx: E) -> &mut String {
+    pub fn get_text_mut(&mut self, idx: E) -> &mut String {
         match &mut self.items[idx.index()] {
             FormWidget::InputBox { text, .. } => text,
             FormWidget::DisplayBox { text, .. } => text,
+            FormWidget::DisplayText(text) => text,
+            FormWidget::ErrorText(text) => text,
             _ => unreachable!(),
         }
     }
@@ -150,20 +156,6 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
         match &mut self.items[idx.index()] {
             FormWidget::InputBox { currency, .. } => Some(currency),
             _ => None,
-        }
-    }
-
-    pub fn get_display_text_mut(&mut self, idx: E) -> &mut String {
-        match &mut self.items[idx.index()] {
-            FormWidget::DisplayText(text, ..) => text,
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn get_error_text_mut(&mut self, idx: E) -> &mut String {
-        match &mut self.items[idx.index()] {
-            FormWidget::ErrorText(text, ..) => text,
-            _ => unreachable!(),
         }
     }
 

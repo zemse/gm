@@ -73,7 +73,7 @@ impl Component for ConfigPage {
         _shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
-        let display_text = self.form.get_display_text_mut(FormItem::DisplayText);
+        let display_text = self.form.get_text_mut(FormItem::DisplayText);
         *display_text = "".to_string();
 
         let mut handle_result = HandleResult::default();
@@ -82,12 +82,12 @@ impl Component for ConfigPage {
             handle_result.reload = true;
 
             let mut config = Config::load();
-            config.alchemy_api_key = Some(form.get_input_text(FormItem::AlchemyApiKey).clone());
+            config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
             config.testnet_mode = form.get_boolean_value(FormItem::TestnetMode);
             config.save();
             transmitter.send(Event::ConfigUpdated)?;
 
-            let display_text = form.get_display_text_mut(FormItem::DisplayText);
+            let display_text = form.get_text_mut(FormItem::DisplayText);
             *display_text = "Configuration saved".to_string();
 
             Ok(())

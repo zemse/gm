@@ -56,8 +56,8 @@ pub struct AddressBookDisplayPage {
 impl AddressBookDisplayPage {
     pub fn new(id: usize, name: String, address: String) -> Self {
         let mut form = Form::init();
-        *form.get_input_text_mut(FormItem::Name) = name;
-        *form.get_input_text_mut(FormItem::Address) = address;
+        *form.get_text_mut(FormItem::Name) = name;
+        *form.get_text_mut(FormItem::Address) = address;
         Self { id, form }
     }
 }
@@ -74,14 +74,14 @@ impl Component for AddressBookDisplayPage {
 
         self.form.handle_event(event, |label, form| {
             if label == FormItem::SaveButton {
-                let name = form.get_input_text(FormItem::Name);
+                let name = form.get_text(FormItem::Name);
                 if name.is_empty() {
-                    let error = form.get_error_text_mut(FormItem::ErrorText);
+                    let error = form.get_text_mut(FormItem::ErrorText);
                     *error = "Please enter name, you cannot leave it empty".to_string();
                 } else {
                     let mut address_book = AddressBook::load();
 
-                    let address = form.get_input_text(FormItem::Address);
+                    let address = form.get_text(FormItem::Address);
                     let result = address.parse().map_err(crate::Error::from).map(|address| {
                         address_book.update(
                             self.id,
@@ -92,7 +92,7 @@ impl Component for AddressBookDisplayPage {
                         );
                     });
                     if let Err(e) = result {
-                        let error = form.get_error_text_mut(FormItem::ErrorText);
+                        let error = form.get_text_mut(FormItem::ErrorText);
                         *error = format!("{e:?}");
                     } else {
                         handle_result.page_pops = 1;

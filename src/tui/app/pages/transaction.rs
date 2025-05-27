@@ -54,11 +54,16 @@ pub struct TransactionPage {
 }
 
 impl TransactionPage {
-    pub fn new(network: &str, to: TxKind, calldata: Bytes, value: U256) -> crate::Result<Self> {
+    pub fn new(
+        network_name: &str,
+        to: TxKind,
+        calldata: Bytes,
+        value: U256,
+    ) -> crate::Result<Self> {
         let network_store = NetworkStore::load();
         let network = network_store
-            .get_by_name(network)
-            .ok_or(crate::Error::InternalErrorStr("Network not found"))?;
+            .get_by_name(network_name)
+            .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))?;
 
         Ok(Self {
             network,

@@ -98,7 +98,7 @@ impl AssetTransferPage {
 
         // Update the form with the asset type, this is because the `asset` is
         // not directly linked to the ASSET_TYPE in form state
-        *page.form.get_input_text_mut(FormItem::AssetType) = format!("{}", asset.r#type);
+        *page.form.get_text_mut(FormItem::AssetType) = format!("{}", asset.r#type);
         *page
             .form
             .get_currency_mut(FormItem::Amount)
@@ -122,7 +122,7 @@ impl Component for AssetTransferPage {
         if self.address_book.is_none() && !self.show_asset_popup {
             // Activate the address book popup if the user presses SPACE in the "To" field
             if self.form.is_focused(FormItem::To)
-                && self.form.get_input_text(FormItem::To).is_empty()
+                && self.form.get_text(FormItem::To).is_empty()
                 && (event.is_char_pressed(Some(' ')) || event.is_key_pressed(KeyCode::Enter))
             {
                 self.address_book = Some(AddressBook::load());
@@ -139,13 +139,13 @@ impl Component for AssetTransferPage {
             // Keyboard events focus on the form
             self.form.handle_event(event, |label, form| {
                 if label == FormItem::TransferButton {
-                    let to = form.get_input_text(FormItem::To);
+                    let to = form.get_text(FormItem::To);
                     let asset = self
                         .asset
                         .as_ref()
                         .ok_or(crate::Error::InternalErrorStr("No asset selected"))?;
                     let amount =
-                        parse_units(form.get_input_text(FormItem::Amount), asset.r#type.decimals)?;
+                        parse_units(form.get_text(FormItem::Amount), asset.r#type.decimals)?;
 
                     sol! {
                         interface IERC20 {
@@ -205,7 +205,7 @@ impl Component for AssetTransferPage {
                             self.search_string.pop();
                         }
                         KeyCode::Enter => {
-                            let to_address = self.form.get_input_text_mut(FormItem::To);
+                            let to_address = self.form.get_text_mut(FormItem::To);
                             *to_address = list[self.cursor.current].address.to_string();
                             self.address_book = None;
                             self.form.advance_cursor();
@@ -229,7 +229,7 @@ impl Component for AssetTransferPage {
                                 self.asset = Some(asset.clone());
                                 self.show_asset_popup = false;
                                 // update form
-                                *self.form.get_input_text_mut(FormItem::AssetType) =
+                                *self.form.get_text_mut(FormItem::AssetType) =
                                     format!("{}", asset.r#type);
                                 *self.form.get_currency_mut(FormItem::Amount).expect(
                                     "currency not found in this input entry, please check idx",
@@ -257,18 +257,17 @@ impl Component for AssetTransferPage {
 
         // Check for amount to be greateer than balance
         if let Some(asset) = &self.asset {
-            let amount = self.form.get_input_text(FormItem::Amount);
+            let amount = self.form.get_text(FormItem::Amount);
             match parse_units(amount, asset.r#type.decimals) {
                 Err(e) => {
-                    *self.form.get_error_text_mut(FormItem::ErrorText) =
-                        format!("Invalid amount: {e}");
+                    *self.form.get_text_mut(FormItem::ErrorText) = format!("Invalid amount: {e}");
                 }
                 Ok(amount) => {
                     if amount.get_absolute() > asset.value {
-                        *self.form.get_error_text_mut(FormItem::ErrorText) =
+                        *self.form.get_text_mut(FormItem::ErrorText) =
                             "Amount exceeds balance".to_string();
                     } else {
-                        self.form.get_error_text_mut(FormItem::ErrorText).clear();
+                        self.form.get_text_mut(FormItem::ErrorText).clear();
                     }
                 }
             }
