@@ -6,6 +6,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    CurrentAccountNotSet,
+    AlchemyApiKeyNotSet,
     AddressBook(String),
     SecretNotFound(Address),
     InternalError(String),
@@ -32,6 +34,7 @@ pub enum Error {
     AlloySignerError(alloy::signers::Error),
     AlloyPendingTransactionError(alloy::providers::PendingTransactionError),
     Abort(&'static str),
+    UrlParseError(url::ParseError),
 }
 
 impl Error {
@@ -196,6 +199,12 @@ impl From<alloy::signers::Error> for Error {
 impl From<alloy::providers::PendingTransactionError> for Error {
     fn from(e: alloy::providers::PendingTransactionError) -> Self {
         Error::AlloyPendingTransactionError(e)
+    }
+}
+
+impl From<url::ParseError> for Error {
+    fn from(e: url::ParseError) -> Self {
+        Error::UrlParseError(e)
     }
 }
 

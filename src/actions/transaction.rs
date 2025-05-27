@@ -78,7 +78,11 @@ impl Handle for TransactionActions {
                 // Implement transaction creation logic
 
                 let network = tx_input.network.as_ref().expect("network must be provided");
-                let rpc_url = network.get_rpc().parse().expect("error parsing URL");
+                let rpc_url = network
+                    .get_rpc()
+                    .unwrap()
+                    .parse()
+                    .expect("error parsing URL");
                 let provider = ProviderBuilder::new().on_http(rpc_url);
 
                 let mut tx = TxEip1559::default();
@@ -93,7 +97,7 @@ impl Handle for TransactionActions {
                     tx.value = value;
                 }
 
-                let current_account = Config::current_account();
+                let current_account = Config::current_account().unwrap();
                 let result = provider.get_transaction_count(current_account);
 
                 // Create a Tokio runtime

@@ -80,7 +80,7 @@ pub struct AssetTransferPage {
 impl Default for AssetTransferPage {
     fn default() -> Self {
         Self {
-            form: Form::init(1),
+            form: Form::init(),
             asset: None,
             address_book: None,
             cursor: Cursor::default(),

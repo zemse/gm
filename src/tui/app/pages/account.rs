@@ -96,6 +96,7 @@ impl Component for AccountPage {
                             config.current_account = Some(*address);
                             config.save();
                             transmitter.send(Event::AccountChange(*address))?;
+                            transmitter.send(Event::ConfigUpdated)?;
                             result.page_pops = 1;
                         }
                     },

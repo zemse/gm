@@ -48,12 +48,9 @@ pub struct TokenBalancesByWalletEntry {
 pub struct Alchemy;
 
 impl Alchemy {
-    pub fn api_key() -> String {
-        Config::alchemy_api_key()
-    }
+    pub async fn get_price(symbol: &str) -> crate::Result<(f64, String)> {
+        let api_key = Config::alchemy_api_key()?;
 
-    pub async fn get_price(symbol: &str) -> Result<(f64, String), Error> {
-        let api_key = Self::api_key();
         let client = reqwest::Client::new();
 
         let res = client
@@ -125,7 +122,7 @@ impl Alchemy {
         address: Address,
         networks: Vec<String>,
     ) -> Result<Vec<TokensByWalletEntry>, Error> {
-        let api_key = Self::api_key();
+        let api_key = Config::alchemy_api_key()?;
 
         let mut result = Vec::new();
         for networks in networks.chunks(5) {
@@ -190,7 +187,7 @@ impl Alchemy {
         // Initialize the reqwest Client
         let client = Client::new();
 
-        let api_key = Self::api_key();
+        let api_key = Config::alchemy_api_key()?;
 
         // Make the POST request
         let response = client

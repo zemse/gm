@@ -111,7 +111,7 @@ impl TransactionPage {
                 value: U256,
                 shutdown_signal: Arc<AtomicBool>,
             ) -> crate::Result<FixedBytes<32>> {
-                let provider = network.get_provider();
+                let provider = network.get_provider()?;
 
                 let wallet = load_wallet(sender_account)?;
 
@@ -170,12 +170,12 @@ impl TransactionPage {
         tr: &mpsc::Sender<Event>,
         shutdown_signal: &Arc<AtomicBool>,
         tx_hash: FixedBytes<32>,
-    ) -> JoinHandle<()> {
+    ) -> crate::Result<JoinHandle<()>> {
         let tr = tr.clone();
         let shutdown_signal = shutdown_signal.clone();
 
-        let provider = self.network.get_provider();
-        tokio::spawn(async move {
+        let provider = self.network.get_provider()?;
+        Ok(tokio::spawn(async move {
             loop {
                 match provider.get_transaction_receipt(tx_hash).await {
                     Ok(result) => {
@@ -197,7 +197,7 @@ impl TransactionPage {
                     break;
                 }
             }
-        })
+        }))
     }
 }
 
@@ -257,7 +257,7 @@ impl Component for TransactionPage {
 
                 self.status = TxStatus::Pending(*hash);
                 if self.watch_tx_thread.is_none() {
-                    self.watch_tx_thread = Some(self.watch_tx_thread(tr, sd, *hash));
+                    self.watch_tx_thread = Some(self.watch_tx_thread(tr, sd, *hash)?);
                 }
             }
 

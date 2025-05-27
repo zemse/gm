@@ -62,13 +62,23 @@ pub struct Form<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> {
 impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
     // TODO remove the cursor parameter, and guess it as the first item that is
     // not heading or static text or similar
-    pub fn init(cursor: usize) -> Self {
-        Self {
-            cursor,
+    pub fn init() -> Self {
+        let mut val = Self {
+            cursor: 0,
             items: E::iter().map(|item| item.into()).collect(),
             hide: HashMap::new(),
             _phantom: PhantomData,
+        };
+
+        for i in 0..val.items.len() {
+            if val.is_valid_cursor(i) {
+                break;
+            } else {
+                val.cursor += 1;
+            }
         }
+
+        val
     }
 
     pub fn hide_item(&mut self, idx: E) {
@@ -81,6 +91,28 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
 
     pub fn hidden_count(&self) -> usize {
         self.hide.len()
+    }
+
+    pub fn visible_count(&self) -> usize {
+        self.items.len() - self.hidden_count()
+    }
+
+    pub fn is_valid_cursor(&self, idx: usize) -> bool {
+        if self.hide.contains_key(&idx) {
+            return false;
+        }
+
+        match &self.items[idx] {
+            FormWidget::Heading(_)
+            | FormWidget::StaticText(_)
+            | FormWidget::DisplayText(_)
+            | FormWidget::ErrorText(_) => false,
+
+            FormWidget::InputBox { .. }
+            | FormWidget::DisplayBox { .. }
+            | FormWidget::BooleanInput { .. }
+            | FormWidget::Button { .. } => true,
+        }
     }
 
     pub fn get_input_text(&self, idx: E) -> &String {
@@ -157,14 +189,8 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
                     KeyCode::Down | KeyCode::Tab => loop {
                         self.cursor = (self.cursor + 1) % self.items.len();
 
-                        if !self.hide.contains_key(&self.cursor) {
-                            match &self.items[self.cursor] {
-                                FormWidget::InputBox { .. }
-                                | FormWidget::DisplayBox { .. }
-                                | FormWidget::BooleanInput { .. }
-                                | FormWidget::Button { .. } => break,
-                                _ => {}
-                            }
+                        if self.is_valid_cursor(self.cursor) {
+                            break;
                         }
                     },
                     KeyCode::Enter => {
@@ -172,12 +198,8 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
                             loop {
                                 self.cursor = (self.cursor + 1) % self.items.len();
 
-                                match &self.items[self.cursor] {
-                                    FormWidget::InputBox { .. }
-                                    | FormWidget::DisplayBox { .. }
-                                    | FormWidget::BooleanInput { .. }
-                                    | FormWidget::Button { .. } => break,
-                                    _ => {}
+                                if self.is_valid_cursor(self.cursor) {
+                                    break;
                                 }
                             }
                         }

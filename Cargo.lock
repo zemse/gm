@@ -2142,6 +2142,7 @@ dependencies = [
  "tokio",
  "toml",
  "tui-qrcode",
+ "url",
 ]
 
 [[package]]

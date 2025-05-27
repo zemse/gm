@@ -38,21 +38,24 @@ impl Display for Network {
 }
 
 impl Network {
-    pub fn get_rpc(&self) -> String {
+    pub fn get_rpc(&self) -> crate::Result<String> {
         if let Some(rpc_url) = &self.rpc_url {
-            rpc_url.clone()
+            Ok(rpc_url.clone())
         } else if let Some(rpc_alchemy) = &self.rpc_alchemy {
-            rpc_alchemy.replace(
+            Ok(rpc_alchemy.replace(
                 "{}",
                 // TODO handle this error when alchemy API key not present
-                &Config::alchemy_api_key(),
-            )
+                &Config::alchemy_api_key()?,
+            ))
         } else if let Some(rpc_infura) = &self.rpc_infura {
-            rpc_infura.clone()
+            Ok(rpc_infura.clone())
         } else {
             // TODO remove this panic and allow user to gracefully handle this situation like providing
             // their own RPC URL or ALCHEMY_API_KEY
-            panic!("No RPC URL found for network {}", self.name);
+            Err(crate::Error::InternalError(format!(
+                "No RPC URL found for network {}",
+                self.name
+            )))
         }
     }
 
@@ -62,9 +65,9 @@ impl Network {
             .map(|explorer_url| explorer_url.replace("{}", tx_hash))
     }
 
-    pub fn get_provider(&self) -> Provider {
-        let rpc_url = self.get_rpc().parse().expect("error parsing URL");
-        ProviderBuilder::new().on_http(rpc_url)
+    pub fn get_provider(&self) -> crate::Result<Provider> {
+        let rpc_url = self.get_rpc()?.parse()?;
+        Ok(ProviderBuilder::new().on_http(rpc_url))
     }
 }
 

@@ -28,7 +28,7 @@ impl Component for Sidebar {
     fn handle_event(
         &mut self,
         event: &crate::tui::Event,
-        _transmitter: &mpsc::Sender<Event>,
+        transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
         shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
@@ -47,6 +47,8 @@ impl Component for Sidebar {
                             let mut config = Config::load();
                             config.testnet_mode = !shared_state.testnet_mode;
                             config.save();
+                            transmitter.send(Event::ConfigUpdated)?;
+
                             result.reload = true;
                             result.refresh_assets = true;
                         }
@@ -83,7 +85,10 @@ impl Component for Sidebar {
             format!("Testnet Mode: {}", shared_state.testnet_mode),
         ];
 
-        if !shared_state.testnet_mode {
+        if !shared_state.testnet_mode
+            && shared_state.current_account.is_some()
+            && shared_state.alchemy_api_key_available
+        {
             let portfolio = if let Some(assets) = &shared_state.assets {
                 let portfolio = assets
                     .iter()

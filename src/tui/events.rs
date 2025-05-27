@@ -22,17 +22,18 @@ pub mod input;
 pub enum Event {
     Input(crossterm::event::KeyEvent),
 
+    AccountChange(Address),
+    ConfigUpdated,
+
     EthPriceUpdate(String),
     EthPriceError(ReqwestError),
-
-    AccountChange(Address),
 
     HashRateResult(f64),
     HashRateError(String),
     VanityResult(SigningKey, usize, Duration),
 
     AssetsUpdate(Vec<Asset>),
-    AssetsUpdateError(String),
+    AssetsUpdateError(String, bool), // bool - whether to silence the error
 
     CandlesUpdate(Vec<Candle>, Interval),
     CandlesUpdateError(ReqwestError),

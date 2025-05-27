@@ -4,7 +4,7 @@ use crate::disk::Config;
 use alloy::{hex, signers::SignerSync};
 
 pub fn sign_message(msg: String) {
-    let current_account = Config::current_account();
+    let current_account = Config::current_account().unwrap();
     let wallet = load_wallet(current_account).expect("must load wallet");
 
     let signature = wallet

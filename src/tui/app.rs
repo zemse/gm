@@ -41,6 +41,7 @@ pub struct SharedState {
     pub assets: Option<Vec<Asset>>,
     pub testnet_mode: bool,
     pub current_account: Option<Address>,
+    pub alchemy_api_key_available: bool,
     pub eth_price: Option<String>,
     pub focus: Focus,
 }
@@ -73,6 +74,7 @@ impl Default for App {
             shared_state: SharedState {
                 assets: None,
                 current_account: config.current_account,
+                alchemy_api_key_available: config.alchemy_api_key.is_some(),
                 online: None,
                 eth_price: None,
                 testnet_mode: config.testnet_mode,
@@ -156,6 +158,12 @@ impl App {
     pub fn reload(&mut self) {
         let config = Config::load();
         self.shared_state.testnet_mode = config.testnet_mode;
+        self.shared_state.alchemy_api_key_available = config.alchemy_api_key.is_some();
+        self.shared_state.current_account = config.current_account;
+
+        for page in &mut self.context {
+            page.reload();
+        }
     }
 
     async fn process_result(
@@ -279,6 +287,10 @@ impl App {
                 self.shared_state.current_account = Some(address);
             }
 
+            Event::ConfigUpdated => {
+                self.reload();
+            }
+
             // ETH Price API
             Event::EthPriceUpdate(eth_price) => {
                 self.shared_state.eth_price = Some(eth_price);
@@ -295,7 +307,11 @@ impl App {
 
             // Assets API
             Event::AssetsUpdate(assets) => self.shared_state.assets = Some(assets),
-            Event::AssetsUpdateError(error) => self.fatal_error = Some(error),
+            Event::AssetsUpdateError(error, silence_error) => {
+                if !silence_error {
+                    self.fatal_error = Some(error)
+                }
+            }
 
             // Candles API
             Event::CandlesUpdateError(error) => {

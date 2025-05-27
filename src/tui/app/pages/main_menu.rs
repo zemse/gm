@@ -6,6 +6,7 @@ use strum::{Display, EnumIter, IntoEnumIterator};
 
 use crate::{
     actions::setup::get_setup_menu,
+    disk::Config,
     tui::{
         app::{widgets::select::Select, Focus, SharedState},
         events::Event,
@@ -23,7 +24,7 @@ use super::{
 pub enum MainMenuItems {
     Setup,
     Assets,
-    Account,
+    Accounts,
     AddressBook,
     SignMessage,
     SendMessage,
@@ -31,12 +32,32 @@ pub enum MainMenuItems {
 }
 
 impl MainMenuItems {
+    pub fn depends_on_current_account(&self) -> bool {
+        match self {
+            MainMenuItems::Setup
+            | MainMenuItems::AddressBook
+            | MainMenuItems::Accounts
+            | MainMenuItems::Config => false,
+
+            MainMenuItems::Assets | MainMenuItems::SignMessage | MainMenuItems::SendMessage => true,
+        }
+    }
+
     pub fn get_menu() -> Vec<MainMenuItems> {
-        let mut options: Vec<MainMenuItems> = MainMenuItems::iter().collect();
+        let mut all_options: Vec<MainMenuItems> = MainMenuItems::iter().collect();
 
         let setup_menu = get_setup_menu();
         if setup_menu.is_empty() {
-            options.remove(0);
+            all_options.remove(0);
+        }
+
+        let current_account_exists = Config::current_account().is_some();
+        let mut options = vec![];
+
+        for option in all_options {
+            if !option.depends_on_current_account() || current_account_exists {
+                options.push(option);
+            }
         }
 
         options
@@ -90,7 +111,7 @@ impl Component for MainMenuPage {
                         MainMenuItems::Assets => result
                             .page_inserts
                             .push(Page::Assets(AssetsPage::default())),
-                        MainMenuItems::Account => {
+                        MainMenuItems::Accounts => {
                             result
                                 .page_inserts
                                 .push(Page::Account(AccountPage::default()));

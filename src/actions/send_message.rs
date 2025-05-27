@@ -12,7 +12,7 @@ use tokio::runtime::Runtime;
 /// Sends a message from the currently selected wallet to a recipient wallet.
 pub async fn send_message(to: String, msg: String, network: Option<Network>) {
     // Retrieve the current account dynamically
-    let sender_account = Config::current_account();
+    let sender_account = Config::current_account().unwrap();
 
     // Load wallet for the current account
     let wallet = load_wallet(sender_account).expect("❌ Failed to load wallet");
@@ -40,7 +40,11 @@ pub async fn send_message(to: String, msg: String, network: Option<Network>) {
     };
 
     // Setup provider
-    let rpc_url = network.get_rpc().parse().expect("❌ Invalid RPC URL");
+    let rpc_url = network
+        .get_rpc()
+        .unwrap()
+        .parse()
+        .expect("❌ Invalid RPC URL");
     let provider = ProviderBuilder::new().on_http(rpc_url);
 
     // Construct transaction

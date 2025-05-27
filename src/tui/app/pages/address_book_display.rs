@@ -55,7 +55,7 @@ pub struct AddressBookDisplayPage {
 
 impl AddressBookDisplayPage {
     pub fn new(id: usize, name: String, address: String) -> Self {
-        let mut form = Form::init(0);
+        let mut form = Form::init();
         *form.get_input_text_mut(FormItem::Name) = name;
         *form.get_input_text_mut(FormItem::Address) = address;
         Self { id, form }

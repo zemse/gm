@@ -63,7 +63,7 @@ pub struct SendMessagePage {
 impl Default for SendMessagePage {
     fn default() -> Self {
         Self {
-            form: Form::init(1),
+            form: Form::init(),
             address_book: None,
             cursor: Cursor::default(),
             search_string: String::new(),

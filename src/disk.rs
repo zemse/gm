@@ -168,13 +168,7 @@ impl DiskInterface for Config {
 }
 
 impl Config {
-    pub fn current_account() -> Address {
-        Config::load()
-            .current_account
-            .expect("current_account is not available")
-    }
-
-    pub fn current_account_optn() -> Option<Address> {
+    pub fn current_account() -> Option<Address> {
         Config::load().current_account
     }
 
@@ -184,10 +178,10 @@ impl Config {
         config.save();
     }
 
-    pub fn alchemy_api_key() -> String {
+    pub fn alchemy_api_key() -> crate::Result<String> {
         Config::load()
             .alchemy_api_key
-            .expect("alchemy_api_key is not set in the config")
+            .ok_or(crate::Error::AlchemyApiKeyNotSet)
     }
 
     pub fn set_alchemy_api_key(alchemy_api_key: String) {

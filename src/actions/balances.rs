@@ -114,7 +114,7 @@ pub fn get_all_balances() {
     let mut eth_price = None;
 
     for network in networks.get_iter(config.testnet_mode) {
-        let provider = network.get_provider();
+        let provider = network.get_provider().unwrap();
 
         let balance = rt
             .block_on(provider.get_balance(wallet_address).into_future())

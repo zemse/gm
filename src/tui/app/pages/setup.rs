@@ -63,7 +63,7 @@ impl Default for SetupPage {
     fn default() -> Self {
         let config = Config::load();
 
-        let mut form = Form::init(0);
+        let mut form = Form::init();
 
         if config.current_account.is_some() {
             form.hide_item(FormItem::CreateOrImportWallet);
@@ -75,16 +75,23 @@ impl Default for SetupPage {
             .unwrap_or(false)
         {
             form.hide_item(FormItem::AlchemyApiKey);
+            form.hide_item(FormItem::Save);
+            form.hide_item(FormItem::Display);
         }
 
         Self { form }
     }
 }
 impl Component for SetupPage {
+    fn reload(&mut self) {
+        let fresh = Self::default();
+        self.form = fresh.form;
+    }
+
     fn handle_event(
         &mut self,
         event: &Event,
-        _transmitter: &mpsc::Sender<Event>,
+        transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
@@ -104,6 +111,8 @@ impl Component for SetupPage {
                 let mut config = Config::load();
                 config.alchemy_api_key = Some(form.get_input_text(FormItem::AlchemyApiKey).clone());
                 config.save();
+                transmitter.send(Event::ConfigUpdated)?;
+
                 let display_text = form.get_display_text_mut(FormItem::Display);
                 *display_text = "Configuration saved".to_string();
             }
@@ -120,8 +129,9 @@ impl Component for SetupPage {
         Line::from("Setup").bold().render(area, buf);
         area = area.consume_height(2);
 
-        if self.form.hidden_count() >= 2 {
-            Line::from("You have completed the setup please return back.").render(area, buf);
+        if self.form.visible_count() == 0 {
+            Line::from("You have completed the setup please press ESC to return back.")
+                .render(area, buf);
         } else {
             "Complete the following steps to get started:".render(area, buf);
             area = area.consume_height(2);

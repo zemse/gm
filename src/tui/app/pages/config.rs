@@ -62,16 +62,14 @@ impl Default for ConfigPage {
         if config.alchemy_api_key.is_none() {
             config.alchemy_api_key = Some("".to_string());
         }
-        Self {
-            form: Form::init(0),
-        }
+        Self { form: Form::init() }
     }
 }
 impl Component for ConfigPage {
     fn handle_event(
         &mut self,
         event: &Event,
-        _transmitter: &mpsc::Sender<Event>,
+        transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
@@ -87,6 +85,7 @@ impl Component for ConfigPage {
             config.alchemy_api_key = Some(form.get_input_text(FormItem::AlchemyApiKey).clone());
             config.testnet_mode = form.get_boolean_value(FormItem::TestnetMode);
             config.save();
+            transmitter.send(Event::ConfigUpdated)?;
 
             let display_text = form.get_display_text_mut(FormItem::DisplayText);
             *display_text = "Configuration saved".to_string();
