@@ -14,6 +14,7 @@ use alloy::{
     primitives::{Address, Bytes, FixedBytes, TxKind, U256},
     providers::Provider,
     rlp::{BytesMut, Encodable},
+    rpc::types::{TransactionInput, TransactionRequest},
 };
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{buffer::Buffer, layout::Rect, style::Stylize, text::Line, widgets::Widget};
@@ -134,8 +135,6 @@ impl TransactionPage {
                 let chain_id = provider.get_chain_id().await?;
                 tx.chain_id = chain_id;
 
-                tx.gas_limit = 51_000;
-
                 // Estimate gas fees
                 let fee_estimation = provider.estimate_eip1559_fees(None).await?;
                 tx.max_priority_fee_per_gas = fee_estimation.max_priority_fee_per_gas;
@@ -148,6 +147,22 @@ impl TransactionPage {
                         gas_price + 9393
                     }
                 }
+
+                tx.gas_limit = provider
+                    .estimate_gas(&TransactionRequest {
+                        from: Some(sender_account),
+                        to: Some(to),
+                        max_fee_per_gas: Some(tx.max_fee_per_gas),
+                        max_priority_fee_per_gas: Some(tx.max_priority_fee_per_gas),
+                        value: Some(tx.value),
+                        input: TransactionInput::new(tx.input.clone()),
+                        nonce: Some(nonce),
+                        chain_id: Some(chain_id),
+                        transaction_type: Some(2),
+                        ..Default::default()
+                    })
+                    .await?;
+                tx.gas_limit = tx.gas_limit * 110 / 100; // TODO allow to configure gas limit
 
                 // Sign transaction
                 let signature = wallet.sign_transaction_sync(&mut tx)?;
