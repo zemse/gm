@@ -83,7 +83,17 @@ impl Component for SendMessagePage {
 
         // Keyboard events focus on the form is there is no address book popup
         if self.address_book.is_none() {
-            self.form.handle_event(event, |_label, _form| Ok(()))?;
+            // Activate the address book popup if the user presses SPACE in the "To" field
+            if self.form.is_focused(FormItem::To)
+                && self.form.get_input_text(FormItem::To).is_empty()
+                && (event.is_char_pressed(Some(' ')) || event.is_key_pressed(KeyCode::Enter))
+            {
+                let ab = AddressBook::load();
+                self.address_book = Some(ab);
+                self.form.advance_cursor();
+            } else {
+                self.form.handle_event(event, |_label, _form| Ok(()))?;
+            }
         } else {
             // TODO refactor this code into FilterSelect module
             let list: Vec<&AddressBookEntry> = self
@@ -116,23 +126,12 @@ impl Component for SendMessagePage {
                     }
                 }
             }
-        }
 
-        // Activate the address book popup if the user presses SPACE in the "To" field
-        if self.form.is_focused(FormItem::To)
-            && self.form.get_input_text(FormItem::To).is_empty()
-            && event.is_char_pressed(Some(' '))
-        {
-            let ab = AddressBook::load();
-            self.address_book = Some(ab);
-        }
+            if event.is_key_pressed(KeyCode::Esc) {
+                self.address_book = None;
+            }
 
-        if self.address_book.is_some() {
             result.esc_ignores = 1;
-        }
-
-        if event.is_key_pressed(KeyCode::Esc) {
-            self.address_book = None;
         }
 
         Ok(result)

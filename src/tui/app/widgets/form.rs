@@ -96,6 +96,15 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
     pub fn visible_count(&self) -> usize {
         self.items.len() - self.hidden_count()
     }
+    pub fn advance_cursor(&mut self) {
+        loop {
+            self.cursor = (self.cursor + 1) % self.items.len();
+
+            if self.is_valid_cursor(self.cursor) {
+                break;
+            }
+        }
+    }
 
     pub fn is_valid_cursor(&self, idx: usize) -> bool {
         if self.hide.contains_key(&idx) {

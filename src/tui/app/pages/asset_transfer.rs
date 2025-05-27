@@ -120,6 +120,22 @@ impl Component for AssetTransferPage {
         let mut result = HandleResult::default();
 
         if self.address_book.is_none() && !self.show_asset_popup {
+            // Activate the address book popup if the user presses SPACE in the "To" field
+            if self.form.is_focused(FormItem::To)
+                && self.form.get_input_text(FormItem::To).is_empty()
+                && (event.is_char_pressed(Some(' ')) || event.is_key_pressed(KeyCode::Enter))
+            {
+                self.address_book = Some(AddressBook::load());
+                self.cursor = Cursor::default();
+            }
+
+            if self.form.is_focused(FormItem::AssetType)
+                && (event.is_char_pressed(Some(' ')) || event.is_key_pressed(KeyCode::Enter))
+            {
+                self.show_asset_popup = true;
+                self.cursor = Cursor::default();
+            }
+
             // Keyboard events focus on the form
             self.form.handle_event(event, |label, form| {
                 if label == FormItem::TransferButton {
@@ -192,6 +208,7 @@ impl Component for AssetTransferPage {
                             let to_address = self.form.get_input_text_mut(FormItem::To);
                             *to_address = list[self.cursor.current].address.to_string();
                             self.address_book = None;
+                            self.form.advance_cursor();
                         }
                         _ => {}
                     }
@@ -227,21 +244,6 @@ impl Component for AssetTransferPage {
             }
         } else {
             unreachable!()
-        }
-
-        // Activate the address book popup if the user presses SPACE in the "To" field
-        if self.form.is_focused(FormItem::To)
-            && self.form.get_input_text(FormItem::To).is_empty()
-            && event.is_char_pressed(Some(' '))
-        {
-            let ab = AddressBook::load();
-            self.address_book = Some(ab);
-            self.cursor = Cursor::default();
-        }
-
-        if self.form.is_focused(FormItem::AssetType) && event.is_char_pressed(Some(' ')) {
-            self.show_asset_popup = true;
-            self.cursor = Cursor::default();
         }
 
         if self.address_book.is_some() || self.show_asset_popup {
