@@ -1,9 +1,10 @@
 use crate::disk::{AddressBook, AddressBookEntry, DiskInterface};
 use crate::tui::app::widgets::filter_select::FilterSelect;
+use crate::tui::app::widgets::form::FormItemIndex;
 use crate::tui::app::widgets::popup::Popup;
 use crate::tui::app::{Focus, SharedState};
 use crate::tui::{
-    app::widgets::form::{Form, FormItem}, // <- Using your custom form system
+    app::widgets::form::{Form, FormWidget}, // <- Using your custom form system
     events::Event,
     traits::{Component, HandleResult},
 };
@@ -14,43 +15,55 @@ use ratatui::style::Color;
 use ratatui::widgets::{Block, Widget};
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
+use strum::EnumIter;
+
+#[derive(EnumIter, PartialEq)]
+pub enum FormItem {
+    Heading,
+    To,
+    Message,
+    SendMessageButton,
+}
+impl FormItemIndex for FormItem {
+    fn index(self) -> usize {
+        self as usize
+    }
+}
+impl From<FormItem> for FormWidget {
+    fn from(value: FormItem) -> Self {
+        match value {
+            FormItem::Heading => FormWidget::Heading("Send a Message"),
+            FormItem::To => FormWidget::InputBox {
+                label: "To",
+                text: String::new(),
+                empty_text: Some("<press SPACE to select from address book>"),
+                currency: None,
+            },
+            FormItem::Message => FormWidget::InputBox {
+                label: "Message",
+                text: String::new(),
+                empty_text: None,
+                currency: None,
+            },
+            FormItem::SendMessageButton => FormWidget::Button {
+                label: "Send Message",
+            },
+        }
+    }
+}
 
 pub struct SendMessagePage {
-    pub form: Form,
+    pub form: Form<FormItem>,
     /// Address book popup state
     pub address_book: Option<AddressBook>,
     pub cursor: Cursor,
     pub search_string: String,
 }
 
-const TO: &str = "To";
-const MESSAGE: &str = "Message";
-const SEND_MESSAGE: &str = "Send Message";
-
 impl Default for SendMessagePage {
     fn default() -> Self {
         Self {
-            form: Form {
-                cursor: 1,
-                items: vec![
-                    FormItem::Heading("Send a Message"),
-                    FormItem::InputBox {
-                        label: TO,
-                        text: String::new(),
-                        empty_text: Some("<press SPACE to select from address book>"),
-                        currency: None,
-                    },
-                    FormItem::InputBox {
-                        label: MESSAGE,
-                        text: String::new(),
-                        empty_text: None,
-                        currency: None,
-                    },
-                    FormItem::Button {
-                        label: SEND_MESSAGE,
-                    },
-                ],
-            },
+            form: Form::init(1),
             address_book: None,
             cursor: Cursor::default(),
             search_string: String::new(),
@@ -95,7 +108,7 @@ impl Component for SendMessagePage {
                             self.search_string.pop();
                         }
                         KeyCode::Enter => {
-                            let to_address = self.form.get_input_text_mut(1);
+                            let to_address = self.form.get_input_text_mut(FormItem::To);
                             *to_address = list[self.cursor.current].address.to_string();
                             self.address_book = None;
                         }
@@ -106,8 +119,8 @@ impl Component for SendMessagePage {
         }
 
         // Activate the address book popup if the user presses SPACE in the "To" field
-        if self.form.is_focused(TO)
-            && self.form.get_input_text(1).is_empty()
+        if self.form.is_focused(FormItem::To)
+            && self.form.get_input_text(FormItem::To).is_empty()
             && event.is_char_pressed(Some(' '))
         {
             let ab = AddressBook::load();

@@ -2,9 +2,10 @@ use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::widgets::Widget;
+use strum::{Display, EnumIter, IntoEnumIterator};
 
 use crate::{
-    actions::Action,
+    actions::setup::get_setup_menu,
     tui::{
         app::{widgets::select::Select, Focus, SharedState},
         events::Event,
@@ -15,19 +16,42 @@ use crate::{
 
 use super::{
     account::AccountPage, address_book::AddressBookPage, assets::AssetsPage, config::ConfigPage,
-    send_message::SendMessagePage, sign_message::SignMessagePage, transaction::TransactionPage,
-    Page,
+    send_message::SendMessagePage, setup::SetupPage, sign_message::SignMessagePage, Page,
 };
+
+#[derive(Display, EnumIter)]
+pub enum MainMenuItems {
+    Setup,
+    Assets,
+    Account,
+    AddressBook,
+    SignMessage,
+    SendMessage,
+    Config,
+}
+
+impl MainMenuItems {
+    pub fn get_menu() -> Vec<MainMenuItems> {
+        let mut options: Vec<MainMenuItems> = MainMenuItems::iter().collect();
+
+        let setup_menu = get_setup_menu();
+        // if setup_menu.is_empty() {
+        //     options.remove(0);
+        // }
+
+        options
+    }
+}
 
 pub struct MainMenuPage {
     cursor: Cursor,
-    list: Vec<Action>,
+    list: Vec<MainMenuItems>,
 }
 
 impl Default for MainMenuPage {
     fn default() -> Self {
         Self {
-            list: Action::get_menu(),
+            list: MainMenuItems::get_menu(),
             cursor: Cursor::default(),
         }
     }
@@ -55,30 +79,29 @@ impl Component for MainMenuPage {
                 #[allow(clippy::single_match)]
                 match key_event.code {
                     KeyCode::Enter => match &self.list[self.cursor.current] {
-                        Action::Setup => todo!(),
-                        Action::AddressBook { .. } => {
+                        &MainMenuItems::Setup => {
+                            result.page_inserts.push(Page::Setup(SetupPage::default()))
+                        }
+                        MainMenuItems::AddressBook => {
                             result
                                 .page_inserts
                                 .push(Page::AddressBook(AddressBookPage::default()));
                         }
-                        Action::Assets => result
+                        MainMenuItems::Assets => result
                             .page_inserts
                             .push(Page::Assets(AssetsPage::default())),
-                        Action::Account { .. } => {
+                        MainMenuItems::Account => {
                             result
                                 .page_inserts
                                 .push(Page::Account(AccountPage::default()));
                         }
-                        Action::Transaction { .. } => result
-                            .page_inserts
-                            .push(Page::Transaction(TransactionPage::default())),
-                        Action::SignMessage { .. } => {
+                        MainMenuItems::SignMessage => {
                             result.page_inserts.push(Page::SignMessage(SignMessagePage))
                         }
-                        Action::SendMessage { .. } => result
+                        MainMenuItems::SendMessage => result
                             .page_inserts
                             .push(Page::SendMessage(SendMessagePage::default())),
-                        Action::Config { .. } => result
+                        MainMenuItems::Config => result
                             .page_inserts
                             .push(Page::Config(ConfigPage::default())),
                     },

@@ -1,12 +1,20 @@
+use std::marker::PhantomData;
+
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{style::Stylize, widgets::Widget};
+use strum::IntoEnumIterator;
 
 use crate::tui::{traits::WidgetHeight, Event};
 
 use super::{button::Button, input_box::InputBox};
 
-pub enum FormItem {
+pub trait FormItemIndex {
+    fn index(self) -> usize;
+}
+
+pub enum FormWidget {
     Heading(&'static str),
+    StaticText(&'static str),
     InputBox {
         label: &'static str,
         text: String,
@@ -29,78 +37,92 @@ pub enum FormItem {
     ErrorText(String),
 }
 
-impl FormItem {
+impl FormWidget {
     pub fn label(&self) -> Option<&'static str> {
         match self {
-            FormItem::InputBox { label, .. } => Some(label),
-            FormItem::BooleanInput { label, .. } => Some(label),
-            FormItem::DisplayBox { label, .. } => Some(label),
-            FormItem::Button { label } => Some(label),
-            _ => None,
+            FormWidget::InputBox { label, .. } => Some(label),
+            FormWidget::DisplayBox { label, .. } => Some(label),
+            FormWidget::BooleanInput { label, .. } => Some(label),
+            FormWidget::Button { label } => Some(label),
+            FormWidget::Heading(_)
+            | FormWidget::StaticText(_)
+            | FormWidget::DisplayText(_)
+            | FormWidget::ErrorText(_) => None,
         }
     }
 }
 
-pub struct Form {
+pub struct Form<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> {
     pub cursor: usize,
-    pub items: Vec<FormItem>,
+    pub items: Vec<FormWidget>,
+    pub _phantom: PhantomData<E>,
 }
 
-impl Form {
-    pub fn get_input_text(&self, idx: usize) -> &String {
-        match &self.items[idx] {
-            FormItem::InputBox { text, .. } => text,
+impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
+    // TODO remove the cursor parameter, and guess it as the first item that is
+    // not heading or static text or similar
+    pub fn init(cursor: usize) -> Self {
+        Self {
+            cursor,
+            items: E::iter().map(|item| item.into()).collect(),
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn get_input_text(&self, idx: E) -> &String {
+        match &self.items[idx.index()] {
+            FormWidget::InputBox { text, .. } => text,
             _ => unreachable!(),
         }
     }
 
-    pub fn get_input_text_mut(&mut self, idx: usize) -> &mut String {
-        match &mut self.items[idx] {
-            FormItem::InputBox { text, .. } => text,
-            FormItem::DisplayBox { text, .. } => text,
+    pub fn get_input_text_mut(&mut self, idx: E) -> &mut String {
+        match &mut self.items[idx.index()] {
+            FormWidget::InputBox { text, .. } => text,
+            FormWidget::DisplayBox { text, .. } => text,
             _ => unreachable!(),
         }
     }
 
-    pub fn get_boolean_value(&self, idx: usize) -> bool {
-        match &self.items[idx] {
-            FormItem::BooleanInput { value, .. } => *value,
+    pub fn get_boolean_value(&self, idx: E) -> bool {
+        match &self.items[idx.index()] {
+            FormWidget::BooleanInput { value, .. } => *value,
             _ => unreachable!(),
         }
     }
 
-    pub fn get_currency_mut(&mut self, idx: usize) -> Option<&mut Option<String>> {
-        match &mut self.items[idx] {
-            FormItem::InputBox { currency, .. } => Some(currency),
+    pub fn get_currency_mut(&mut self, idx: E) -> Option<&mut Option<String>> {
+        match &mut self.items[idx.index()] {
+            FormWidget::InputBox { currency, .. } => Some(currency),
             _ => None,
         }
     }
 
-    pub fn get_display_text_mut(&mut self, idx: usize) -> &mut String {
-        match &mut self.items[idx] {
-            FormItem::DisplayText(text, ..) => text,
+    pub fn get_display_text_mut(&mut self, idx: E) -> &mut String {
+        match &mut self.items[idx.index()] {
+            FormWidget::DisplayText(text, ..) => text,
             _ => unreachable!(),
         }
     }
 
-    pub fn get_error_text_mut(&mut self, idx: usize) -> &mut String {
-        match &mut self.items[idx] {
-            FormItem::ErrorText(text, ..) => text,
+    pub fn get_error_text_mut(&mut self, idx: E) -> &mut String {
+        match &mut self.items[idx.index()] {
+            FormWidget::ErrorText(text, ..) => text,
             _ => unreachable!(),
         }
     }
 
-    pub fn is_focused(&self, label: &str) -> bool {
-        self.items[self.cursor].label() == Some(label)
+    pub fn is_focused(&self, idx: E) -> bool {
+        self.cursor == idx.index()
     }
 
     pub fn is_button_focused(&self) -> bool {
-        matches!(self.items[self.cursor], FormItem::Button { .. })
+        matches!(self.items[self.cursor], FormWidget::Button { .. })
     }
 
     pub fn handle_event<F>(&mut self, event: &Event, mut on_button: F) -> crate::Result<()>
     where
-        F: FnMut(&'static str, &mut Self) -> crate::Result<()>,
+        F: FnMut(E, &mut Self) -> crate::Result<()>,
     {
         if let Event::Input(key_event) = event {
             if key_event.kind == KeyEventKind::Press {
@@ -109,10 +131,10 @@ impl Form {
                         self.cursor = (self.cursor + self.items.len() - 1) % self.items.len();
 
                         match &self.items[self.cursor] {
-                            FormItem::InputBox { .. }
-                            | FormItem::DisplayBox { .. }
-                            | FormItem::BooleanInput { .. }
-                            | FormItem::Button { .. } => break,
+                            FormWidget::InputBox { .. }
+                            | FormWidget::DisplayBox { .. }
+                            | FormWidget::BooleanInput { .. }
+                            | FormWidget::Button { .. } => break,
 
                             _ => {}
                         }
@@ -121,10 +143,10 @@ impl Form {
                         self.cursor = (self.cursor + 1) % self.items.len();
 
                         match &self.items[self.cursor] {
-                            FormItem::InputBox { .. }
-                            | FormItem::DisplayBox { .. }
-                            | FormItem::BooleanInput { .. }
-                            | FormItem::Button { .. } => break,
+                            FormWidget::InputBox { .. }
+                            | FormWidget::DisplayBox { .. }
+                            | FormWidget::BooleanInput { .. }
+                            | FormWidget::Button { .. } => break,
                             _ => {}
                         }
                     },
@@ -134,10 +156,10 @@ impl Form {
                                 self.cursor = (self.cursor + 1) % self.items.len();
 
                                 match &self.items[self.cursor] {
-                                    FormItem::InputBox { .. }
-                                    | FormItem::DisplayBox { .. }
-                                    | FormItem::BooleanInput { .. }
-                                    | FormItem::Button { .. } => break,
+                                    FormWidget::InputBox { .. }
+                                    | FormWidget::DisplayBox { .. }
+                                    | FormWidget::BooleanInput { .. }
+                                    | FormWidget::Button { .. } => break,
                                     _ => {}
                                 }
                             }
@@ -148,13 +170,13 @@ impl Form {
                 }
 
                 match &mut self.items[self.cursor] {
-                    FormItem::InputBox { text, .. } => {
+                    FormWidget::InputBox { text, .. } => {
                         InputBox::handle_events(text, event)?;
                     }
-                    FormItem::DisplayBox { .. } => {
+                    FormWidget::DisplayBox { .. } => {
                         // we don't have to handle this as parent component will do it
                     }
-                    FormItem::BooleanInput { value, .. } => {
+                    FormWidget::BooleanInput { value, .. } => {
                         if matches!(
                             key_event.code,
                             KeyCode::Char(_) | KeyCode::Left | KeyCode::Right | KeyCode::Backspace
@@ -162,9 +184,11 @@ impl Form {
                             *value = !*value
                         }
                     }
-                    FormItem::Button { label } => {
+                    FormWidget::Button { .. } => {
                         if matches!(key_event.code, KeyCode::Enter) {
-                            on_button(label, self)?
+                            let enum_repr =
+                                E::iter().nth(self.cursor).expect("Invalid cursor index");
+                            on_button(enum_repr, self)?
                         }
                     }
                     _ => {}
@@ -175,18 +199,22 @@ impl Form {
     }
 }
 
-impl Widget for &Form {
+impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E> {
     fn render(self, mut area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,
     {
         for (i, item) in self.items.iter().enumerate() {
             match item {
-                FormItem::Heading(heading) => {
+                FormWidget::Heading(heading) => {
                     heading.bold().render(area, buf);
                     area.y += 2;
                 }
-                FormItem::InputBox {
+                FormWidget::StaticText(text) => {
+                    text.render(area, buf);
+                    area.y += 2;
+                }
+                FormWidget::InputBox {
                     label,
                     text,
                     empty_text,
@@ -203,7 +231,7 @@ impl Widget for &Form {
                     widget.render(area, buf);
                     area.y += height_used;
                 }
-                FormItem::DisplayBox {
+                FormWidget::DisplayBox {
                     label,
                     text,
                     empty_text,
@@ -219,7 +247,7 @@ impl Widget for &Form {
                     widget.render(area, buf);
                     area.y += height_used;
                 }
-                FormItem::BooleanInput { label, value } => {
+                FormWidget::BooleanInput { label, value } => {
                     let widget = InputBox {
                         focus: self.cursor == i,
                         label,
@@ -231,15 +259,15 @@ impl Widget for &Form {
                     widget.render(area, buf);
                     area.y += height_used;
                 }
-                FormItem::Button { label } => {
+                FormWidget::Button { label } => {
                     Button {
                         focus: self.cursor == i,
                         label,
                     }
                     .render(area, buf);
-                    area.y += 3;
+                    area.y += 4;
                 }
-                FormItem::DisplayText(text) | FormItem::ErrorText(text) => {
+                FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
                     if !text.is_empty() {
                         area.y += 1;
                         text.render(area, buf);

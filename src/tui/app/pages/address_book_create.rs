@@ -2,7 +2,7 @@ use crate::{
     disk::{AddressBook, AddressBookEntry, DiskInterface},
     tui::{
         app::{
-            widgets::form::{Form, FormItem},
+            widgets::form::{Form, FormItemIndex, FormWidget},
             SharedState,
         },
         events::Event,
@@ -11,35 +11,54 @@ use crate::{
 };
 use ratatui::widgets::Widget;
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
+use strum::EnumIter;
+
+#[derive(EnumIter, PartialEq)]
+pub enum FormItem {
+    Heading,
+    Name,
+    Address,
+    SaveButton,
+    ErrorText,
+}
+impl FormItemIndex for FormItem {
+    fn index(self) -> usize {
+        self as usize
+    }
+}
+impl From<FormItem> for FormWidget {
+    fn from(value: FormItem) -> Self {
+        match value {
+            FormItem::Heading => FormWidget::Heading("Edit AddressBook entry"),
+            FormItem::Name => FormWidget::InputBox {
+                label: "name",
+                text: String::new(),
+                empty_text: None,
+                currency: None,
+            },
+            FormItem::Address => FormWidget::InputBox {
+                label: "address",
+                text: String::new(),
+                empty_text: None,
+                currency: None,
+            },
+            FormItem::SaveButton => FormWidget::Button { label: "Save" },
+            FormItem::ErrorText => FormWidget::ErrorText(String::new()),
+        }
+    }
+}
 
 pub struct AddressBookCreatePage {
-    pub form: Form,
+    pub form: Form<FormItem>,
 }
 
 impl AddressBookCreatePage {
     pub fn new(name: String, address: String) -> Self {
-        Self {
-            form: Form {
-                cursor: 1,
-                items: vec![
-                    FormItem::Heading("Edit AddressBook entry"),
-                    FormItem::InputBox {
-                        label: "name",
-                        text: name,
-                        empty_text: None,
-                        currency: None,
-                    },
-                    FormItem::InputBox {
-                        label: "address",
-                        text: address,
-                        empty_text: None,
-                        currency: None,
-                    },
-                    FormItem::Button { label: "Save" },
-                    FormItem::ErrorText(String::new()),
-                ],
-            },
-        }
+        let mut form = Form::init(1);
+        *form.get_input_text_mut(FormItem::Name) = name;
+        *form.get_input_text_mut(FormItem::Address) = address;
+
+        Self { form }
     }
 }
 
@@ -54,15 +73,15 @@ impl Component for AddressBookCreatePage {
         let mut handle_result = HandleResult::default();
 
         self.form.handle_event(event, |label, form| {
-            if label == "Save" {
-                let name = form.get_input_text(1);
+            if label == FormItem::SaveButton {
+                let name = form.get_input_text(FormItem::Name);
                 if name.is_empty() {
-                    let error = form.get_error_text_mut(4);
+                    let error = form.get_error_text_mut(FormItem::ErrorText);
                     *error = "Please enter name, you cannot leave it empty".to_string();
                 } else {
                     let mut address_book = AddressBook::load();
 
-                    let address = form.get_input_text(2);
+                    let address = form.get_input_text(FormItem::Address);
 
                     let result = address
                         .parse()
@@ -74,7 +93,7 @@ impl Component for AddressBookCreatePage {
                             })
                         });
                     if let Err(e) = result {
-                        let error = form.get_error_text_mut(4);
+                        let error = form.get_error_text_mut(FormItem::ErrorText);
                         *error = format!("{e:?}");
                     } else {
                         handle_result.page_pops = 1;

@@ -2,10 +2,11 @@ use crate::disk::{AddressBook, AddressBookEntry, DiskInterface};
 use crate::tui::app::pages::transaction::TransactionPage;
 use crate::tui::app::pages::Page;
 use crate::tui::app::widgets::filter_select::FilterSelect;
+use crate::tui::app::widgets::form::FormItemIndex;
 use crate::tui::app::widgets::popup::Popup;
 use crate::tui::app::{Focus, SharedState};
 use crate::tui::{
-    app::widgets::form::{Form, FormItem}, // <- Using your custom form system
+    app::widgets::form::{Form, FormWidget},
     events::Event,
     traits::{Component, HandleResult},
 };
@@ -21,9 +22,51 @@ use ratatui::style::Color;
 use ratatui::widgets::{Block, Widget};
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
+use strum::EnumIter;
+
+#[derive(EnumIter, PartialEq)]
+pub enum FormItem {
+    Heading,
+    To,
+    AssetType,
+    Amount,
+    ErrorText,
+    TransferButton,
+}
+impl FormItemIndex for FormItem {
+    fn index(self) -> usize {
+        self as usize
+    }
+}
+impl From<FormItem> for FormWidget {
+    fn from(value: FormItem) -> Self {
+        match value {
+            FormItem::Heading => FormWidget::Heading("Transfer Assets"),
+            FormItem::To => FormWidget::InputBox {
+                label: "To",
+                text: String::new(),
+                empty_text: Some("<press SPACE to select from address book>"),
+                currency: None,
+            },
+            FormItem::AssetType => FormWidget::DisplayBox {
+                label: "Asset Type",
+                text: String::new(),
+                empty_text: Some("<press SPACE to select from your assets>"),
+            },
+            FormItem::Amount => FormWidget::InputBox {
+                label: "Amount",
+                text: String::new(),
+                empty_text: None,
+                currency: None,
+            },
+            FormItem::ErrorText => FormWidget::ErrorText(String::new()),
+            FormItem::TransferButton => FormWidget::Button { label: "Transfer" },
+        }
+    }
+}
 
 pub struct AssetTransferPage {
-    pub form: Form,
+    pub form: Form<FormItem>,
     pub asset: Option<Asset>,
     /// Asset popup - we get asset details from `shared_state`
     pub show_asset_popup: bool,
@@ -34,39 +77,10 @@ pub struct AssetTransferPage {
     pub cursor: Cursor,
 }
 
-const TO: &str = "To";
-const ASSET_TYPE: &str = "Asset Type";
-const AMOUNT: &str = "Amount";
-const TRANSFER: &str = "Transfer";
-
 impl Default for AssetTransferPage {
     fn default() -> Self {
         Self {
-            form: Form {
-                cursor: 1,
-                items: vec![
-                    FormItem::Heading("Transfer Assets"),
-                    FormItem::InputBox {
-                        label: TO,
-                        text: String::new(),
-                        empty_text: Some("<press SPACE to select from address book>"),
-                        currency: None,
-                    },
-                    FormItem::DisplayBox {
-                        label: ASSET_TYPE,
-                        text: String::new(),
-                        empty_text: Some("<press SPACE to select from your assets>"),
-                    },
-                    FormItem::InputBox {
-                        label: AMOUNT,
-                        text: String::new(),
-                        empty_text: None,
-                        currency: None,
-                    },
-                    FormItem::ErrorText(String::new()),
-                    FormItem::Button { label: TRANSFER },
-                ],
-            },
+            form: Form::init(1),
             asset: None,
             address_book: None,
             cursor: Cursor::default(),
@@ -84,10 +98,10 @@ impl AssetTransferPage {
 
         // Update the form with the asset type, this is because the `asset` is
         // not directly linked to the ASSET_TYPE in form state
-        *page.form.get_input_text_mut(2) = format!("{}", asset.r#type);
+        *page.form.get_input_text_mut(FormItem::AssetType) = format!("{}", asset.r#type);
         *page
             .form
-            .get_currency_mut(3)
+            .get_currency_mut(FormItem::Amount)
             .expect("currency not found in this input entry, please check idx") =
             Some(asset.r#type.symbol.clone());
 
@@ -108,13 +122,14 @@ impl Component for AssetTransferPage {
         if self.address_book.is_none() && !self.show_asset_popup {
             // Keyboard events focus on the form
             self.form.handle_event(event, |label, form| {
-                if label == TRANSFER {
-                    let to = form.get_input_text(1);
+                if label == FormItem::TransferButton {
+                    let to = form.get_input_text(FormItem::To);
                     let asset = self
                         .asset
                         .as_ref()
                         .ok_or(crate::Error::InternalErrorStr("No asset selected"))?;
-                    let amount = parse_units(form.get_input_text(3), asset.r#type.decimals)?;
+                    let amount =
+                        parse_units(form.get_input_text(FormItem::Amount), asset.r#type.decimals)?;
 
                     sol! {
                         interface IERC20 {
@@ -174,7 +189,7 @@ impl Component for AssetTransferPage {
                             self.search_string.pop();
                         }
                         KeyCode::Enter => {
-                            let to_address = self.form.get_input_text_mut(1);
+                            let to_address = self.form.get_input_text_mut(FormItem::To);
                             *to_address = list[self.cursor.current].address.to_string();
                             self.address_book = None;
                         }
@@ -197,8 +212,9 @@ impl Component for AssetTransferPage {
                                 self.asset = Some(asset.clone());
                                 self.show_asset_popup = false;
                                 // update form
-                                *self.form.get_input_text_mut(2) = format!("{}", asset.r#type);
-                                *self.form.get_currency_mut(3).expect(
+                                *self.form.get_input_text_mut(FormItem::AssetType) =
+                                    format!("{}", asset.r#type);
+                                *self.form.get_currency_mut(FormItem::Amount).expect(
                                     "currency not found in this input entry, please check idx",
                                 ) = Some(asset.r#type.symbol.clone());
                             }
@@ -214,8 +230,8 @@ impl Component for AssetTransferPage {
         }
 
         // Activate the address book popup if the user presses SPACE in the "To" field
-        if self.form.is_focused(TO)
-            && self.form.get_input_text(1).is_empty()
+        if self.form.is_focused(FormItem::To)
+            && self.form.get_input_text(FormItem::To).is_empty()
             && event.is_char_pressed(Some(' '))
         {
             let ab = AddressBook::load();
@@ -223,7 +239,7 @@ impl Component for AssetTransferPage {
             self.cursor = Cursor::default();
         }
 
-        if self.form.is_focused(ASSET_TYPE) && event.is_char_pressed(Some(' ')) {
+        if self.form.is_focused(FormItem::AssetType) && event.is_char_pressed(Some(' ')) {
             self.show_asset_popup = true;
             self.cursor = Cursor::default();
         }
@@ -239,16 +255,18 @@ impl Component for AssetTransferPage {
 
         // Check for amount to be greateer than balance
         if let Some(asset) = &self.asset {
-            let amount = self.form.get_input_text(3);
+            let amount = self.form.get_input_text(FormItem::Amount);
             match parse_units(amount, asset.r#type.decimals) {
                 Err(e) => {
-                    *self.form.get_error_text_mut(4) = format!("Invalid amount: {e}");
+                    *self.form.get_error_text_mut(FormItem::ErrorText) =
+                        format!("Invalid amount: {e}");
                 }
                 Ok(amount) => {
                     if amount.get_absolute() > asset.value {
-                        *self.form.get_error_text_mut(4) = "Amount exceeds balance".to_string();
+                        *self.form.get_error_text_mut(FormItem::ErrorText) =
+                            "Amount exceeds balance".to_string();
                     } else {
-                        self.form.get_error_text_mut(4).clear();
+                        self.form.get_error_text_mut(FormItem::ErrorText).clear();
                     }
                 }
             }
