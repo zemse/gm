@@ -199,8 +199,12 @@ impl TransactionPage {
             loop {
                 match provider.get_transaction_receipt(tx_hash).await {
                     Ok(result) => {
-                        if result.is_some() {
-                            let _ = tr.send(Event::TxStatus(TxStatus::Confirmed(tx_hash)));
+                        if let Some(result) = result {
+                            let _ = tr.send(Event::TxStatus(if result.status() {
+                                TxStatus::Confirmed(tx_hash)
+                            } else {
+                                TxStatus::Failed(tx_hash)
+                            }));
                             break;
                         }
                     }
