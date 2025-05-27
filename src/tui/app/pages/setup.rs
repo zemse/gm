@@ -61,14 +61,23 @@ pub struct SetupPage {
 
 impl Default for SetupPage {
     fn default() -> Self {
-        let mut config = Config::load();
-        if config.alchemy_api_key.is_none() {
-            config.alchemy_api_key = Some("".to_string());
-        };
+        let config = Config::load();
 
-        Self {
-            form: Form::init(0),
+        let mut form = Form::init(0);
+
+        if config.current_account.is_some() {
+            form.hide_item(FormItem::CreateOrImportWallet);
         }
+
+        if config
+            .alchemy_api_key
+            .map(|s| !s.is_empty())
+            .unwrap_or(false)
+        {
+            form.hide_item(FormItem::AlchemyApiKey);
+        }
+
+        Self { form }
     }
 }
 impl Component for SetupPage {
@@ -111,10 +120,14 @@ impl Component for SetupPage {
         Line::from("Setup").bold().render(area, buf);
         area = area.consume_height(2);
 
-        "Complete the following steps to get started:".render(area, buf);
-        area = area.consume_height(2);
+        if self.form.hidden_count() >= 2 {
+            Line::from("You have completed the setup please return back.").render(area, buf);
+        } else {
+            "Complete the following steps to get started:".render(area, buf);
+            area = area.consume_height(2);
 
-        self.form.render(area, buf);
+            self.form.render(area, buf);
+        }
         area
     }
 }

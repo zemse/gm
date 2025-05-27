@@ -35,9 +35,9 @@ impl MainMenuItems {
         let mut options: Vec<MainMenuItems> = MainMenuItems::iter().collect();
 
         let setup_menu = get_setup_menu();
-        // if setup_menu.is_empty() {
-        //     options.remove(0);
-        // }
+        if setup_menu.is_empty() {
+            options.remove(0);
+        }
 
         options
     }

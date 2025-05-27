@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{collections::HashMap, marker::PhantomData};
 
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{style::Stylize, widgets::Widget};
@@ -55,6 +55,7 @@ impl FormWidget {
 pub struct Form<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> {
     pub cursor: usize,
     pub items: Vec<FormWidget>,
+    pub hide: HashMap<usize, bool>,
     pub _phantom: PhantomData<E>,
 }
 
@@ -65,8 +66,21 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
         Self {
             cursor,
             items: E::iter().map(|item| item.into()).collect(),
+            hide: HashMap::new(),
             _phantom: PhantomData,
         }
+    }
+
+    pub fn hide_item(&mut self, idx: E) {
+        self.hide.insert(idx.index(), true);
+    }
+
+    pub fn show_item(&mut self, idx: E) {
+        self.hide.remove(&idx.index());
+    }
+
+    pub fn hidden_count(&self) -> usize {
+        self.hide.len()
     }
 
     pub fn get_input_text(&self, idx: E) -> &String {
@@ -130,24 +144,27 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
                     KeyCode::Up => loop {
                         self.cursor = (self.cursor + self.items.len() - 1) % self.items.len();
 
-                        match &self.items[self.cursor] {
-                            FormWidget::InputBox { .. }
-                            | FormWidget::DisplayBox { .. }
-                            | FormWidget::BooleanInput { .. }
-                            | FormWidget::Button { .. } => break,
-
-                            _ => {}
+                        if !self.hide.contains_key(&self.cursor) {
+                            match &self.items[self.cursor] {
+                                FormWidget::InputBox { .. }
+                                | FormWidget::DisplayBox { .. }
+                                | FormWidget::BooleanInput { .. }
+                                | FormWidget::Button { .. } => break,
+                                _ => {}
+                            }
                         }
                     },
                     KeyCode::Down | KeyCode::Tab => loop {
                         self.cursor = (self.cursor + 1) % self.items.len();
 
-                        match &self.items[self.cursor] {
-                            FormWidget::InputBox { .. }
-                            | FormWidget::DisplayBox { .. }
-                            | FormWidget::BooleanInput { .. }
-                            | FormWidget::Button { .. } => break,
-                            _ => {}
+                        if !self.hide.contains_key(&self.cursor) {
+                            match &self.items[self.cursor] {
+                                FormWidget::InputBox { .. }
+                                | FormWidget::DisplayBox { .. }
+                                | FormWidget::BooleanInput { .. }
+                                | FormWidget::Button { .. } => break,
+                                _ => {}
+                            }
                         }
                     },
                     KeyCode::Enter => {
@@ -205,6 +222,10 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
         Self: Sized,
     {
         for (i, item) in self.items.iter().enumerate() {
+            if self.hide.contains_key(&i) {
+                continue; // skip hidden items
+            }
+
             match item {
                 FormWidget::Heading(heading) => {
                     heading.bold().render(area, buf);
