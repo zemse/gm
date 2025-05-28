@@ -27,8 +27,12 @@ pub async fn run() -> crate::Result<()> {
         app.draw(&mut terminal)?;
 
         // make any changes to Controller state
-        app.handle_event(event_rc.recv()?, &event_tr, &shutdown)
-            .await?;
+        let result = app
+            .handle_event(event_rc.recv()?, &event_tr, &shutdown)
+            .await;
+        if let Err(e) = result {
+            app.fatal_error = Some(e.to_string());
+        }
     }
 
     // final render before exiting

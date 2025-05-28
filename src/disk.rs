@@ -157,6 +157,10 @@ impl AddressBook {
     pub fn list_owned(self) -> Vec<AddressBookEntry> {
         self.entries
     }
+
+    pub fn load_list() -> Vec<AddressBookEntry> {
+        AddressBook::load().list_owned()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]

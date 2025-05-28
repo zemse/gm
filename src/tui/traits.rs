@@ -52,6 +52,16 @@ pub struct HandleResult {
     pub refresh_assets: bool,
 }
 
+impl HandleResult {
+    pub fn merge(&mut self, other: HandleResult) {
+        self.page_pops += other.page_pops;
+        self.page_inserts.extend(other.page_inserts);
+        self.esc_ignores += other.esc_ignores;
+        self.reload |= other.reload;
+        self.refresh_assets |= other.refresh_assets;
+    }
+}
+
 pub trait Component {
     // TODO rename to `reload` or `refresh_component`
     fn reload(&mut self) {}

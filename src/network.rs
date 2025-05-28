@@ -82,6 +82,10 @@ impl DiskInterface for NetworkStore {
 }
 
 impl NetworkStore {
+    pub fn load_networks() -> Vec<Network> {
+        NetworkStore::load().networks
+    }
+
     pub fn sort_config() -> Self {
         let mut networks = HashMap::<u32, Network>::new();
 

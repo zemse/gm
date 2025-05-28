@@ -46,6 +46,10 @@ pub enum Event {
 }
 
 impl Event {
+    pub fn is_space_or_enter_pressed(&self) -> bool {
+        self.is_char_pressed(Some(' ')) || self.is_key_pressed(crossterm::event::KeyCode::Enter)
+    }
+
     pub fn is_char_pressed(&self, char: Option<char>) -> bool {
         if let Some(ch) = char {
             matches!(

@@ -8,6 +8,10 @@ pub struct Cursor {
 }
 
 impl Cursor {
+    pub fn reset(&mut self) {
+        self.current = 0;
+    }
+
     pub fn handle(&mut self, event: &Event, cursor_max: usize) {
         if let Event::Input(key_event) = event {
             if key_event.kind == KeyEventKind::Press {

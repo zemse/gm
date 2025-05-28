@@ -1,6 +1,7 @@
 pub mod button;
 pub mod candle_chart;
 pub mod filter_select;
+pub mod filter_select_popup;
 pub mod footer;
 pub mod form;
 pub mod input_box;
