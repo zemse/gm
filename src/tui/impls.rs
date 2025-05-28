@@ -90,4 +90,13 @@ impl RectUtil for Rect {
             height,
         }
     }
+
+    fn margin_h(self, x: u16) -> Rect {
+        Rect {
+            x: self.x + x,
+            y: self.y,
+            width: self.width - 2 * x,
+            height: self.height,
+        }
+    }
 }

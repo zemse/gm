@@ -8,7 +8,10 @@ use ratatui::{
 };
 use strum::IntoEnumIterator;
 
-use crate::tui::{traits::WidgetHeight, Event};
+use crate::tui::{
+    traits::{RectUtil, WidgetHeight},
+    Event,
+};
 
 use super::{button::Button, input_box::InputBox};
 
@@ -356,7 +359,7 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
                         area.y += 1;
                         Paragraph::new(Text::raw(text))
                             .wrap(Wrap { trim: false })
-                            .render(area, buf);
+                            .render(area.margin_h(1), buf);
                         area.y += (text.len() as u16).div_ceil(area.width) + 1;
                     }
                 }
