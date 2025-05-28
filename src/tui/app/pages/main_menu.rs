@@ -116,9 +116,9 @@ impl Component for MainMenuPage {
                                 .page_inserts
                                 .push(Page::Account(AccountPage::default()));
                         }
-                        MainMenuItems::SignMessage => {
-                            result.page_inserts.push(Page::SignMessage(SignMessagePage))
-                        }
+                        MainMenuItems::SignMessage => result
+                            .page_inserts
+                            .push(Page::SignMessage(SignMessagePage::default())),
                         MainMenuItems::SendMessage => result
                             .page_inserts
                             .push(Page::SendMessage(SendMessagePage::default())),

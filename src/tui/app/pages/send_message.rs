@@ -50,7 +50,7 @@ impl From<FormItem> for FormWidget {
             FormItem::Message => FormWidget::InputBox {
                 label: "Message",
                 text: String::new(),
-                empty_text: None,
+                empty_text: Some("Type message to send"),
                 currency: None,
             },
             FormItem::Network => FormWidget::DisplayBox {

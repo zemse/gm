@@ -88,7 +88,7 @@ impl TransactionPage {
         let shutdown_signal = shutdown_signal.clone();
         let sender_account = shared_state
             .current_account
-            .ok_or(crate::Error::InternalErrorStr("No current account"))?;
+            .ok_or(crate::Error::CurrentAccountNotSet)?;
         let network = self.network.clone();
         let to = self.to;
         let calldata = self.calldata.clone();

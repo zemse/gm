@@ -1,7 +1,11 @@
 use std::{collections::HashMap, marker::PhantomData};
 
 use crossterm::event::{KeyCode, KeyEventKind};
-use ratatui::{style::Stylize, widgets::Widget};
+use ratatui::{
+    style::Stylize,
+    text::Text,
+    widgets::{Paragraph, Widget, Wrap},
+};
 use strum::IntoEnumIterator;
 
 use crate::tui::{traits::WidgetHeight, Event};
@@ -350,8 +354,10 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
                 FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
                     if !text.is_empty() {
                         area.y += 1;
-                        text.render(area, buf);
-                        area.y += 1;
+                        Paragraph::new(Text::raw(text))
+                            .wrap(Wrap { trim: false })
+                            .render(area, buf);
+                        area.y += (text.len() as u16).div_ceil(area.width) + 1;
                     }
                 }
             }

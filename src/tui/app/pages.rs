@@ -70,6 +70,7 @@ impl Page {
             Page::AddressBookDisplay(_) => true,
             Page::Trade(_) => true,
             Page::SendMessage(_) => true,
+            Page::SignMessage(_) => true,
             _ => false,
         }
     }
