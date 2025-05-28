@@ -1,25 +1,21 @@
-use crate::disk::{AddressBook, AddressBookEntry, DiskInterface};
+use crate::disk::{AddressBook, AddressBookEntry};
 use crate::tui::app::pages::transaction::TransactionPage;
 use crate::tui::app::pages::Page;
-use crate::tui::app::widgets::filter_select::FilterSelect;
+use crate::tui::app::widgets::filter_select_popup::FilterSelectPopup;
 use crate::tui::app::widgets::form::FormItemIndex;
-use crate::tui::app::widgets::popup::Popup;
-use crate::tui::app::{Focus, SharedState};
+use crate::tui::app::SharedState;
 use crate::tui::{
     app::widgets::form::{Form, FormWidget},
     events::Event,
     traits::{Component, HandleResult},
 };
 use crate::utils::assets::{Asset, TokenAddress};
-use crate::utils::cursor::Cursor;
 use crate::Result;
 use alloy::primitives::utils::parse_units;
 use alloy::primitives::{Bytes, TxKind, U256};
 use alloy::sol;
 use alloy::sol_types::SolCall;
-use crossterm::event::{KeyCode, KeyEventKind};
-use ratatui::style::Color;
-use ratatui::widgets::{Block, Widget};
+use ratatui::widgets::Widget;
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use strum::EnumIter;
@@ -67,14 +63,9 @@ impl From<FormItem> for FormWidget {
 
 pub struct AssetTransferPage {
     pub form: Form<FormItem>,
-    pub asset: Option<Asset>,
-    /// Asset popup - we get asset details from `shared_state`
-    pub show_asset_popup: bool,
-    /// Address book popup state
-    pub address_book: Option<AddressBook>,
-    pub search_string: String,
-    /// Reused for both Address book popup and Asset popup
-    pub cursor: Cursor,
+    pub asset: Option<Asset>, // TODO see if we can avoid this here
+    pub address_book_popup: FilterSelectPopup<AddressBookEntry>,
+    pub asset_popup: FilterSelectPopup<Asset>,
 }
 
 impl Default for AssetTransferPage {
@@ -82,10 +73,8 @@ impl Default for AssetTransferPage {
         Self {
             form: Form::init(),
             asset: None,
-            address_book: None,
-            cursor: Cursor::default(),
-            search_string: String::new(),
-            show_asset_popup: false,
+            address_book_popup: FilterSelectPopup::new("Select destination address"),
+            asset_popup: FilterSelectPopup::new("Choose asset to transfer"),
         }
     }
 }
@@ -119,25 +108,36 @@ impl Component for AssetTransferPage {
     ) -> Result<HandleResult> {
         let mut result = HandleResult::default();
 
-        if self.address_book.is_none() && !self.show_asset_popup {
-            // Activate the address book popup if the user presses SPACE in the "To" field
+        if self.address_book_popup.is_open() {
+            result.merge(self.address_book_popup.handle_event(event, |entry| {
+                *self.form.get_text_mut(FormItem::To) = entry.address.to_string();
+                self.form.advance_cursor();
+            })?);
+        } else if self.asset_popup.is_open() {
+            result.merge(self.asset_popup.handle_event(event, |asset| {
+                self.asset = Some(asset.clone());
+                *self.form.get_text_mut(FormItem::AssetType) = format!("{}", asset.r#type);
+                *self
+                    .form
+                    .get_currency_mut(FormItem::Amount)
+                    .expect("currency not found in this input entry, please check idx") =
+                    Some(asset.r#type.symbol.clone());
+                self.form.advance_cursor();
+            })?);
+        } else {
+            // Handle form events
             if self.form.is_focused(FormItem::To)
                 && self.form.get_text(FormItem::To).is_empty()
-                && (event.is_char_pressed(Some(' ')) || event.is_key_pressed(KeyCode::Enter))
+                && event.is_space_or_enter_pressed()
             {
-                self.address_book = Some(AddressBook::load());
-                self.cursor = Cursor::default();
-            }
-
-            if self.form.is_focused(FormItem::AssetType)
-                && (event.is_char_pressed(Some(' ')) || event.is_key_pressed(KeyCode::Enter))
+                self.address_book_popup.open(Some(AddressBook::load_list()));
+                result.esc_ignores = 1;
+            } else if self.form.is_focused(FormItem::AssetType) && event.is_space_or_enter_pressed()
             {
-                self.show_asset_popup = true;
-                self.cursor = Cursor::default();
-            }
-
-            // Keyboard events focus on the form
-            self.form.handle_event(event, |label, form| {
+                self.asset_popup.open(shared_state.assets.clone());
+                result.esc_ignores = 1;
+            } else {
+                self.form.handle_event(event, |label, form| {
                 if label == FormItem::TransferButton {
                     let to = form.get_text(FormItem::To);
                     let asset = self
@@ -183,76 +183,7 @@ impl Component for AssetTransferPage {
                 }
                 Ok(())
             })?;
-        } else if let Some(address_book) = self.address_book.as_ref() {
-            // Keyboard events go to the address book popup
-            // TODO refactor this code into FilterSelect module
-            let list: Vec<&AddressBookEntry> = address_book
-                .list()
-                .iter()
-                .filter(|entry| format!("{entry}").contains(self.search_string.as_str()))
-                .collect();
-
-            let cursor_max = list.len();
-            self.cursor.handle(event, cursor_max);
-
-            if let Event::Input(key_event) = event {
-                if key_event.kind == KeyEventKind::Press {
-                    match key_event.code {
-                        KeyCode::Char(char) => {
-                            self.search_string.push(char);
-                        }
-                        KeyCode::Backspace => {
-                            self.search_string.pop();
-                        }
-                        KeyCode::Enter => {
-                            let to_address = self.form.get_text_mut(FormItem::To);
-                            *to_address = list[self.cursor.current].address.to_string();
-                            self.address_book = None;
-                            self.form.advance_cursor();
-                        }
-                        _ => {}
-                    }
-                }
             }
-        } else if self.show_asset_popup {
-            // Keyboard events go to the asset popup
-            if let Some(assets) = shared_state.assets.as_ref() {
-                let cursor_max = assets.len();
-                self.cursor.handle(event, cursor_max);
-
-                if let Event::Input(key_event) = event {
-                    if key_event.kind == KeyEventKind::Press {
-                        #[allow(clippy::single_match)]
-                        match key_event.code {
-                            KeyCode::Enter => {
-                                let asset = &assets[self.cursor.current];
-                                self.asset = Some(asset.clone());
-                                self.show_asset_popup = false;
-                                // update form
-                                *self.form.get_text_mut(FormItem::AssetType) =
-                                    format!("{}", asset.r#type);
-                                *self.form.get_currency_mut(FormItem::Amount).expect(
-                                    "currency not found in this input entry, please check idx",
-                                ) = Some(asset.r#type.symbol.clone());
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            } else {
-                // Assets not loaded yet
-            }
-        } else {
-            unreachable!()
-        }
-
-        if self.address_book.is_some() || self.show_asset_popup {
-            result.esc_ignores = 1;
-        }
-
-        if event.is_key_pressed(KeyCode::Esc) {
-            self.address_book = None;
-            self.show_asset_popup = false;
         }
 
         // Check for amount to be greateer than balance
@@ -280,56 +211,16 @@ impl Component for AssetTransferPage {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
-        shared_state: &SharedState,
+        _shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
     {
         self.form.render(area, buf);
 
-        if let Some(address_book) = &self.address_book {
-            Popup {
-                bg_color: Some(Color::Blue),
-            }
-            .render(area, buf);
+        self.address_book_popup.render(area, buf);
 
-            let inner_area = Popup::inner_area(area);
-            let block = Block::bordered().title("Address Book");
-            let block_inner_area = block.inner(inner_area);
-            block.render(inner_area, buf);
-
-            FilterSelect {
-                full_list: address_book.list(),
-                cursor: &self.cursor,
-                search_string: &self.search_string,
-                focus: shared_state.focus == Focus::Main,
-            }
-            .render(block_inner_area, buf);
-        }
-
-        if self.show_asset_popup {
-            Popup {
-                bg_color: Some(Color::Blue),
-            }
-            .render(area, buf);
-
-            let inner_area = Popup::inner_area(area);
-            let block = Block::bordered().title("Assets");
-            let block_inner_area = block.inner(inner_area);
-            block.render(inner_area, buf);
-
-            if let Some(assets) = shared_state.assets.as_ref() {
-                FilterSelect {
-                    full_list: assets,
-                    cursor: &self.cursor,
-                    search_string: &self.search_string,
-                    focus: shared_state.focus == Focus::Main,
-                }
-                .render(block_inner_area, buf);
-            } else {
-                "Loading assets..".render(block_inner_area, buf);
-            }
-        }
+        self.asset_popup.render(area, buf);
 
         area
     }

@@ -108,9 +108,10 @@ impl Component for SendMessagePage {
                 && self.form.get_text(FormItem::To).is_empty()
                 && event.is_space_or_enter_pressed()
             {
-                self.address_book_popup.open(AddressBook::load_list());
+                self.address_book_popup.open(Some(AddressBook::load_list()));
             } else if self.form.is_focused(FormItem::Network) && event.is_space_or_enter_pressed() {
-                self.networks_popup.open(NetworkStore::load_networks());
+                self.networks_popup
+                    .open(Some(NetworkStore::load_networks()));
             } else {
                 self.form.handle_event(event, |label, form| {
                     if label == FormItem::SendMessageButton {

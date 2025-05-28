@@ -16,7 +16,7 @@ use super::{filter_select::FilterSelect, popup::Popup};
 pub struct FilterSelectPopup<Item: Display> {
     title: &'static str,
     open: bool,
-    items: Vec<Item>,
+    items: Option<Vec<Item>>,
     cursor: Cursor,
     search_string: String,
 }
@@ -26,7 +26,7 @@ impl<Item: Display> FilterSelectPopup<Item> {
         Self {
             title,
             open: false,
-            items: vec![],
+            items: None,
             cursor: Cursor::default(),
             search_string: String::new(),
         }
@@ -36,7 +36,7 @@ impl<Item: Display> FilterSelectPopup<Item> {
     }
 
     // Opens the popup with the fresh items.
-    pub fn open(&mut self, items: Vec<Item>) {
+    pub fn open(&mut self, items: Option<Vec<Item>>) {
         self.open = true;
         self.cursor.reset();
         self.search_string.clear();
@@ -57,8 +57,10 @@ impl<Item: Display> FilterSelectPopup<Item> {
     {
         let mut result = HandleResult::default();
 
-        if self.open {
-            let cursor_max = self.items.len();
+        if self.open
+            && let Some(items) = &self.items
+        {
+            let cursor_max = items.len();
             self.cursor.handle(event, cursor_max);
 
             if let Event::Input(key_event) = event {
@@ -71,7 +73,7 @@ impl<Item: Display> FilterSelectPopup<Item> {
                             self.search_string.pop();
                         }
                         KeyCode::Enter => {
-                            on_enter(&self.items[self.cursor.current]);
+                            on_enter(&items[self.cursor.current]);
                             self.close();
                         }
                         _ => {}
@@ -106,13 +108,17 @@ impl<Item: Display> Widget for &FilterSelectPopup<Item> {
             let block_inner_area = block.inner(inner_area);
             block.render(inner_area, buf);
 
-            FilterSelect {
-                full_list: &self.items,
-                cursor: &self.cursor,
-                search_string: &self.search_string,
-                focus: true,
+            if let Some(items) = &self.items {
+                FilterSelect {
+                    full_list: items,
+                    cursor: &self.cursor,
+                    search_string: &self.search_string,
+                    focus: true,
+                }
+                .render(block_inner_area, buf);
+            } else {
+                "Loading...".render(block_inner_area, buf);
             }
-            .render(block_inner_area, buf);
         }
     }
 }
