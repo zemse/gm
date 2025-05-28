@@ -401,7 +401,9 @@ impl Widget for &App {
 
             let popup_inner_area = Popup::inner_area(area);
 
-            let block = Block::bordered().title("Fatal Error");
+            let block = Block::bordered()
+                .title("Fatal Error")
+                .title_bottom("press ESC to dismiss");
             Paragraph::new(Text::raw(fatal_error))
                 .wrap(Wrap { trim: false })
                 .to_owned()
