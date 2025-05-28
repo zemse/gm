@@ -30,7 +30,7 @@ use super::{
 pub mod pages;
 pub mod widgets;
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Focus {
     Main,
     Sidebar,
@@ -238,6 +238,7 @@ impl App {
                         KeyCode::Left => {
                             if self.shared_state.focus == Focus::Sidebar {
                                 self.shared_state.focus = Focus::Main;
+                                let _ = tr.send(Event::FocusChange(Focus::Main));
                             }
                         }
                         KeyCode::Right => {
@@ -248,6 +249,7 @@ impl App {
                                 )
                             {
                                 self.shared_state.focus = Focus::Sidebar;
+                                let _ = tr.send(Event::FocusChange(Focus::Sidebar));
                             }
                         }
                         KeyCode::Char(char) => {
@@ -289,7 +291,7 @@ impl App {
                 self.shared_state.current_account = Some(address);
             }
 
-            Event::ConfigUpdated => {
+            Event::ConfigUpdate => {
                 self.reload();
             }
 

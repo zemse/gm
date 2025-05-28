@@ -47,7 +47,7 @@ impl Component for Sidebar {
                             let mut config = Config::load();
                             config.testnet_mode = !shared_state.testnet_mode;
                             config.save();
-                            transmitter.send(Event::ConfigUpdated)?;
+                            transmitter.send(Event::ConfigUpdate)?;
 
                             result.reload = true;
                             result.refresh_assets = true;

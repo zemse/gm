@@ -111,7 +111,7 @@ impl Component for SetupPage {
                 let mut config = Config::load();
                 config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
                 config.save();
-                transmitter.send(Event::ConfigUpdated)?;
+                transmitter.send(Event::ConfigUpdate)?;
 
                 let display_text = form.get_text_mut(FormItem::Display);
                 *display_text = "Configuration saved".to_string();

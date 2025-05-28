@@ -55,6 +55,7 @@ impl FormWidget {
 
 pub struct Form<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> {
     pub cursor: usize,
+    pub form_focus: bool,
     pub items: Vec<FormWidget>,
     pub hide: HashMap<usize, bool>,
     pub _phantom: PhantomData<E>,
@@ -66,6 +67,7 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
     pub fn init() -> Self {
         let mut val = Self {
             cursor: 0,
+            form_focus: true,
             items: E::iter().map(|item| item.into()).collect(),
             hide: HashMap::new(),
             _phantom: PhantomData,
@@ -80,6 +82,10 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
         }
 
         val
+    }
+
+    pub fn set_form_focus(&mut self, focus: bool) {
+        self.form_focus = focus;
     }
 
     pub fn hide_item(&mut self, idx: E) {
@@ -265,7 +271,7 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
                     currency,
                 } => {
                     let widget = InputBox {
-                        focus: self.cursor == i,
+                        focus: self.form_focus && self.cursor == i,
                         label,
                         text,
                         empty_text: *empty_text,
@@ -281,7 +287,7 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
                     empty_text,
                 } => {
                     let widget = InputBox {
-                        focus: self.cursor == i,
+                        focus: self.form_focus && self.cursor == i,
                         label,
                         text,
                         empty_text: *empty_text,
@@ -293,7 +299,7 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
                 }
                 FormWidget::BooleanInput { label, value } => {
                     let widget = InputBox {
-                        focus: self.cursor == i,
+                        focus: self.form_focus && self.cursor == i,
                         label,
                         text: &value.to_string(),
                         empty_text: None,
@@ -305,7 +311,7 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
                 }
                 FormWidget::Button { label } => {
                     Button {
-                        focus: self.cursor == i,
+                        focus: self.form_focus && self.cursor == i,
                         label,
                     }
                     .render(area, buf);

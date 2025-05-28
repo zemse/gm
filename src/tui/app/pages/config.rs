@@ -85,7 +85,7 @@ impl Component for ConfigPage {
             config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
             config.testnet_mode = form.get_boolean_value(FormItem::TestnetMode);
             config.save();
-            transmitter.send(Event::ConfigUpdated)?;
+            transmitter.send(Event::ConfigUpdate)?;
 
             let display_text = form.get_text_mut(FormItem::DisplayText);
             *display_text = "Configuration saved".to_string();

@@ -2,7 +2,7 @@ use crate::tui::app::pages::transaction::TransactionPage;
 use crate::tui::app::pages::Page;
 use crate::tui::app::widgets::filter_select_popup::FilterSelectPopup;
 use crate::tui::app::widgets::form::FormItemIndex;
-use crate::tui::app::SharedState;
+use crate::tui::app::{Focus, SharedState};
 use crate::tui::{
     app::widgets::form::{Form, FormWidget},
     events::Event,
@@ -108,6 +108,14 @@ impl Component for AssetTransferPage {
         shared_state: &SharedState,
     ) -> Result<HandleResult> {
         let mut result = HandleResult::default();
+
+        #[allow(clippy::single_match)]
+        match event {
+            Event::FocusChange(focus) => {
+                self.form.set_form_focus(*focus == Focus::Main);
+            }
+            _ => {}
+        }
 
         if self.address_book_popup.is_open() {
             result.merge(self.address_book_popup.handle_event(event, |entry| {
