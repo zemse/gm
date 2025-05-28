@@ -204,8 +204,8 @@ impl App {
         tr: &mpsc::Sender<Event>,
         sd: &Arc<AtomicBool>,
     ) -> crate::Result<()> {
-        let mut esc_ignores = if self.fatal_error.is_none()
-            && self.shared_state.focus == Focus::Main
+        let mut esc_ignores = if (!event.is_input()
+            || (self.shared_state.focus == Focus::Main && self.fatal_error.is_none()))
             && let Some(page) = self.context.last_mut()
         {
             let result = page.handle_event(&event, tr, sd, &self.shared_state);
@@ -214,7 +214,9 @@ impl App {
             0
         };
 
-        esc_ignores += if self.fatal_error.is_none() && self.shared_state.focus == Focus::Sidebar {
+        esc_ignores += if !event.is_input()
+            || (self.shared_state.focus == Focus::Sidebar && self.fatal_error.is_none())
+        {
             let result = self
                 .sidebar
                 .handle_event(&event, tr, sd, &self.shared_state);

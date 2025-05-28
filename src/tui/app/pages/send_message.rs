@@ -1,3 +1,4 @@
+use crate::disk::DiskInterface;
 use crate::network::{Network, NetworkStore};
 
 use crate::tui::app::widgets::filter_select_popup::FilterSelectPopup;
@@ -86,9 +87,25 @@ impl Component for SendMessagePage {
         event: &Event,
         _tr: &mpsc::Sender<Event>,
         _sd: &Arc<AtomicBool>,
-        _shared_state: &SharedState,
+        shared_state: &SharedState,
     ) -> Result<HandleResult> {
         let mut result = HandleResult::default();
+
+        #[allow(clippy::single_match)]
+        match event {
+            Event::ConfigUpdated => {
+                let network_name = self.form.get_text(FormItem::Network);
+                let network_store = NetworkStore::load();
+                let network = network_store
+                    .get_by_name(network_name)
+                    .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))?;
+
+                if network.is_testnet != shared_state.testnet_mode {
+                    self.form.get_text_mut(FormItem::Network).clear();
+                }
+            }
+            _ => {}
+        }
 
         if self.address_book_popup.is_open() {
             result.merge(self.address_book_popup.handle_event(event, |entry| {
@@ -112,7 +129,7 @@ impl Component for SendMessagePage {
                     .open(Some(AddressBookMenuItem::get_menu(false)));
             } else if self.form.is_focused(FormItem::Network) && event.is_space_or_enter_pressed() {
                 self.networks_popup
-                    .open(Some(NetworkStore::load_networks()));
+                    .open(Some(NetworkStore::load_networks(shared_state.testnet_mode)));
             } else {
                 self.form.handle_event(event, |label, form| {
                     if label == FormItem::SendMessageButton {

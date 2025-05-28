@@ -82,8 +82,12 @@ impl DiskInterface for NetworkStore {
 }
 
 impl NetworkStore {
-    pub fn load_networks() -> Vec<Network> {
-        NetworkStore::load().networks
+    pub fn load_networks(testnet_mode: bool) -> Vec<Network> {
+        NetworkStore::load()
+            .networks
+            .into_iter()
+            .filter(|n| n.is_testnet == testnet_mode)
+            .collect()
     }
 
     pub fn sort_config() -> Self {

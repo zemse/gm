@@ -46,6 +46,10 @@ pub enum Event {
 }
 
 impl Event {
+    pub fn is_input(&self) -> bool {
+        matches!(self, Event::Input(_))
+    }
+
     pub fn is_space_or_enter_pressed(&self) -> bool {
         self.is_char_pressed(Some(' ')) || self.is_key_pressed(crossterm::event::KeyCode::Enter)
     }
