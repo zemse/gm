@@ -1,4 +1,3 @@
-use crate::disk::{AddressBook, AddressBookEntry};
 use crate::tui::app::pages::transaction::TransactionPage;
 use crate::tui::app::pages::Page;
 use crate::tui::app::widgets::filter_select_popup::FilterSelectPopup;
@@ -19,6 +18,8 @@ use ratatui::widgets::Widget;
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use strum::EnumIter;
+
+use super::address_book::AddressBookMenuItem;
 
 #[derive(EnumIter, PartialEq)]
 pub enum FormItem {
@@ -64,7 +65,7 @@ impl From<FormItem> for FormWidget {
 pub struct AssetTransferPage {
     pub form: Form<FormItem>,
     pub asset: Option<Asset>, // TODO see if we can avoid this here
-    pub address_book_popup: FilterSelectPopup<AddressBookEntry>,
+    pub address_book_popup: FilterSelectPopup<AddressBookMenuItem>,
     pub asset_popup: FilterSelectPopup<Asset>,
 }
 
@@ -110,7 +111,7 @@ impl Component for AssetTransferPage {
 
         if self.address_book_popup.is_open() {
             result.merge(self.address_book_popup.handle_event(event, |entry| {
-                *self.form.get_text_mut(FormItem::To) = entry.address.to_string();
+                *self.form.get_text_mut(FormItem::To) = entry.address_unwrap().to_string();
                 self.form.advance_cursor();
             })?);
         } else if self.asset_popup.is_open() {
@@ -130,7 +131,8 @@ impl Component for AssetTransferPage {
                 && self.form.get_text(FormItem::To).is_empty()
                 && event.is_space_or_enter_pressed()
             {
-                self.address_book_popup.open(Some(AddressBook::load_list()));
+                self.address_book_popup
+                    .open(Some(AddressBookMenuItem::get_menu(false)));
                 result.esc_ignores = 1;
             } else if self.form.is_focused(FormItem::AssetType) && event.is_space_or_enter_pressed()
             {

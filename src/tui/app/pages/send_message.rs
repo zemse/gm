@@ -1,4 +1,3 @@
-use crate::disk::{AddressBook, AddressBookEntry};
 use crate::network::{Network, NetworkStore};
 
 use crate::tui::app::widgets::filter_select_popup::FilterSelectPopup;
@@ -20,6 +19,7 @@ use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use strum::EnumIter;
 
+use super::address_book::AddressBookMenuItem;
 use super::transaction::TransactionPage;
 use super::Page;
 
@@ -66,7 +66,7 @@ impl From<FormItem> for FormWidget {
 
 pub struct SendMessagePage {
     pub form: Form<FormItem>,
-    pub address_book_popup: FilterSelectPopup<AddressBookEntry>,
+    pub address_book_popup: FilterSelectPopup<AddressBookMenuItem>,
     pub networks_popup: FilterSelectPopup<Network>,
 }
 
@@ -93,7 +93,7 @@ impl Component for SendMessagePage {
         if self.address_book_popup.is_open() {
             result.merge(self.address_book_popup.handle_event(event, |entry| {
                 let to_address = self.form.get_text_mut(FormItem::To);
-                *to_address = entry.address.to_string();
+                *to_address = entry.address_unwrap().to_string();
                 self.form.advance_cursor();
             })?);
         } else if self.networks_popup.is_open() {
@@ -108,7 +108,8 @@ impl Component for SendMessagePage {
                 && self.form.get_text(FormItem::To).is_empty()
                 && event.is_space_or_enter_pressed()
             {
-                self.address_book_popup.open(Some(AddressBook::load_list()));
+                self.address_book_popup
+                    .open(Some(AddressBookMenuItem::get_menu(false)));
             } else if self.form.is_focused(FormItem::Network) && event.is_space_or_enter_pressed() {
                 self.networks_popup
                     .open(Some(NetworkStore::load_networks()));

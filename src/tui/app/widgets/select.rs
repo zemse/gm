@@ -54,8 +54,7 @@ impl<T: Display> Widget for Select<'_, T> {
             List::new(display_items).render(list_area, buf);
             CustomScrollBar {
                 cursor: self.cursor.current,
-                capacity,
-                max: self.list.len(),
+                total: self.list.len(),
             }
             .render(scroll_area, buf);
         } else {

@@ -28,7 +28,7 @@ use super::{
 pub enum AddressBookMenuItem {
     Create,
     View(AddressBookEntry),
-    ViewAddressOnly(Address),
+    UnnamedOwned(Address),
 }
 
 impl Display for AddressBookMenuItem {
@@ -36,16 +36,20 @@ impl Display for AddressBookMenuItem {
         match self {
             AddressBookMenuItem::Create => write!(f, "Create new address book entry"),
             AddressBookMenuItem::View(entry) => write!(f, "{} - {}", entry.name, entry.address),
-            AddressBookMenuItem::ViewAddressOnly(address) => {
-                write!(f, "Unsaved: {}", address)
+            AddressBookMenuItem::UnnamedOwned(address) => {
+                write!(f, "Un-named: {}", address)
             }
         }
     }
 }
 
 impl AddressBookMenuItem {
-    pub fn get_menu() -> Vec<AddressBookMenuItem> {
-        let mut entries = vec![AddressBookMenuItem::Create];
+    pub fn get_menu(with_create: bool) -> Vec<AddressBookMenuItem> {
+        let mut entries = vec![];
+
+        if with_create {
+            entries.push(AddressBookMenuItem::Create);
+        }
 
         // From address book
         entries.extend(
@@ -66,11 +70,22 @@ impl AddressBookMenuItem {
                         _ => false,
                     })
                 })
-                .map(AddressBookMenuItem::ViewAddressOnly)
+                .map(AddressBookMenuItem::UnnamedOwned)
                 .collect::<Vec<AddressBookMenuItem>>(),
         );
 
         entries
+    }
+
+    // Must only be used if you are sure that the list will not contain Create
+    pub fn address_unwrap(&self) -> Address {
+        match self {
+            AddressBookMenuItem::Create => {
+                unreachable!("AddressBookMenuItem::Create entry must not be present")
+            }
+            AddressBookMenuItem::View(entry) => entry.address,
+            AddressBookMenuItem::UnnamedOwned(address) => *address,
+        }
     }
 }
 
@@ -83,7 +98,7 @@ pub struct AddressBookPage {
 impl Default for AddressBookPage {
     fn default() -> Self {
         Self {
-            full_list: AddressBookMenuItem::get_menu(),
+            full_list: AddressBookMenuItem::get_menu(true),
             search_string: String::new(),
             cursor: Cursor::default(),
         }
@@ -144,7 +159,7 @@ impl Component for AddressBookPage {
                                 entry.address.to_string(),
                             ))
                         }
-                        AddressBookMenuItem::ViewAddressOnly(address) => Page::AddressBookCreate(
+                        AddressBookMenuItem::UnnamedOwned(address) => Page::AddressBookCreate(
                             AddressBookCreatePage::new(String::new(), address.to_string()),
                         ),
                     }),

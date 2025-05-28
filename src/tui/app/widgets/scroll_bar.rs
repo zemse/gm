@@ -2,8 +2,7 @@ use ratatui::{layout::Offset, widgets::Widget};
 
 pub struct CustomScrollBar {
     pub cursor: usize,
-    pub capacity: usize,
-    pub max: usize,
+    pub total: usize,
 }
 
 impl Widget for CustomScrollBar {
@@ -11,29 +10,22 @@ impl Widget for CustomScrollBar {
     where
         Self: Sized,
     {
-        let num_pages = self.max.div_ceil(self.capacity);
-        let current_page = self.cursor / self.capacity;
+        let capacity = area.height as usize;
+        let num_pages = self.total.div_ceil(capacity);
+        let current_page = self.cursor / capacity;
 
-        let height = area.height as usize;
-
-        let get_page_height = |i| {
-            let base = height.div_ceil(num_pages);
-            if height % num_pages <= i {
-                base
-            } else {
-                base - 1
-            }
-        };
-
-        let top = (0..current_page).map(get_page_height).sum::<usize>();
-        let middle = get_page_height(current_page);
+        let top = (0..current_page)
+            .map(|i| get_page_height(i, capacity, num_pages))
+            .sum::<usize>();
+        let middle = get_page_height(current_page, capacity, num_pages);
         let bottom = ((current_page + 1)..num_pages)
-            .map(get_page_height)
+            .map(|i| get_page_height(i, capacity, num_pages))
             .sum::<usize>();
         assert_eq!(
             top + middle + bottom,
-            height,
-            "current_page = {current_page}, num_pages = {num_pages}, top = {top}, middle = {middle}, bottom = {bottom}, height = {height}"
+            capacity,
+            "self.total = {}, capacity = {}, current_page = {current_page}, num_pages = {num_pages}, top = {top}, middle = {middle}, bottom = {bottom}",
+            self.total, capacity
         );
 
         let mut i = 0;
@@ -52,26 +44,41 @@ impl Widget for CustomScrollBar {
     }
 }
 
-// num_pages 3
-// height 10
-// first 4
-// second 3
-// third 3
+fn get_page_height(i: usize, capacity: usize, num_pages: usize) -> usize {
+    let base = capacity / num_pages;
+    if capacity % num_pages <= i {
+        base
+    } else {
+        base + 1
+    }
+}
 
-// num_pages 3
-// height 11
-// first 4
-// second 4
-// third 3
+#[cfg(test)]
+mod test {
+    use super::*;
 
-// num_pages 3
-// height 20
-// first 7
-// second 7
-// third 6
+    #[test]
+    fn test_get_page_height() {
+        for capacity in 10..100 {
+            for num_pages in 1..15 {
+                let mut sum = 0;
+                for i in 0..num_pages {
+                    sum += get_page_height(i, capacity, num_pages);
+                }
 
-// num_pages 3
-// height 21
-// first 7
-// second 7
-// third 7
+                if sum != capacity {
+                    println!("capacity: {capacity}, num_pages: {num_pages}");
+                    for i in 0..num_pages {
+                        let h = get_page_height(i, capacity, num_pages);
+                        println!("page {i}: {h}");
+                    }
+                }
+
+                assert_eq!(
+                    sum, capacity,
+                    "capacity: {capacity}, num_pages: {num_pages}"
+                );
+            }
+        }
+    }
+}
