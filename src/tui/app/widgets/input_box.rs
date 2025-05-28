@@ -171,7 +171,7 @@ impl InputBox<'_> {
                 Span::from("|").render(
                     Rect {
                         x: inner_area.x + (*text_cursor as u16) % (area.width - 2),
-                        y: inner_area.y + (*text_cursor as u16) / area.width,
+                        y: inner_area.y + (*text_cursor as u16) / (area.width - 2),
                         width: 1,
                         height: 1,
                     },
