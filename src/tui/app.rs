@@ -243,10 +243,11 @@ impl App {
                         }
                         KeyCode::Right => {
                             if self.shared_state.focus == Focus::Main
-                                && !matches!(
-                                    self.context.last(),
-                                    Some(Page::AccountCreate(_)) | Some(Page::Trade(_))
-                                )
+                                && self
+                                    .context
+                                    .last()
+                                    .map(|p| !p.is_full_screen())
+                                    .unwrap_or(false)
                             {
                                 self.shared_state.focus = Focus::Sidebar;
                                 let _ = tr.send(Event::FocusChange(Focus::Sidebar));
@@ -260,7 +261,7 @@ impl App {
                             if char == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
                                 self.exit = true;
                             }
-                            if char == 'e' && key_event.modifiers == KeyModifiers::CONTROL {
+                            if char == 'r' && key_event.modifiers == KeyModifiers::CONTROL {
                                 self.fatal_error = Some("test error".to_string());
                             }
                             if char == 't' && key_event.modifiers == KeyModifiers::CONTROL {

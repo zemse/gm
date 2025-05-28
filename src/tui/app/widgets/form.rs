@@ -51,10 +51,24 @@ impl FormWidget {
             | FormWidget::ErrorText(_) => None,
         }
     }
+
+    pub fn max_cursor(&self) -> usize {
+        match self {
+            FormWidget::InputBox { text, .. } => text.len(),
+            FormWidget::DisplayBox { text, .. } => text.len(),
+            FormWidget::Button { .. }
+            | FormWidget::BooleanInput { .. }
+            | FormWidget::Heading(_)
+            | FormWidget::StaticText(_)
+            | FormWidget::DisplayText(_)
+            | FormWidget::ErrorText(_) => 0,
+        }
+    }
 }
 
 pub struct Form<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> {
     pub cursor: usize,
+    pub text_cursor: usize,
     pub form_focus: bool,
     pub items: Vec<FormWidget>,
     pub hide: HashMap<usize, bool>,
@@ -67,11 +81,14 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
     pub fn init() -> Self {
         let mut val = Self {
             cursor: 0,
+            text_cursor: 0,
             form_focus: true,
             items: E::iter().map(|item| item.into()).collect(),
             hide: HashMap::new(),
             _phantom: PhantomData,
         };
+
+        val.text_cursor = val.items[val.cursor].max_cursor();
 
         for i in 0..val.items.len() {
             if val.is_valid_cursor(i) {
@@ -103,9 +120,22 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
     pub fn visible_count(&self) -> usize {
         self.items.len() - self.hidden_count()
     }
+
     pub fn advance_cursor(&mut self) {
         loop {
             self.cursor = (self.cursor + 1) % self.items.len();
+            self.text_cursor = self.items[self.cursor].max_cursor();
+
+            if self.is_valid_cursor(self.cursor) {
+                break;
+            }
+        }
+    }
+
+    pub fn retreat_cursor(&mut self) {
+        loop {
+            self.cursor = (self.cursor + self.items.len() - 1) % self.items.len();
+            self.text_cursor = self.items[self.cursor].max_cursor();
 
             if self.is_valid_cursor(self.cursor) {
                 break;
@@ -181,7 +211,7 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
             if key_event.kind == KeyEventKind::Press {
                 match key_event.code {
                     KeyCode::Up => loop {
-                        self.cursor = (self.cursor + self.items.len() - 1) % self.items.len();
+                        self.retreat_cursor();
 
                         if !self.hide.contains_key(&self.cursor) {
                             match &self.items[self.cursor] {
@@ -194,7 +224,7 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
                         }
                     },
                     KeyCode::Down | KeyCode::Tab => loop {
-                        self.cursor = (self.cursor + 1) % self.items.len();
+                        self.advance_cursor();
 
                         if self.is_valid_cursor(self.cursor) {
                             break;
@@ -217,7 +247,7 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
 
                 match &mut self.items[self.cursor] {
                     FormWidget::InputBox { text, .. } => {
-                        InputBox::handle_events(text, event)?;
+                        InputBox::handle_events(text, &mut self.text_cursor, event)?;
                     }
                     FormWidget::DisplayBox { .. } => {
                         // we don't have to handle this as parent component will do it
@@ -278,7 +308,7 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
                         currency: currency.as_ref(),
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf);
+                    widget.render(area, buf, &self.text_cursor);
                     area.y += height_used;
                 }
                 FormWidget::DisplayBox {
@@ -294,7 +324,7 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf);
+                    widget.render(area, buf, &self.text_cursor);
                     area.y += height_used;
                 }
                 FormWidget::BooleanInput { label, value } => {
@@ -306,7 +336,7 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf);
+                    widget.render(area, buf, &self.text_cursor);
                     area.y += height_used;
                 }
                 FormWidget::Button { label } => {

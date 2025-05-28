@@ -20,6 +20,7 @@ use crate::{
 pub struct AccountImportPage {
     pub screen: usize,
     pub input: String,
+    pub text_cursor: usize,
     pub display: Option<String>,
     pub success: bool,
 }
@@ -85,7 +86,7 @@ impl Component for AccountImportPage {
             empty_text: None,
             currency: None,
         }
-        .render(area, buf);
+        .render(area, buf, &self.text_cursor);
 
         if let Some(display) = &self.display {
             display.render(area.offset(Offset { x: 0, y: 4 }), buf);

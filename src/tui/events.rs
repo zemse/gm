@@ -48,6 +48,10 @@ pub enum Event {
 }
 
 impl Event {
+    pub fn fmt(&self) -> String {
+        format!("{self:?}")
+    }
+
     pub fn is_input(&self) -> bool {
         matches!(self, Event::Input(_))
     }

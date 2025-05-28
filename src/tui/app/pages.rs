@@ -69,6 +69,7 @@ impl Page {
         match self {
             Page::AddressBookDisplay(_) => true,
             Page::Trade(_) => true,
+            Page::SendMessage(_) => true,
             _ => false,
         }
     }
