@@ -111,11 +111,7 @@ impl<Item: Display> Widget for &FilterSelectPopup<Item> {
                     cursor: &self.cursor,
                     search_string: &self.search_string,
                     focus: true,
-                    focus_style: Some(
-                        Style::default()
-                            .remove_modifier(Modifier::REVERSED)
-                            .add_modifier(Modifier::BOLD),
-                    ),
+                    focus_style: Some(Style::default().remove_modifier(Modifier::REVERSED)),
                 }
                 .render(block_inner_area, buf);
             } else {
