@@ -74,6 +74,8 @@ pub trait Component {
 
     async fn exit_threads(&mut self) {}
 
+    fn set_focus(&mut self, _focus: bool) {}
+
     fn handle_event(
         &mut self,
         event: &Event,

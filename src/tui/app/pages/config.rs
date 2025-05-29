@@ -30,21 +30,17 @@ impl FormItemIndex for FormItem {
 }
 impl From<FormItem> for FormWidget {
     fn from(value: FormItem) -> Self {
-        let mut config = Config::load();
-        if config.alchemy_api_key.is_none() {
-            config.alchemy_api_key = Some("".to_string());
-        }
         match value {
             FormItem::Heading => FormWidget::Heading("Configuration"),
             FormItem::AlchemyApiKey => FormWidget::InputBox {
                 label: "Alchemy API key",
-                text: config.alchemy_api_key.unwrap_or_default(),
+                text: String::new(),
                 empty_text: Some("Please get an Alchemy API key from https://www.alchemy.com/"),
                 currency: None,
             },
             FormItem::TestnetMode => FormWidget::BooleanInput {
                 label: "Testnet Mode",
-                value: config.testnet_mode,
+                value: false,
             },
             FormItem::SaveButton => FormWidget::Button { label: "Save" },
             FormItem::DisplayText => FormWidget::DisplayText(String::new()),
@@ -58,14 +54,22 @@ pub struct ConfigPage {
 
 impl Default for ConfigPage {
     fn default() -> Self {
-        let mut config = Config::load();
-        if config.alchemy_api_key.is_none() {
-            config.alchemy_api_key = Some("".to_string());
-        }
-        Self { form: Form::init() }
+        let form = Form::init(|form| {
+            let config = Config::load();
+            *form.get_text_mut(FormItem::AlchemyApiKey) =
+                config.alchemy_api_key.clone().unwrap_or_default();
+            *form.get_boolean_mut(FormItem::TestnetMode) = config.testnet_mode;
+        });
+
+        Self { form }
     }
 }
+
 impl Component for ConfigPage {
+    fn set_focus(&mut self, focus: bool) {
+        self.form.set_form_focus(focus);
+    }
+
     fn handle_event(
         &mut self,
         event: &Event,
@@ -83,7 +87,7 @@ impl Component for ConfigPage {
 
             let mut config = Config::load();
             config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
-            config.testnet_mode = form.get_boolean_value(FormItem::TestnetMode);
+            config.testnet_mode = form.get_boolean(FormItem::TestnetMode);
             config.save();
             transmitter.send(Event::ConfigUpdate)?;
 

@@ -52,11 +52,17 @@ impl From<FormItem> for FormWidget {
 
 impl Default for SignMessagePage {
     fn default() -> Self {
-        Self { form: Form::init() }
+        Self {
+            form: Form::init(|_| {}),
+        }
     }
 }
 
 impl Component for SignMessagePage {
+    fn set_focus(&mut self, focus: bool) {
+        self.form.set_form_focus(focus);
+    }
+
     fn handle_event(
         &mut self,
         event: &Event,

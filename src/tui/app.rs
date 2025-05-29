@@ -5,15 +5,21 @@ use std::{
 
 use alloy::primitives::Address;
 use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
-use pages::{main_menu::MainMenuPage, trade::TradePage, Page};
+use pages::{
+    config::ConfigPage,
+    main_menu::{MainMenuItem, MainMenuPage},
+    text::TextPage,
+    trade::TradePage,
+    Page,
+};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
     text::Text,
-    widgets::{Block, BorderType, Paragraph, Widget, Wrap},
+    widgets::{Block, Paragraph, Widget, Wrap},
     DefaultTerminal,
 };
-use widgets::{footer::Footer, popup::Popup, sidebar::Sidebar, title::Title};
+use widgets::{footer::Footer, form::Form, popup::Popup, sidebar::Sidebar, title::Title};
 
 use crate::{
     disk::{Config, DiskInterface},
@@ -47,6 +53,8 @@ pub struct SharedState {
 
 pub struct App {
     pub context: Vec<Page>,
+    pub preview_page: Option<Page>,
+
     pub sidebar: Sidebar,
 
     pub exit: bool,
@@ -65,6 +73,8 @@ impl Default for App {
 
         Self {
             context: vec![Page::MainMenu(MainMenuPage::default())],
+            preview_page: None,
+
             sidebar: Sidebar::default(),
 
             exit: false,
@@ -203,7 +213,7 @@ impl App {
         tr: &mpsc::Sender<Event>,
         sd: &Arc<AtomicBool>,
     ) -> crate::Result<()> {
-        let mut esc_ignores = if (!event.is_input()
+        let esc_ignores = if (!event.is_input()
             || (self.shared_state.focus == Focus::Main && self.fatal_error.is_none()))
             && let Some(page) = self.context.last_mut()
         {
@@ -213,16 +223,16 @@ impl App {
             0
         };
 
-        esc_ignores += if !event.is_input()
-            || (self.shared_state.focus == Focus::Sidebar && self.fatal_error.is_none())
-        {
-            let result = self
-                .sidebar
-                .handle_event(&event, tr, sd, &self.shared_state);
-            self.process_result(result).await?
-        } else {
-            0
-        };
+        // esc_ignores += if !event.is_input()
+        //     || (self.shared_state.focus == Focus::Sidebar && self.fatal_error.is_none())
+        // {
+        //     let result = self
+        //         .sidebar
+        //         .handle_event(&event, tr, sd, &self.shared_state);
+        //     self.process_result(result).await?
+        // } else {
+        //     0
+        // };
 
         if self.context.is_empty() {
             self.exit = true;
@@ -353,25 +363,20 @@ impl Widget for &App {
         ]);
         let [title_area, body_area, footer_area] = vertical_layout.areas(area);
 
-        if let Some(page) = self.current_page() {
-            Title {
-                current_account: self.shared_state.current_account.as_ref(),
-                online: self.shared_state.online,
-            }
-            .render(title_area, buf);
+        Title {
+            current_account: self.shared_state.current_account.as_ref(),
+            online: self.shared_state.online,
+        }
+        .render(title_area, buf);
 
-            // Body render
-            if page.is_full_screen() {
-                page.render_component_with_block(
-                    body_area,
-                    buf,
-                    Block::bordered(),
-                    &self.shared_state,
-                );
-            } else {
-                let horizontal_layout =
-                    Layout::horizontal([Constraint::Percentage(70), Constraint::Percentage(30)]);
-                let [left_area, right_area] = horizontal_layout.areas(body_area);
+        if let Some(page) = self.current_page() {
+            // Render Body
+            if page.is_main_menu()
+                && let Some(main_menu_item) = page.main_menu_focused_item()
+            {
+                let [left_area, right_area] =
+                    Layout::horizontal([Constraint::Length(15), Constraint::Min(2)])
+                        .areas(body_area);
 
                 page.render_component_with_block(
                     left_area,
@@ -380,10 +385,45 @@ impl Widget for &App {
                     &self.shared_state,
                 );
 
-                self.sidebar.render_component_with_block(
+                let page = match main_menu_item {
+                    MainMenuItem::Assets => {
+                        let mut preview_page = main_menu_item.get_page();
+                        preview_page.set_focus(false);
+                        preview_page
+                    }
+                    MainMenuItem::Config => Page::Config(ConfigPage {
+                        form: Form::init(|form| {
+                            form.show_everything_empty(true);
+                        }),
+                    }),
+                    MainMenuItem::Setup => Page::Text(TextPage::new(
+                        "Setup some of the essential stuff to get the most out of gm".to_string(),
+                    )),
+                    MainMenuItem::Accounts => {
+                        Page::Text(TextPage::new("Create or load accounts".to_string()))
+                    }
+                    MainMenuItem::AddressBook => {
+                        Page::Text(TextPage::new("Manage familiar addresses".to_string()))
+                    }
+                    MainMenuItem::SignMessage => Page::Text(TextPage::new(
+                        "Sign a message and prove ownership to somebody".to_string(),
+                    )),
+                    MainMenuItem::SendMessage => {
+                        Page::Text(TextPage::new("Send onchain message to someone".to_string()))
+                    }
+                };
+
+                page.render_component_with_block(
                     right_area,
                     buf,
-                    Block::bordered().border_type(BorderType::Plain),
+                    Block::bordered(),
+                    &self.shared_state,
+                );
+            } else {
+                page.render_component_with_block(
+                    body_area,
+                    buf,
+                    Block::bordered(),
                     &self.shared_state,
                 );
             }
@@ -394,6 +434,48 @@ impl Widget for &App {
             }
             .render(footer_area, buf);
         }
+
+        // if let Some(page) = self.current_page() {
+        //     Title {
+        //         current_account: self.shared_state.current_account.as_ref(),
+        //         online: self.shared_state.online,
+        //     }
+        //     .render(title_area, buf);
+
+        //     // Body render
+        //     if page.is_full_screen() {
+        //         page.render_component_with_block(
+        //             body_area,
+        //             buf,
+        //             Block::bordered(),
+        //             &self.shared_state,
+        //         );
+        //     } else {
+        //         let horizontal_layout =
+        //             Layout::horizontal([Constraint::Percentage(70), Constraint::Percentage(30)]);
+        //         let [left_area, right_area] = horizontal_layout.areas(body_area);
+
+        //         page.render_component_with_block(
+        //             left_area,
+        //             buf,
+        //             Block::bordered(),
+        //             &self.shared_state,
+        //         );
+
+        //         self.sidebar.render_component_with_block(
+        //             right_area,
+        //             buf,
+        //             Block::bordered().border_type(BorderType::Plain),
+        //             &self.shared_state,
+        //         );
+        //     }
+
+        // Footer {
+        //     exit: &self.exit,
+        //     is_main_menu: &page.is_main_menu(),
+        // }
+        // .render(footer_area, buf);
+        // }
 
         if let Some(fatal_error) = &self.fatal_error {
             Popup.render(area, buf);

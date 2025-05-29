@@ -17,9 +17,14 @@ use super::{asset_transfer::AssetTransferPage, Page};
 #[derive(Default)]
 pub struct AssetsPage {
     cursor: Cursor,
+    focus: bool,
 }
 
 impl Component for AssetsPage {
+    fn set_focus(&mut self, focus: bool) {
+        self.focus = focus;
+    }
+
     fn handle_event(
         &mut self,
         event: &Event,
@@ -66,7 +71,7 @@ impl Component for AssetsPage {
                 Select {
                     list,
                     cursor: &self.cursor,
-                    focus: shared_state.focus == Focus::Main,
+                    focus: self.focus && shared_state.focus == Focus::Main,
                     focus_style: None,
                 }
                 .render(area, buf);

@@ -93,6 +93,7 @@ pub struct AddressBookPage {
     full_list: Vec<AddressBookMenuItem>,
     search_string: String,
     cursor: Cursor,
+    focus: bool,
 }
 
 impl Default for AddressBookPage {
@@ -101,11 +102,16 @@ impl Default for AddressBookPage {
             full_list: AddressBookMenuItem::get_menu(true),
             search_string: String::new(),
             cursor: Cursor::default(),
+            focus: true,
         }
     }
 }
 
 impl Component for AddressBookPage {
+    fn set_focus(&mut self, focus: bool) {
+        self.focus = focus;
+    }
+
     fn reload(&mut self) {
         let fresh = Self::default();
         self.full_list = fresh.full_list;
@@ -184,7 +190,7 @@ impl Component for AddressBookPage {
             full_list: &self.full_list,
             cursor: &self.cursor,
             search_string: &self.search_string,
-            focus: shared_state.focus == Focus::Main,
+            focus: self.focus && shared_state.focus == Focus::Main,
             focus_style: None,
         }
         .render(area, buf);

@@ -40,6 +40,7 @@ impl Display for AccountSelect {
 
 pub struct AccountPage {
     cursor: Cursor,
+    focus: bool,
     list: Vec<AccountSelect>,
 }
 
@@ -54,12 +55,17 @@ impl Default for AccountPage {
         );
         Self {
             cursor: Cursor::default(),
+            focus: true,
             list,
         }
     }
 }
 
 impl Component for AccountPage {
+    fn set_focus(&mut self, focus: bool) {
+        self.focus = focus;
+    }
+
     fn reload(&mut self) {
         let fresh = Self::default();
         self.list = fresh.list;
@@ -115,7 +121,7 @@ impl Component for AccountPage {
         Select {
             list: &self.list,
             cursor: &self.cursor,
-            focus: shared_state.focus == Focus::Main,
+            focus: self.focus && shared_state.focus == Focus::Main,
             focus_style: None,
         }
         .render(area, buf);

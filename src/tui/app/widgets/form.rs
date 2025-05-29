@@ -79,37 +79,45 @@ pub struct Form<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> {
     pub form_focus: bool,
     pub items: Vec<FormWidget>,
     pub hide: HashMap<usize, bool>,
+    pub everything_empty: bool,
     pub _phantom: PhantomData<E>,
 }
 
 impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
     // TODO remove the cursor parameter, and guess it as the first item that is
     // not heading or static text or similar
-    pub fn init() -> Self {
-        let mut val = Self {
+    pub fn init<F>(set_values_closure: F) -> Self
+    where
+        F: FnOnce(&mut Self),
+    {
+        let mut form = Self {
             cursor: 0,
             text_cursor: 0,
             form_focus: true,
             items: E::iter().map(|item| item.into()).collect(),
             hide: HashMap::new(),
+            everything_empty: false,
             _phantom: PhantomData,
         };
-
-        val.text_cursor = val.items[val.cursor].max_cursor();
-
-        for i in 0..val.items.len() {
-            if val.is_valid_cursor(i) {
+        for i in 0..form.items.len() {
+            if form.is_valid_cursor(i) {
                 break;
             } else {
-                val.cursor += 1;
+                form.cursor += 1;
             }
         }
+        set_values_closure(&mut form);
+        form.text_cursor = form.items[form.cursor].max_cursor();
 
-        val
+        form
     }
 
     pub fn set_form_focus(&mut self, focus: bool) {
         self.form_focus = focus;
+    }
+
+    pub fn show_everything_empty(&mut self, empty: bool) {
+        self.everything_empty = empty;
     }
 
     pub fn hide_item(&mut self, idx: E) {
@@ -188,9 +196,16 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
         }
     }
 
-    pub fn get_boolean_value(&self, idx: E) -> bool {
+    pub fn get_boolean(&self, idx: E) -> bool {
         match &self.items[idx.index()] {
             FormWidget::BooleanInput { value, .. } => *value,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_boolean_mut(&mut self, idx: E) -> &mut bool {
+        match &mut self.items[idx.index()] {
+            FormWidget::BooleanInput { value, .. } => value,
             _ => unreachable!(),
         }
     }
@@ -310,8 +325,16 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
                     let widget = InputBox {
                         focus: self.form_focus && self.cursor == i,
                         label,
-                        text,
-                        empty_text: *empty_text,
+                        text: if !self.everything_empty {
+                            text
+                        } else {
+                            &"".to_string()
+                        },
+                        empty_text: if !self.everything_empty {
+                            *empty_text
+                        } else {
+                            Some("")
+                        },
                         currency: currency.as_ref(),
                     };
                     let height_used = widget.height_used(area); // to see height based on width
@@ -326,8 +349,16 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
                     let widget = InputBox {
                         focus: self.form_focus && self.cursor == i,
                         label,
-                        text,
-                        empty_text: *empty_text,
+                        text: if !self.everything_empty {
+                            text
+                        } else {
+                            &"".to_string()
+                        },
+                        empty_text: if !self.everything_empty {
+                            *empty_text
+                        } else {
+                            Some("")
+                        },
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
@@ -338,7 +369,11 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E>
                     let widget = InputBox {
                         focus: self.form_focus && self.cursor == i,
                         label,
-                        text: &value.to_string(),
+                        text: if !self.everything_empty {
+                            &value.to_string()
+                        } else {
+                            &"".to_string()
+                        },
                         empty_text: None,
                         currency: None,
                     };

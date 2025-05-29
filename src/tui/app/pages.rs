@@ -9,10 +9,11 @@ use address_book_display::AddressBookDisplayPage;
 use asset_transfer::AssetTransferPage;
 use assets::AssetsPage;
 use config::ConfigPage;
-use main_menu::MainMenuPage;
+use main_menu::{MainMenuItem, MainMenuPage};
 use send_message::SendMessagePage;
 use setup::SetupPage;
 use sign_message::SignMessagePage;
+use text::TextPage;
 use trade::TradePage;
 use transaction::TransactionPage;
 
@@ -36,6 +37,7 @@ pub mod main_menu;
 pub mod send_message;
 pub mod setup;
 pub mod sign_message;
+pub mod text;
 pub mod trade;
 pub mod transaction;
 
@@ -61,6 +63,8 @@ pub enum Page {
     Transaction(TransactionPage),
 
     Trade(TradePage),
+
+    Text(TextPage),
 }
 
 impl Page {
@@ -78,9 +82,43 @@ impl Page {
     pub fn is_main_menu(&self) -> bool {
         matches!(self, Page::MainMenu(_))
     }
+
+    pub fn main_menu_focused_item(&self) -> Option<&MainMenuItem> {
+        match self {
+            Page::MainMenu(page) => Some(page.get_focussed_item()),
+            _ => None,
+        }
+    }
 }
 
 impl Component for Page {
+    fn set_focus(&mut self, focus: bool) {
+        match self {
+            Page::MainMenu(page) => page.set_focus(focus),
+            Page::Setup(page) => page.set_focus(focus),
+
+            Page::AddressBook(page) => page.set_focus(focus),
+            Page::AddressBookCreate(page) => page.set_focus(focus),
+            Page::AddressBookDisplay(page) => page.set_focus(focus),
+
+            Page::Account(page) => page.set_focus(focus),
+            Page::AccountCreate(page) => page.set_focus(focus),
+            Page::AccountImport(page) => page.set_focus(focus),
+
+            Page::Assets(page) => page.set_focus(focus),
+            Page::AssetTransfer(page) => page.set_focus(focus),
+
+            Page::Config(page) => page.set_focus(focus),
+            Page::SendMessage(page) => page.set_focus(focus),
+            Page::SignMessage(page) => page.set_focus(focus),
+            Page::Transaction(page) => page.set_focus(focus),
+
+            Page::Trade(page) => page.set_focus(focus),
+
+            Page::Text(page) => page.set_focus(focus),
+        }
+    }
+
     async fn exit_threads(&mut self) {
         match self {
             Page::MainMenu(page) => page.exit_threads().await,
@@ -103,6 +141,8 @@ impl Component for Page {
             Page::Transaction(page) => page.exit_threads().await,
 
             Page::Trade(page) => page.exit_threads().await,
+
+            Page::Text(page) => page.exit_threads().await,
         }
     }
 
@@ -128,6 +168,8 @@ impl Component for Page {
             Page::Transaction(page) => page.reload(),
 
             Page::Trade(page) => page.reload(),
+
+            Page::Text(page) => page.reload(),
         }
     }
 
@@ -159,6 +201,8 @@ impl Component for Page {
             Page::Transaction(page) => page.handle_event(event, tr, sd, ss),
 
             Page::Trade(page) => page.handle_event(event, tr, sd, ss),
+
+            Page::Text(page) => page.handle_event(event, tr, sd, ss),
         }
     }
 
@@ -192,6 +236,8 @@ impl Component for Page {
             Page::Transaction(page) => page.render_component(area, buf, shared_state),
 
             Page::Trade(page) => page.render_component(area, buf, shared_state),
+
+            Page::Text(page) => page.render_component(area, buf, shared_state),
         }
     }
 }

@@ -74,7 +74,7 @@ pub struct SendMessagePage {
 impl Default for SendMessagePage {
     fn default() -> Self {
         Self {
-            form: Form::init(),
+            form: Form::init(|_| {}),
             address_book_popup: FilterSelectPopup::new("Address Book"),
             networks_popup: FilterSelectPopup::new("Networks"),
         }
@@ -82,6 +82,10 @@ impl Default for SendMessagePage {
 }
 
 impl Component for SendMessagePage {
+    fn set_focus(&mut self, focus: bool) {
+        self.form.set_form_focus(focus);
+    }
+
     fn handle_event(
         &mut self,
         event: &Event,

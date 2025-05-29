@@ -72,7 +72,7 @@ pub struct AssetTransferPage {
 impl Default for AssetTransferPage {
     fn default() -> Self {
         Self {
-            form: Form::init(),
+            form: Form::init(|_| {}),
             asset: None,
             address_book_popup: FilterSelectPopup::new("Select destination address"),
             asset_popup: FilterSelectPopup::new("Choose asset to transfer"),
@@ -100,6 +100,10 @@ impl AssetTransferPage {
 }
 
 impl Component for AssetTransferPage {
+    fn set_focus(&mut self, focus: bool) {
+        self.form.set_form_focus(focus);
+    }
+
     fn handle_event(
         &mut self,
         event: &Event,

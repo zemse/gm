@@ -61,28 +61,30 @@ pub struct SetupPage {
 
 impl Default for SetupPage {
     fn default() -> Self {
-        let config = Config::load();
-
-        let mut form = Form::init();
-
-        if config.current_account.is_some() {
-            form.hide_item(FormItem::CreateOrImportWallet);
+        Self {
+            form: Form::init(|form| {
+                let config = Config::load();
+                if config.current_account.is_some() {
+                    form.hide_item(FormItem::CreateOrImportWallet);
+                }
+                if config
+                    .alchemy_api_key
+                    .map(|s| !s.is_empty())
+                    .unwrap_or(false)
+                {
+                    form.hide_item(FormItem::AlchemyApiKey);
+                    form.hide_item(FormItem::Save);
+                    form.hide_item(FormItem::Display);
+                }
+            }),
         }
-
-        if config
-            .alchemy_api_key
-            .map(|s| !s.is_empty())
-            .unwrap_or(false)
-        {
-            form.hide_item(FormItem::AlchemyApiKey);
-            form.hide_item(FormItem::Save);
-            form.hide_item(FormItem::Display);
-        }
-
-        Self { form }
     }
 }
 impl Component for SetupPage {
+    fn set_focus(&mut self, focus: bool) {
+        self.form.set_form_focus(focus);
+    }
+
     fn reload(&mut self) {
         let fresh = Self::default();
         self.form = fresh.form;

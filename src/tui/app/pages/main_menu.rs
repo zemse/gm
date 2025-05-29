@@ -21,7 +21,7 @@ use super::{
 };
 
 #[derive(Display, EnumIter)]
-pub enum MainMenuItems {
+pub enum MainMenuItem {
     Setup,
     Assets,
     Accounts,
@@ -31,20 +31,32 @@ pub enum MainMenuItems {
     Config,
 }
 
-impl MainMenuItems {
-    pub fn depends_on_current_account(&self) -> bool {
+impl MainMenuItem {
+    pub fn get_page(&self) -> Page {
         match self {
-            MainMenuItems::Setup
-            | MainMenuItems::AddressBook
-            | MainMenuItems::Accounts
-            | MainMenuItems::Config => false,
-
-            MainMenuItems::Assets | MainMenuItems::SignMessage | MainMenuItems::SendMessage => true,
+            MainMenuItem::Setup => Page::Setup(SetupPage::default()),
+            MainMenuItem::Assets => Page::Assets(AssetsPage::default()),
+            MainMenuItem::Accounts => Page::Account(AccountPage::default()),
+            MainMenuItem::AddressBook => Page::AddressBook(AddressBookPage::default()),
+            MainMenuItem::SignMessage => Page::SignMessage(SignMessagePage::default()),
+            MainMenuItem::SendMessage => Page::SendMessage(SendMessagePage::default()),
+            MainMenuItem::Config => Page::Config(ConfigPage::default()),
         }
     }
 
-    pub fn get_menu() -> Vec<MainMenuItems> {
-        let mut all_options: Vec<MainMenuItems> = MainMenuItems::iter().collect();
+    pub fn depends_on_current_account(&self) -> bool {
+        match self {
+            MainMenuItem::Setup
+            | MainMenuItem::AddressBook
+            | MainMenuItem::Accounts
+            | MainMenuItem::Config => false,
+
+            MainMenuItem::Assets | MainMenuItem::SignMessage | MainMenuItem::SendMessage => true,
+        }
+    }
+
+    pub fn get_menu() -> Vec<MainMenuItem> {
+        let mut all_options: Vec<MainMenuItem> = MainMenuItem::iter().collect();
 
         let setup_menu = get_setup_menu();
         if setup_menu.is_empty() {
@@ -65,14 +77,22 @@ impl MainMenuItems {
 }
 
 pub struct MainMenuPage {
-    cursor: Cursor,
-    list: Vec<MainMenuItems>,
+    pub cursor: Cursor,
+    pub list: Vec<MainMenuItem>,
+}
+
+impl MainMenuPage {
+    pub fn get_focussed_item(&self) -> &MainMenuItem {
+        self.list
+            .get(self.cursor.current)
+            .expect("Invalid cursor position in MainMenuPage")
+    }
 }
 
 impl Default for MainMenuPage {
     fn default() -> Self {
         Self {
-            list: MainMenuItems::get_menu(),
+            list: MainMenuItem::get_menu(),
             cursor: Cursor::default(),
         }
     }
@@ -99,33 +119,10 @@ impl Component for MainMenuPage {
             if key_event.kind == KeyEventKind::Press {
                 #[allow(clippy::single_match)]
                 match key_event.code {
-                    KeyCode::Enter => match &self.list[self.cursor.current] {
-                        &MainMenuItems::Setup => {
-                            result.page_inserts.push(Page::Setup(SetupPage::default()))
-                        }
-                        MainMenuItems::AddressBook => {
-                            result
-                                .page_inserts
-                                .push(Page::AddressBook(AddressBookPage::default()));
-                        }
-                        MainMenuItems::Assets => result
-                            .page_inserts
-                            .push(Page::Assets(AssetsPage::default())),
-                        MainMenuItems::Accounts => {
-                            result
-                                .page_inserts
-                                .push(Page::Account(AccountPage::default()));
-                        }
-                        MainMenuItems::SignMessage => result
-                            .page_inserts
-                            .push(Page::SignMessage(SignMessagePage::default())),
-                        MainMenuItems::SendMessage => result
-                            .page_inserts
-                            .push(Page::SendMessage(SendMessagePage::default())),
-                        MainMenuItems::Config => result
-                            .page_inserts
-                            .push(Page::Config(ConfigPage::default())),
-                    },
+                    KeyCode::Enter => {
+                        let page = self.list[self.cursor.current].get_page();
+                        result.page_inserts.push(page);
+                    }
                     _ => {}
                 }
             }
