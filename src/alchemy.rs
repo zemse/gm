@@ -22,6 +22,7 @@ pub struct TokensByWalletEntry {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenMetadata {
     pub symbol: String,
+    #[serde(default)]
     pub decimals: u8,
     pub name: String,
     pub logo: Option<String>,
@@ -164,7 +165,8 @@ impl Alchemy {
                     "'tokens' not present in response {response:?}"
                 )))?;
 
-            let parsed: Vec<TokensByWalletEntry> = serde_json::from_value(response.clone())?;
+            let parsed: Vec<TokensByWalletEntry> = serde_json::from_value(response.clone())
+                .map_err(|e| crate::Error::SerdeJsonWithValue(e, response.clone()))?;
             result.extend(parsed);
         }
 
@@ -208,7 +210,8 @@ impl Alchemy {
             .get("tokens")
             .expect("'tokens' not present in response");
 
-        let parsed: Vec<TokenBalancesByWalletEntry> = serde_json::from_value(response.clone())?;
+        let parsed: Vec<TokenBalancesByWalletEntry> = serde_json::from_value(response.clone())
+            .map_err(|e| crate::Error::SerdeJsonWithValue(e, response.clone()))?;
         Ok(parsed)
     }
 }

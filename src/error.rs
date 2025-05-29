@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use alloy::primitives::Address;
+use serde_json::Value;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -25,6 +26,8 @@ pub enum Error {
     YamlError(serde_yaml::Error),
     ReqwestError(reqwest::Error),
     SerdeJson(serde_json::Error),
+    SerdeJsonWithValue(serde_json::Error, Value),
+    SerdeJsonWithString(serde_json::Error, String),
     MpscRecvError(std::sync::mpsc::RecvError),
     MpscSendError(std::sync::mpsc::SendError<crate::tui::Event>),
     MnemonicError(coins_bip39::MnemonicError),
