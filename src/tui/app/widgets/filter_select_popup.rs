@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
-    style::Color,
+    style::{Modifier, Style},
     widgets::{Block, Widget},
 };
 
@@ -98,10 +98,7 @@ impl<Item: Display> Widget for &FilterSelectPopup<Item> {
         Self: Sized,
     {
         if self.is_open() {
-            Popup {
-                bg_color: Some(Color::Blue),
-            }
-            .render(area, buf);
+            Popup.render(area, buf);
 
             let inner_area = Popup::inner_area(area);
             let block = Block::bordered().title(self.title);
@@ -114,6 +111,11 @@ impl<Item: Display> Widget for &FilterSelectPopup<Item> {
                     cursor: &self.cursor,
                     search_string: &self.search_string,
                     focus: true,
+                    focus_style: Some(
+                        Style::default()
+                            .remove_modifier(Modifier::REVERSED)
+                            .add_modifier(Modifier::BOLD),
+                    ),
                 }
                 .render(block_inner_area, buf);
             } else {

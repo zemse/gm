@@ -147,6 +147,7 @@ impl Component for MainMenuPage {
             list: &self.list,
             cursor: &self.cursor,
             focus: shared_state.focus == Focus::Main,
+            focus_style: None,
         }
         .render(area, buf);
 

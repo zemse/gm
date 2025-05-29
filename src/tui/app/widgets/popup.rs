@@ -1,12 +1,10 @@
 use ratatui::{
     layout::{Margin, Rect},
-    style::{Color, Style},
+    style::{Modifier, Style},
     widgets::{Block, Clear, Widget},
 };
 
-pub struct Popup {
-    pub bg_color: Option<Color>,
-}
+pub struct Popup;
 
 impl Popup {
     pub fn area(full_area: Rect) -> Rect {
@@ -38,11 +36,7 @@ impl Widget for Popup {
         Clear.render(popup_area, buf);
 
         Block::default()
-            .style(if let Some(bg_color) = self.bg_color {
-                Style::default().bg(bg_color)
-            } else {
-                Style::default()
-            })
+            .style(Style::default().add_modifier(Modifier::REVERSED))
             .render(popup_area, buf);
     }
 }

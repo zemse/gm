@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use ratatui::{
     layout::{Constraint, Layout},
+    style::Style,
     text::Line,
     widgets::Widget,
 };
@@ -15,6 +16,7 @@ pub struct FilterSelect<'a, T: Display> {
     pub cursor: &'a Cursor,
     pub search_string: &'a String,
     pub focus: bool,
+    pub focus_style: Option<Style>,
 }
 
 impl<T: Display> Widget for FilterSelect<'_, T> {
@@ -38,6 +40,7 @@ impl<T: Display> Widget for FilterSelect<'_, T> {
                 .collect::<Vec<&T>>(),
             cursor: self.cursor,
             focus: self.focus,
+            focus_style: self.focus_style,
         }
         .render(list_area, buf);
     }

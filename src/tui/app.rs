@@ -9,7 +9,6 @@ use pages::{main_menu::MainMenuPage, trade::TradePage, Page};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
-    style::Color,
     text::Text,
     widgets::{Block, BorderType, Paragraph, Widget, Wrap},
     DefaultTerminal,
@@ -397,10 +396,7 @@ impl Widget for &App {
         }
 
         if let Some(fatal_error) = &self.fatal_error {
-            Popup {
-                bg_color: Some(Color::Red),
-            }
-            .render(area, buf);
+            Popup.render(area, buf);
 
             let popup_inner_area = Popup::inner_area(area);
 

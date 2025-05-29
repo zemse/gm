@@ -185,6 +185,7 @@ impl Component for AddressBookPage {
             cursor: &self.cursor,
             search_string: &self.search_string,
             focus: shared_state.focus == Focus::Main,
+            focus_style: None,
         }
         .render(area, buf);
         area

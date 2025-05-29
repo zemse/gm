@@ -107,6 +107,7 @@ impl Component for Sidebar {
             list: &list,
             cursor: &self.cursor,
             focus: shared_state.focus == Focus::Sidebar,
+            focus_style: None,
         }
         .render(area, buf);
 

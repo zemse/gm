@@ -9,7 +9,7 @@ use crossterm::event::KeyCode;
 use ratatui::{
     buffer::Buffer,
     layout::{Offset, Rect},
-    style::{Color, Modifier, Style, Stylize},
+    style::{Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{Gauge, Widget},
 };
@@ -236,9 +236,7 @@ impl Component for AccountCreatePage {
             let span = Span::from(content.to_string());
 
             let style = if self.cursor == i {
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+                Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED)
             } else {
                 Style::default()
             };
