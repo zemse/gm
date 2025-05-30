@@ -46,10 +46,10 @@ impl Widget for CustomScrollBar {
 
 fn get_page_height(i: usize, capacity: usize, num_pages: usize) -> usize {
     let base = capacity / num_pages;
-    if capacity % num_pages <= i {
-        base
-    } else {
+    if i < capacity % num_pages {
         base + 1
+    } else {
+        base
     }
 }
 

@@ -31,7 +31,7 @@ pub async fn run() -> crate::Result<()> {
             .handle_event(event_rc.recv()?, area, &event_tr, &shutdown)
             .await;
         if let Err(e) = result {
-            app.fatal_error = Some(e.to_string());
+            app.fatal_error_popup.set_text(e.to_string());
         }
     }
 

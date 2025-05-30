@@ -9,6 +9,6 @@ pub mod popup;
 pub mod scroll_bar;
 pub mod select;
 pub mod sidebar;
-#[allow(dead_code)]
+pub mod text_popup;
 pub mod text_scroll;
 pub mod title;

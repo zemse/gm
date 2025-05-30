@@ -1,6 +1,19 @@
+use crossterm::event::KeyCode;
+use ratatui::{
+    layout::{Constraint, Layout, Rect},
+    widgets::Widget,
+};
+
+use crate::tui::{
+    traits::{HandleResult, RectUtil},
+    Event,
+};
+
+use super::scroll_bar::CustomScrollBar;
+
 pub struct TextScroll {
-    text: String,
-    scroll_offset: usize,
+    pub text: String,
+    pub scroll_offset: usize,
 }
 
 impl TextScroll {
@@ -18,37 +31,51 @@ impl TextScroll {
             .collect()
     }
 
-    pub fn set_text(&mut self, text: String) {
-        self.text = text;
-        self.scroll_offset = 0; // Reset scroll offset when text changes
-    }
-
-    pub fn scroll_up(&mut self, lines: usize) {
-        if self.scroll_offset >= lines {
-            self.scroll_offset -= lines;
-        } else {
-            self.scroll_offset = 0;
+    pub fn scroll_up(&mut self) {
+        if self.scroll_offset > 0 {
+            self.scroll_offset -= 1;
         }
     }
 
-    pub fn scroll_down(&mut self, lines: usize) {
-        let max_scroll = self.text.lines().count().saturating_sub(1);
-        if self.scroll_offset + lines <= max_scroll {
-            self.scroll_offset += lines;
-        } else {
-            self.scroll_offset = max_scroll;
+    pub fn scroll_down(&mut self, width: usize, height: usize) {
+        let lines = self.lines(width).len();
+        if self.scroll_offset + height < lines {
+            self.scroll_offset += 1;
         }
     }
 
-    pub fn get_visible_text(&self, width: usize) -> String {
-        let lines: Vec<&str> = self.text.lines().collect();
-        let visible_lines: Vec<&str> = lines
-            .iter()
-            .skip(self.scroll_offset)
-            .take(width)
-            .map(|line| line.trim_end())
-            .collect();
-        visible_lines.join("\n")
+    pub fn get_visible_text(&self, area: Rect) -> (Vec<&str>, usize) {
+        let lines: Vec<&str> = self.lines(area.width as usize);
+        (
+            lines
+                .iter()
+                .skip(self.scroll_offset)
+                .take(area.height as usize)
+                .map(|line| line.trim_end())
+                .collect(),
+            lines.len(),
+        )
+    }
+
+    pub fn handle_event(
+        &mut self,
+        event: &Event,
+        area: ratatui::prelude::Rect,
+    ) -> crate::Result<HandleResult> {
+        #[allow(clippy::single_match)]
+        match event {
+            Event::Input(key) => match key.code {
+                KeyCode::Up => {
+                    self.scroll_up();
+                }
+                KeyCode::Down => {
+                    self.scroll_down(area.width as usize, area.height as usize);
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+        Ok(HandleResult::default())
     }
 }
 
@@ -71,4 +98,26 @@ fn split_str_by_width(s: &str, width: usize) -> Vec<&str> {
     }
 
     result
+}
+
+impl Widget for &TextScroll {
+    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
+    where
+        Self: Sized,
+    {
+        let [mut text_area, scroll_area] =
+            Layout::horizontal([Constraint::Min(1), Constraint::Length(1)]).areas(area);
+
+        let (lines, total) = self.get_visible_text(text_area);
+        for line in &lines {
+            line.render(text_area, buf);
+            text_area = text_area.consume_height(1);
+        }
+
+        CustomScrollBar {
+            cursor: self.scroll_offset,
+            total: total - area.height as usize,
+        }
+        .render(scroll_area, buf);
+    }
 }

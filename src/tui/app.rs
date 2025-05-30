@@ -15,11 +15,12 @@ use pages::{
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
-    text::Text,
-    widgets::{Block, Paragraph, Widget, Wrap},
+    widgets::{Block, Widget},
     DefaultTerminal,
 };
-use widgets::{footer::Footer, form::Form, popup::Popup, sidebar::Sidebar, title::Title};
+use widgets::{
+    footer::Footer, form::Form, popup::Popup, sidebar::Sidebar, text_popup::TextPopup, title::Title,
+};
 
 use crate::{
     disk::{Config, DiskInterface},
@@ -29,7 +30,7 @@ use crate::{
 
 use super::{
     events::{self, Event},
-    traits::{BorderedWidget, Component, HandleResult},
+    traits::{Component, HandleResult},
 };
 
 pub mod pages;
@@ -58,7 +59,8 @@ pub struct App {
     pub sidebar: Sidebar,
 
     pub exit: bool,
-    pub fatal_error: Option<String>,
+    // pub fatal_error: Option<String>,
+    pub fatal_error_popup: TextPopup,
 
     pub shared_state: SharedState,
 
@@ -78,7 +80,8 @@ impl Default for App {
             sidebar: Sidebar::default(),
 
             exit: false,
-            fatal_error: None,
+            // fatal_error: None,
+            fatal_error_popup: TextPopup::new("Fatal Error"),
 
             shared_state: SharedState {
                 assets: None,
@@ -182,7 +185,7 @@ impl App {
         let result = match result {
             Ok(res) => res,
             Err(error) => {
-                self.fatal_error = Some(format!("{error:#?}"));
+                self.fatal_error_popup.set_text(format!("{error:#?}"));
                 return Err(error);
             }
         };
@@ -215,8 +218,10 @@ impl App {
         sd: &Arc<AtomicBool>,
     ) -> crate::Result<()> {
         let [_, body_area, _] = self.get_areas(area);
-        let esc_ignores = if (!event.is_input()
-            || (self.shared_state.focus == Focus::Main && self.fatal_error.is_none()))
+
+        // supply events to pages
+        let mut esc_ignores = if (!event.is_input()
+            || (self.shared_state.focus == Focus::Main && !self.fatal_error_popup.is_shown()))
             && let Some(page) = self.context.last_mut()
         {
             let result = page.handle_event(&event, body_area, tr, sd, &self.shared_state);
@@ -225,16 +230,11 @@ impl App {
             0
         };
 
-        // esc_ignores += if !event.is_input()
-        //     || (self.shared_state.focus == Focus::Sidebar && self.fatal_error.is_none())
-        // {
-        //     let result = self
-        //         .sidebar
-        //         .handle_event(&event, tr, sd, &self.shared_state);
-        //     self.process_result(result).await?
-        // } else {
-        //     0
-        // };
+        // suppy event to fatal error popup
+        let result = self
+            .fatal_error_popup
+            .handle_event(&event, Popup::inner_area(area));
+        esc_ignores += self.process_result(result).await?;
 
         if self.context.is_empty() {
             self.exit = true;
@@ -273,15 +273,15 @@ impl App {
                                 self.exit = true;
                             }
                             if char == 'r' && key_event.modifiers == KeyModifiers::CONTROL {
-                                self.fatal_error = Some("test error".to_string());
+                                self.fatal_error_popup.set_text("test error".to_string());
                             }
                             if char == 't' && key_event.modifiers == KeyModifiers::CONTROL {
                                 self.context.push(Page::Trade(TradePage::default()));
                             }
                         }
                         KeyCode::Esc => {
-                            if self.fatal_error.is_some() {
-                                self.fatal_error = None;
+                            if self.fatal_error_popup.is_shown() {
+                                self.fatal_error_popup.clear();
                             } else if self.shared_state.focus == Focus::Sidebar {
                                 self.shared_state.focus = Focus::Main;
                             } else if esc_ignores == 0 {
@@ -317,7 +317,8 @@ impl App {
                     // ETH Price is the main API for understanding if we are connected to internet
                     self.set_offline().await;
                 } else {
-                    self.fatal_error = Some(error.fmt_err("EthPriceError"))
+                    self.fatal_error_popup
+                        .set_text(error.fmt_err("EthPriceError"));
                 }
             }
 
@@ -325,18 +326,19 @@ impl App {
             Event::AssetsUpdate(assets) => self.shared_state.assets = Some(assets),
             Event::AssetsUpdateError(error, silence_error) => {
                 if !silence_error {
-                    self.fatal_error = Some(error)
+                    self.fatal_error_popup.set_text(error);
                 }
             }
 
             // Candles API
             Event::CandlesUpdateError(error) => {
-                self.fatal_error = Some(error.fmt_err("CandlesUpdateError"));
+                self.fatal_error_popup
+                    .set_text(error.fmt_err("CandlesUpdateError"));
             }
 
             // Transaction API
-            Event::TxSubmitError(error) => self.fatal_error = Some(error),
-            Event::TxStatusError(error) => self.fatal_error = Some(error),
+            Event::TxSubmitError(error) => self.fatal_error_popup.set_text(error),
+            Event::TxStatusError(error) => self.fatal_error_popup.set_text(error),
 
             _ => {}
         };
@@ -442,18 +444,6 @@ impl Widget for &App {
             .render(footer_area, buf);
         }
 
-        if let Some(fatal_error) = &self.fatal_error {
-            Popup.render(area, buf);
-
-            let popup_inner_area = Popup::inner_area(area);
-
-            let block = Block::bordered()
-                .title("Fatal Error")
-                .title_bottom("press ESC to dismiss");
-            Paragraph::new(Text::raw(fatal_error))
-                .wrap(Wrap { trim: false })
-                .to_owned()
-                .render_with_block(popup_inner_area, buf, block);
-        };
+        self.fatal_error_popup.render(area, buf);
     }
 }
