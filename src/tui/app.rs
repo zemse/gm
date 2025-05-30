@@ -182,7 +182,7 @@ impl App {
         let result = match result {
             Ok(res) => res,
             Err(error) => {
-                self.fatal_error = Some(format!("{error:?}"));
+                self.fatal_error = Some(format!("{error:#?}"));
                 return Err(error);
             }
         };
@@ -434,48 +434,6 @@ impl Widget for &App {
             }
             .render(footer_area, buf);
         }
-
-        // if let Some(page) = self.current_page() {
-        //     Title {
-        //         current_account: self.shared_state.current_account.as_ref(),
-        //         online: self.shared_state.online,
-        //     }
-        //     .render(title_area, buf);
-
-        //     // Body render
-        //     if page.is_full_screen() {
-        //         page.render_component_with_block(
-        //             body_area,
-        //             buf,
-        //             Block::bordered(),
-        //             &self.shared_state,
-        //         );
-        //     } else {
-        //         let horizontal_layout =
-        //             Layout::horizontal([Constraint::Percentage(70), Constraint::Percentage(30)]);
-        //         let [left_area, right_area] = horizontal_layout.areas(body_area);
-
-        //         page.render_component_with_block(
-        //             left_area,
-        //             buf,
-        //             Block::bordered(),
-        //             &self.shared_state,
-        //         );
-
-        //         self.sidebar.render_component_with_block(
-        //             right_area,
-        //             buf,
-        //             Block::bordered().border_type(BorderType::Plain),
-        //             &self.shared_state,
-        //         );
-        //     }
-
-        // Footer {
-        //     exit: &self.exit,
-        //     is_main_menu: &page.is_main_menu(),
-        // }
-        // .render(footer_area, buf);
-        // }
 
         if let Some(fatal_error) = &self.fatal_error {
             Popup.render(area, buf);

@@ -53,9 +53,9 @@ impl Error {
 impl FmtError for Error {
     fn fmt_err(&self, id: &str) -> String {
         if self.is_connect_reqwest() {
-            format!("Please check your internet connection - {id}: {self:?}")
+            format!("Please check your internet connection - {id}: {self:#?}")
         } else {
-            format!("{id}: {self:?}")
+            format!("{id}: {self:#?}")
         }
     }
 }
