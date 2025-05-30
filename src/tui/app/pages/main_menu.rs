@@ -1,7 +1,7 @@
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
 use crossterm::event::{KeyCode, KeyEventKind};
-use ratatui::widgets::Widget;
+use ratatui::{layout::Rect, widgets::Widget};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
 use crate::{
@@ -107,6 +107,7 @@ impl Component for MainMenuPage {
     fn handle_event(
         &mut self,
         event: &Event,
+        _area: Rect,
         _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,
@@ -133,7 +134,7 @@ impl Component for MainMenuPage {
 
     fn render_component(
         &self,
-        area: ratatui::prelude::Rect,
+        area: Rect,
         buf: &mut ratatui::prelude::Buffer,
         shared_state: &SharedState,
     ) -> ratatui::prelude::Rect

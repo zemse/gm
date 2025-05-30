@@ -15,6 +15,7 @@ use crate::Result;
 
 use alloy::primitives::{Bytes, TxKind, U256};
 
+use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
@@ -89,6 +90,7 @@ impl Component for SendMessagePage {
     fn handle_event(
         &mut self,
         event: &Event,
+        _area: Rect,
         _tr: &mpsc::Sender<Event>,
         _sd: &Arc<AtomicBool>,
         shared_state: &SharedState,
@@ -165,7 +167,7 @@ impl Component for SendMessagePage {
 
     fn render_component(
         &self,
-        area: ratatui::prelude::Rect,
+        area: Rect,
         buf: &mut ratatui::prelude::Buffer,
         _shared_state: &SharedState,
     ) -> ratatui::prelude::Rect

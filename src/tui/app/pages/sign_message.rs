@@ -66,6 +66,7 @@ impl Component for SignMessagePage {
     fn handle_event(
         &mut self,
         event: &Event,
+        _area: Rect,
         _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
         shared_state: &SharedState,

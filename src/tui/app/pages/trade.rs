@@ -30,6 +30,7 @@ impl Component for TradePage {
     fn handle_event(
         &mut self,
         event: &crate::tui::Event,
+        _area: ratatui::prelude::Rect,
         transmitter: &std::sync::mpsc::Sender<crate::tui::Event>,
         _shutdown_signal: &std::sync::Arc<std::sync::atomic::AtomicBool>,
         _shared_state: &SharedState,

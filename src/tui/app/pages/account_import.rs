@@ -29,6 +29,7 @@ impl Component for AccountImportPage {
     fn handle_event(
         &mut self,
         event: &Event,
+        _area: Rect,
         _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,

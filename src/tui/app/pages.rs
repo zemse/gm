@@ -176,33 +176,34 @@ impl Component for Page {
     fn handle_event(
         &mut self,
         event: &Event,
+        area: ratatui::prelude::Rect,
         tr: &mpsc::Sender<Event>,
         sd: &Arc<AtomicBool>,
         ss: &SharedState,
     ) -> crate::Result<HandleResult> {
         match self {
-            Page::MainMenu(page) => page.handle_event(event, tr, sd, ss),
-            Page::Setup(page) => page.handle_event(event, tr, sd, ss),
+            Page::MainMenu(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::Setup(page) => page.handle_event(event, area, tr, sd, ss),
 
-            Page::AddressBook(page) => page.handle_event(event, tr, sd, ss),
-            Page::AddressBookCreate(page) => page.handle_event(event, tr, sd, ss),
-            Page::AddressBookDisplay(page) => page.handle_event(event, tr, sd, ss),
+            Page::AddressBook(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::AddressBookCreate(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::AddressBookDisplay(page) => page.handle_event(event, area, tr, sd, ss),
 
-            Page::Account(page) => page.handle_event(event, tr, sd, ss),
-            Page::AccountCreate(page) => page.handle_event(event, tr, sd, ss),
-            Page::AccountImport(page) => page.handle_event(event, tr, sd, ss),
+            Page::Account(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::AccountCreate(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::AccountImport(page) => page.handle_event(event, area, tr, sd, ss),
 
-            Page::Assets(page) => page.handle_event(event, tr, sd, ss),
-            Page::AssetTransfer(page) => page.handle_event(event, tr, sd, ss),
+            Page::Assets(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::AssetTransfer(page) => page.handle_event(event, area, tr, sd, ss),
 
-            Page::Config(page) => page.handle_event(event, tr, sd, ss),
-            Page::SendMessage(page) => page.handle_event(event, tr, sd, ss),
-            Page::SignMessage(page) => page.handle_event(event, tr, sd, ss),
-            Page::Transaction(page) => page.handle_event(event, tr, sd, ss),
+            Page::Config(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::SendMessage(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::SignMessage(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::Transaction(page) => page.handle_event(event, area, tr, sd, ss),
 
-            Page::Trade(page) => page.handle_event(event, tr, sd, ss),
+            Page::Trade(page) => page.handle_event(event, area, tr, sd, ss),
 
-            Page::Text(page) => page.handle_event(event, tr, sd, ss),
+            Page::Text(page) => page.handle_event(event, area, tr, sd, ss),
         }
     }
 

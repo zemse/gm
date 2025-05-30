@@ -98,11 +98,11 @@ impl Default for App {
 }
 
 impl App {
-    pub fn draw(&self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        terminal.draw(|frame| {
+    pub fn draw(&self, terminal: &mut DefaultTerminal) -> io::Result<Rect> {
+        let completed_frame = terminal.draw(|frame| {
             frame.render_widget(self, frame.area());
         })?;
-        Ok(())
+        Ok(completed_frame.area)
     }
 
     pub fn init_threads(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
@@ -210,14 +210,16 @@ impl App {
     pub async fn handle_event(
         &mut self,
         event: super::events::Event,
+        area: Rect,
         tr: &mpsc::Sender<Event>,
         sd: &Arc<AtomicBool>,
     ) -> crate::Result<()> {
+        let [_, body_area, _] = self.get_areas(area);
         let esc_ignores = if (!event.is_input()
             || (self.shared_state.focus == Focus::Main && self.fatal_error.is_none()))
             && let Some(page) = self.context.last_mut()
         {
-            let result = page.handle_event(&event, tr, sd, &self.shared_state);
+            let result = page.handle_event(&event, body_area, tr, sd, &self.shared_state);
             self.process_result(result).await?
         } else {
             0
@@ -349,6 +351,16 @@ impl App {
     fn current_page_mut(&mut self) -> Option<&mut Page> {
         self.context.last_mut()
     }
+
+    fn get_areas(&self, area: Rect) -> [Rect; 3] {
+        let [title_area, body_area, footer_area] = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Min(3),
+            Constraint::Length(1),
+        ])
+        .areas(area);
+        [title_area, body_area, footer_area]
+    }
 }
 
 impl Widget for &App {
@@ -356,12 +368,7 @@ impl Widget for &App {
     where
         Self: Sized,
     {
-        let vertical_layout = Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Min(3),
-            Constraint::Length(1),
-        ]);
-        let [title_area, body_area, footer_area] = vertical_layout.areas(area);
+        let [title_area, body_area, footer_area] = self.get_areas(area);
 
         Title {
             current_account: self.shared_state.current_account.as_ref(),

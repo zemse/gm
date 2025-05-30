@@ -98,6 +98,7 @@ impl Component for AccountCreatePage {
     fn handle_event(
         &mut self,
         event: &Event,
+        _area: Rect,
         transmitter: &mpsc::Sender<Event>,
         shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,

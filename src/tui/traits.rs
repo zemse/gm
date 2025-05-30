@@ -79,6 +79,7 @@ pub trait Component {
     fn handle_event(
         &mut self,
         event: &Event,
+        area: ratatui::prelude::Rect,
         transmitter: &mpsc::Sender<Event>,
         shutdown_signal: &Arc<AtomicBool>,
         shared_state: &SharedState,

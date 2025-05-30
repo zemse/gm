@@ -1,6 +1,7 @@
 use std::sync::{atomic::AtomicBool, mpsc::Sender, Arc};
 
 use ratatui::{
+    layout::Rect,
     text::Text,
     widgets::{Paragraph, Widget, Wrap},
 };
@@ -26,6 +27,7 @@ impl Component for TextPage {
     fn handle_event(
         &mut self,
         _event: &Event,
+        _area: Rect,
         _transmitter: &Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,
@@ -35,7 +37,7 @@ impl Component for TextPage {
 
     fn render_component(
         &self,
-        area: ratatui::prelude::Rect,
+        area: Rect,
         buf: &mut ratatui::prelude::Buffer,
         _shared_state: &crate::tui::app::SharedState,
     ) -> ratatui::prelude::Rect

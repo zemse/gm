@@ -28,6 +28,7 @@ impl Component for Sidebar {
     fn handle_event(
         &mut self,
         event: &crate::tui::Event,
+        _area: Rect,
         transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
         shared_state: &SharedState,

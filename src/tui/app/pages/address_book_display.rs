@@ -69,6 +69,7 @@ impl Component for AddressBookDisplayPage {
     fn handle_event(
         &mut self,
         event: &Event,
+        _area: ratatui::prelude::Rect,
         _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,

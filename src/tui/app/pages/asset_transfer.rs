@@ -107,6 +107,7 @@ impl Component for AssetTransferPage {
     fn handle_event(
         &mut self,
         event: &Event,
+        _area: ratatui::prelude::Rect,
         _tr: &mpsc::Sender<Event>,
         _sd: &Arc<AtomicBool>,
         shared_state: &SharedState,

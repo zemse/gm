@@ -73,6 +73,7 @@ impl Component for ConfigPage {
     fn handle_event(
         &mut self,
         event: &Event,
+        _area: Rect,
         transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,

@@ -244,6 +244,7 @@ impl Component for TransactionPage {
     fn handle_event(
         &mut self,
         event: &Event,
+        _area: Rect,
         tr: &mpsc::Sender<Event>,
         sd: &Arc<AtomicBool>,
         shared_state: &SharedState,
