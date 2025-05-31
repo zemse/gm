@@ -68,6 +68,9 @@ impl InputBox<'_> {
                             }
                             text_input.remove(*text_cursor - 1);
                             *text_cursor -= 1;
+                            if *text_cursor == 0 {
+                                break;
+                            }
                             let next_char = text_input.chars().nth(*text_cursor - 1).unwrap_or(' ');
                             if next_char == ' ' {
                                 break;
