@@ -26,6 +26,7 @@ pub enum Error {
     YamlError(serde_yaml::Error),
     ReqwestError(reqwest::Error),
     SerdeJson(serde_json::Error),
+    SerdePathToError(serde_path_to_error::Error<serde_json::Error>),
     SerdeJsonWithValue(serde_json::Error, Value),
     SerdeJsonWithString(serde_json::Error, String),
     MpscRecvError(std::sync::mpsc::RecvError),
