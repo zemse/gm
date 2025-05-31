@@ -55,7 +55,9 @@ impl TextPopup {
             _ => {}
         }
 
-        result.esc_ignores = 1;
+        if self.is_shown() {
+            result.esc_ignores = 1;
+        }
 
         Ok(result)
     }
