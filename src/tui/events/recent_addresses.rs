@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::Sender,
@@ -71,6 +72,8 @@ async fn get_recent_addresses() -> crate::Result<Option<Vec<Address>>> {
                     None
                 }
             })
+            .collect::<HashSet<_>>()
+            .into_iter()
             .collect(),
     ))
 }
