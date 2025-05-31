@@ -8,7 +8,7 @@ use crate::{
     tui::{
         app::{
             pages::{assets::AssetsPage, trade::TradePage, Page},
-            Focus, SharedState,
+            SharedState,
         },
         traits::{Component, HandleResult},
         Event,
@@ -20,7 +20,7 @@ use super::select::Select;
 
 #[derive(Default)]
 pub struct Sidebar {
-    pub focus: bool,
+    // pub focus: bool,
     pub cursor: Cursor,
 }
 
@@ -107,7 +107,7 @@ impl Component for Sidebar {
             // @dev make sure to update event handlers
             list: &list,
             cursor: &self.cursor,
-            focus: shared_state.focus == Focus::Sidebar,
+            focus: false,
             focus_style: None,
         }
         .render(area, buf);

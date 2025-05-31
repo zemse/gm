@@ -12,7 +12,6 @@ use reqwest::Error as ReqwestError;
 use super::app::{
     pages::transaction::TxStatus,
     widgets::candle_chart::{Candle, Interval},
-    Focus,
 };
 
 pub mod assets;
@@ -26,7 +25,6 @@ pub enum Event {
 
     AccountChange(Address),
     ConfigUpdate,
-    FocusChange(Focus),
 
     EthPriceUpdate(String),
     EthPriceError(ReqwestError),

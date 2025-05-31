@@ -8,7 +8,7 @@ use crate::{
     actions::setup::get_setup_menu,
     disk::Config,
     tui::{
-        app::{widgets::select::Select, Focus, SharedState},
+        app::{widgets::select::Select, SharedState},
         events::Event,
         traits::{Component, HandleResult},
     },
@@ -121,7 +121,8 @@ impl Component for MainMenuPage {
                 #[allow(clippy::single_match)]
                 match key_event.code {
                     KeyCode::Enter => {
-                        let page = self.list[self.cursor.current].get_page();
+                        let mut page = self.list[self.cursor.current].get_page();
+                        page.set_focus(true);
                         result.page_inserts.push(page);
                     }
                     _ => {}
@@ -136,7 +137,7 @@ impl Component for MainMenuPage {
         &self,
         area: Rect,
         buf: &mut ratatui::prelude::Buffer,
-        shared_state: &SharedState,
+        _shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
@@ -144,7 +145,7 @@ impl Component for MainMenuPage {
         Select {
             list: &self.list,
             cursor: &self.cursor,
-            focus: shared_state.focus == Focus::Main,
+            focus: true,
             focus_style: None,
         }
         .render(area, buf);

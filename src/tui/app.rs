@@ -18,9 +18,7 @@ use ratatui::{
     widgets::{Block, Widget},
     DefaultTerminal,
 };
-use widgets::{
-    footer::Footer, form::Form, popup::Popup, sidebar::Sidebar, text_popup::TextPopup, title::Title,
-};
+use widgets::{footer::Footer, form::Form, popup::Popup, text_popup::TextPopup, title::Title};
 
 use crate::{
     disk::{Config, DiskInterface},
@@ -36,6 +34,8 @@ use super::{
 pub mod pages;
 pub mod widgets;
 
+// TODO update focus to have title bar, footer
+#[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub enum Focus {
     Main,
@@ -50,14 +50,11 @@ pub struct SharedState {
     pub current_account: Option<Address>,
     pub alchemy_api_key_available: bool,
     pub eth_price: Option<String>,
-    pub focus: Focus,
 }
 
 pub struct App {
     pub context: Vec<Page>,
     pub preview_page: Option<Page>,
-
-    pub sidebar: Sidebar,
 
     pub exit: bool,
     // pub fatal_error: Option<String>,
@@ -79,8 +76,6 @@ impl Default for App {
             context: vec![Page::MainMenu(MainMenuPage::default())],
             preview_page: None,
 
-            sidebar: Sidebar::default(),
-
             exit: false,
             // fatal_error: None,
             fatal_error_popup: TextPopup::new("Fatal Error"),
@@ -93,7 +88,6 @@ impl Default for App {
                 online: None,
                 eth_price: None,
                 testnet_mode: config.testnet_mode,
-                focus: Focus::Main,
             },
 
             input_thread: None,
@@ -223,10 +217,6 @@ impl App {
             self.shared_state.assets = None;
             // TODO restart the assets thread to avoid the delay
         }
-        if !result.page_inserts.is_empty() {
-            // In case we are in the sidebar, we should switch to left side.
-            self.shared_state.focus = Focus::Main;
-        }
         self.context.extend(result.page_inserts);
         Ok(result.esc_ignores)
     }
@@ -241,8 +231,7 @@ impl App {
         let [_, body_area, _] = self.get_areas(area);
 
         // supply events to pages
-        let mut esc_ignores = if (!event.is_input()
-            || (self.shared_state.focus == Focus::Main && !self.fatal_error_popup.is_shown()))
+        let mut esc_ignores = if (!event.is_input() || !self.fatal_error_popup.is_shown())
             && let Some(page) = self.context.last_mut()
         {
             let result = page.handle_event(&event, body_area, tr, sd, &self.shared_state);
@@ -267,24 +256,6 @@ impl App {
                 if key_event.kind == KeyEventKind::Press {
                     #[allow(clippy::single_match)]
                     match key_event.code {
-                        KeyCode::Left => {
-                            if self.shared_state.focus == Focus::Sidebar {
-                                self.shared_state.focus = Focus::Main;
-                                let _ = tr.send(Event::FocusChange(Focus::Main));
-                            }
-                        }
-                        KeyCode::Right => {
-                            if self.shared_state.focus == Focus::Main
-                                && self
-                                    .context
-                                    .last()
-                                    .map(|p| !p.is_full_screen())
-                                    .unwrap_or(false)
-                            {
-                                self.shared_state.focus = Focus::Sidebar;
-                                let _ = tr.send(Event::FocusChange(Focus::Sidebar));
-                            }
-                        }
                         KeyCode::Char(char) => {
                             // TODO can we quit using q as well?
                             // if char == 'q' && self.navigation.text_input().is_none() {
@@ -303,8 +274,6 @@ impl App {
                         KeyCode::Esc => {
                             if self.fatal_error_popup.is_shown() {
                                 self.fatal_error_popup.clear();
-                            } else if self.shared_state.focus == Focus::Sidebar {
-                                self.shared_state.focus = Focus::Main;
                             } else if esc_ignores == 0 {
                                 let page = self.context.pop();
                                 if let Some(mut page) = page {

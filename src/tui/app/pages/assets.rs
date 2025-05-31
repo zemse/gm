@@ -5,7 +5,7 @@ use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 
 use crate::{
     tui::{
-        app::{widgets::select::Select, Focus, SharedState},
+        app::{widgets::select::Select, SharedState},
         events::Event,
         traits::{Component, HandleResult},
     },
@@ -72,7 +72,7 @@ impl Component for AssetsPage {
                 Select {
                     list,
                     cursor: &self.cursor,
-                    focus: self.focus && shared_state.focus == Focus::Main,
+                    focus: self.focus,
                     focus_style: None,
                 }
                 .render(area, buf);

@@ -10,7 +10,7 @@ use ratatui::widgets::Widget;
 use crate::{
     disk::{AddressBook, AddressBookEntry, DiskInterface},
     tui::{
-        app::{widgets::filter_select::FilterSelect, Focus, SharedState},
+        app::{widgets::filter_select::FilterSelect, SharedState},
         events::Event,
         traits::{Component, HandleResult},
     },
@@ -38,10 +38,10 @@ impl Display for AddressBookMenuItem {
             AddressBookMenuItem::Create => write!(f, "Create new address book entry"),
             AddressBookMenuItem::View(entry) => write!(f, "{} - {}", entry.name, entry.address),
             AddressBookMenuItem::UnnamedOwned(address) => {
-                write!(f, "Un-named: {}", address)
+                write!(f, "Self: {}", address)
             }
             AddressBookMenuItem::RecentlyInteracted(address) => {
-                write!(f, "Recently interacted: {}", address)
+                write!(f, "Recent: {}", address)
             }
         }
     }
@@ -220,7 +220,7 @@ impl Component for AddressBookPage {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
-        shared_state: &SharedState,
+        _shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
@@ -229,7 +229,7 @@ impl Component for AddressBookPage {
             full_list: &self.full_list,
             cursor: &self.cursor,
             search_string: &self.search_string,
-            focus: self.focus && shared_state.focus == Focus::Main,
+            focus: self.focus,
             focus_style: None,
         }
         .render(area, buf);

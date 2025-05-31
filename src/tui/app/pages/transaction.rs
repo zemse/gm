@@ -26,7 +26,7 @@ use crate::{
     error::FmtError,
     network::{Network, NetworkStore},
     tui::{
-        app::{widgets::button::Button, Focus, SharedState},
+        app::{widgets::button::Button, SharedState},
         events::Event,
         traits::{Component, CustomRender, HandleResult, RectUtil},
     },
@@ -297,7 +297,12 @@ impl Component for TransactionPage {
         Ok(HandleResult::default())
     }
 
-    fn render_component(&self, mut area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        mut area: Rect,
+        buf: &mut Buffer,
+        _shared_state: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {
@@ -316,7 +321,7 @@ impl Component for TransactionPage {
         match self.status {
             TxStatus::NotSent => Button {
                 label: "Send Transaction",
-                focus: shared_state.focus == Focus::Main,
+                focus: true,
             }
             .render(area, buf),
 

@@ -4,7 +4,7 @@ use crate::network::{Network, NetworkStore};
 use crate::tui::app::widgets::filter_select_popup::FilterSelectPopup;
 use crate::tui::app::widgets::form::FormItemIndex;
 
-use crate::tui::app::{Focus, SharedState};
+use crate::tui::app::SharedState;
 use crate::tui::{
     app::widgets::form::{Form, FormWidget}, // <- Using your custom form system
     events::Event,
@@ -97,6 +97,7 @@ impl Component for SendMessagePage {
     ) -> Result<HandleResult> {
         let mut result = HandleResult::default();
 
+        #[allow(clippy::single_match)]
         match event {
             Event::ConfigUpdate => {
                 let network_name = self.form.get_text(FormItem::Network);
@@ -108,9 +109,6 @@ impl Component for SendMessagePage {
                 if network.is_testnet != shared_state.testnet_mode {
                     self.form.get_text_mut(FormItem::Network).clear();
                 }
-            }
-            Event::FocusChange(focus) => {
-                self.form.set_form_focus(*focus == Focus::Main);
             }
             _ => {}
         }
