@@ -23,7 +23,7 @@ use super::{
 #[derive(Display, EnumIter)]
 pub enum MainMenuItem {
     Setup,
-    Assets,
+    Portfolio,
     Accounts,
     AddressBook,
     SignMessage,
@@ -35,7 +35,7 @@ impl MainMenuItem {
     pub fn get_page(&self) -> Page {
         match self {
             MainMenuItem::Setup => Page::Setup(SetupPage::default()),
-            MainMenuItem::Assets => Page::Assets(AssetsPage::default()),
+            MainMenuItem::Portfolio => Page::Assets(AssetsPage::default()),
             MainMenuItem::Accounts => Page::Account(AccountPage::default()),
             MainMenuItem::AddressBook => Page::AddressBook(AddressBookPage::default()),
             MainMenuItem::SignMessage => Page::SignMessage(SignMessagePage::default()),
@@ -51,7 +51,7 @@ impl MainMenuItem {
             | MainMenuItem::Accounts
             | MainMenuItem::Config => false,
 
-            MainMenuItem::Assets | MainMenuItem::SignMessage | MainMenuItem::SendMessage => true,
+            MainMenuItem::Portfolio | MainMenuItem::SignMessage | MainMenuItem::SendMessage => true,
         }
     }
 

@@ -25,7 +25,10 @@ pub async fn watch_eth_price_change(transmitter: Sender<Event>, shutdown_signal:
             // shutdown, then we will get error. Since our event is not
             // critical, we do not store it to disk.
             let _ = match query_eth_price().await {
-                Ok(price) => transmitter.send(Event::EthPriceUpdate(price)),
+                Ok(price) => {
+                    let price = format_decimal_string(price);
+                    transmitter.send(Event::EthPriceUpdate(price))
+                }
                 Err(error) => transmitter.send(Event::EthPriceError(error)),
             };
             counter = 0;
@@ -33,6 +36,13 @@ pub async fn watch_eth_price_change(transmitter: Sender<Event>, shutdown_signal:
 
         counter += thread_sleep_duration_milli;
         thread::sleep(Duration::from_millis(thread_sleep_duration_milli));
+    }
+}
+
+fn format_decimal_string(input: String) -> String {
+    match input.parse::<f64>() {
+        Ok(f) => format!("{:.2}", f), // 2 decimal places
+        Err(_) => input.to_string(),  // fallback: return as-is
     }
 }
 

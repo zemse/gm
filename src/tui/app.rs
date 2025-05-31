@@ -369,11 +369,7 @@ impl Widget for &App {
     {
         let [title_area, body_area, footer_area] = self.get_areas(area);
 
-        Title {
-            current_account: self.shared_state.current_account.as_ref(),
-            online: self.shared_state.online,
-        }
-        .render(title_area, buf);
+        Title.render_component(title_area, buf, &self.shared_state);
 
         if let Some(page) = self.current_page() {
             // Render Body
@@ -392,7 +388,7 @@ impl Widget for &App {
                 );
 
                 let page = match main_menu_item {
-                    MainMenuItem::Assets => {
+                    MainMenuItem::Portfolio => {
                         let mut preview_page = main_menu_item.get_page();
                         preview_page.set_focus(false);
                         preview_page
