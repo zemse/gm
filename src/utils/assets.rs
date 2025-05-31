@@ -114,15 +114,18 @@ pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
     .map(|entry| Asset {
         wallet_address,
         r#type: AssetType {
-            token_address: TokenAddress::Contract(entry.token_address),
+            token_address: match entry.token_address {
+                Some(token_address) => TokenAddress::Contract(token_address),
+                None => TokenAddress::Native,
+            },
             network: networks
                 .get_by_name(&entry.network)
                 .expect("must exist")
                 .name
                 .clone(),
-            symbol: entry.token_metadata.symbol,
-            name: entry.token_metadata.name,
-            decimals: entry.token_metadata.decimals,
+            symbol: entry.token_metadata.symbol.unwrap_or("UNKNOWN".to_string()),
+            name: entry.token_metadata.name.unwrap_or("UNKNOWN".to_string()),
+            decimals: entry.token_metadata.decimals.unwrap_or_default(),
             price: entry
                 .token_prices
                 .first()
@@ -142,7 +145,7 @@ pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
             networks.register_token(
                 &balance.r#type.network,
                 token_address,
-                &balance.r#type.symbol,
+                Some(balance.r#type.symbol.as_str()),
                 &balance.r#type.name,
                 balance.r#type.decimals,
             );

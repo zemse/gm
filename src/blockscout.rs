@@ -2,10 +2,14 @@ use alloy::primitives::Address;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
+use crate::utils::SerdeResponseParse;
+
 #[derive(Debug, Serialize, Deserialize)]
-enum BlockScoutNetwork {
+pub enum BlockScoutNetwork {
     #[serde(rename = "eth")]
     Mainnet,
+
+    Arbitrum,
 }
 
 impl BlockScoutNetwork {
@@ -17,8 +21,8 @@ impl BlockScoutNetwork {
     }
 }
 
-struct BlockScout {
-    network: BlockScoutNetwork,
+pub struct BlockScout {
+    pub network: BlockScoutNetwork,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -68,7 +72,7 @@ pub struct TransactionMetadata {
 pub struct AddressInfo {
     pub ens_domain_name: Option<String>,
     pub hash: String,
-    // pub implementations: Option<Vec<String>>, // TODO
+    pub implementations: Option<serde_json::value::Value>,
     pub is_contract: bool,
     pub is_scam: bool,
     pub is_verified: bool,
@@ -94,7 +98,7 @@ pub struct Transaction {
     pub result: String,
     pub hash: String,
     pub max_fee_per_gas: Option<String>,
-    pub revert_reason: Option<String>,
+    pub revert_reason: Option<serde_json::value::Value>,
     pub confirmation_duration: [f64; 2],
     pub transaction_burnt_fee: Option<String>,
     #[serde(rename = "type")]
@@ -116,16 +120,16 @@ pub struct Transaction {
     pub actions: Vec<String>,
     pub gas_limit: String,
     pub gas_price: String,
-    // pub decoded_input: Option<String>,
+    pub decoded_input: Option<serde_json::value::Value>,
     pub token_transfers: Option<String>,
     pub base_fee_per_gas: String,
     pub timestamp: String,
     pub nonce: u64,
-    pub historic_exchange_rate: String,
+    pub historic_exchange_rate: Option<String>,
     pub transaction_types: Vec<String>,
     pub exchange_rate: String,
     pub block_number: u64,
-    pub has_error_in_internal_transactions: bool,
+    pub has_error_in_internal_transactions: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -139,7 +143,7 @@ pub struct TokenInfo {
     pub holders_count: String,
     pub icon_url: Option<String>,
     pub name: String,
-    pub symbol: String,
+    pub symbol: Option<String>,
     pub total_supply: String,
     #[serde(rename = "type")]
     pub token_type: String,
@@ -239,10 +243,13 @@ impl BlockScout {
         println!("Fetching address info from: {}", url);
 
         let client = reqwest::Client::new();
-        let response = client.get(&url).send().await?.error_for_status()?; // error if not 2xx
-
-        let account_info = response.json::<AccountInfo>().await?;
-        Ok(account_info)
+        client
+            .get(&url)
+            .send()
+            .await?
+            .error_for_status()?
+            .serde_parse_custom()
+            .await
     }
 
     pub async fn address_transactions(
@@ -256,12 +263,13 @@ impl BlockScout {
         );
 
         let client = reqwest::Client::new();
-        let response = client.get(&url).send().await?.error_for_status()?;
-
-        serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(
-            &response.text().await?,
-        ))
-        .map_err(crate::Error::SerdePathToError)
+        client
+            .get(&url)
+            .send()
+            .await?
+            .error_for_status()?
+            .serde_parse_custom()
+            .await
     }
 
     pub async fn token_transfers(
@@ -275,12 +283,13 @@ impl BlockScout {
         );
 
         let client = Client::new();
-        let response = client.get(url).send().await?.error_for_status()?;
-
-        serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(
-            &response.text().await?,
-        ))
-        .map_err(crate::Error::SerdePathToError)
+        client
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?
+            .serde_parse_custom()
+            .await
     }
 
     pub async fn token_balances(&self, address: Address) -> crate::Result<Vec<TokenBalance>> {

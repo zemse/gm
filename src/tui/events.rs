@@ -18,6 +18,7 @@ use super::app::{
 pub mod assets;
 pub mod eth_price;
 pub mod input;
+pub mod recent_addresses;
 
 #[derive(Debug)]
 pub enum Event {
@@ -36,6 +37,9 @@ pub enum Event {
 
     AssetsUpdate(Vec<Asset>),
     AssetsUpdateError(String, bool), // bool - whether to silence the error
+
+    RecentAddressesUpdate(Vec<Address>),
+    RecentAddressesUpdateError(String),
 
     CandlesUpdate(Vec<Candle>, Interval),
     CandlesUpdateError(ReqwestError),

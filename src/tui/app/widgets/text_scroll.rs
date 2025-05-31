@@ -109,15 +109,22 @@ impl Widget for &TextScroll {
             Layout::horizontal([Constraint::Min(1), Constraint::Length(1)]).areas(area);
 
         let (lines, total) = self.get_visible_text(text_area);
-        for line in &lines {
-            line.render(text_area, buf);
-            text_area = text_area.consume_height(1);
-        }
+        if total > area.height as usize {
+            for line in &lines {
+                line.render(text_area, buf);
+                text_area = text_area.consume_height(1);
+            }
 
-        CustomScrollBar {
-            cursor: self.scroll_offset,
-            total: total - area.height as usize,
+            CustomScrollBar {
+                cursor: self.scroll_offset,
+                total: total - area.height as usize,
+            }
+            .render(scroll_area, buf);
+        } else {
+            for line in &lines {
+                line.render(text_area, buf);
+                text_area = text_area.consume_height(1);
+            }
         }
-        .render(scroll_area, buf);
     }
 }

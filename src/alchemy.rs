@@ -3,14 +3,14 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::{disk::Config, error::Error}; // for building the JSON body
+use crate::{disk::Config, error::Error, utils::SerdeResponseParse}; // for building the JSON body
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokensByWalletEntry {
     pub address: Address,
     pub network: String,
     #[serde(rename = "tokenAddress")]
-    pub token_address: Address,
+    pub token_address: Option<Address>,
     #[serde(rename = "tokenBalance")]
     pub token_balance: U256,
     #[serde(rename = "tokenMetadata")]
@@ -21,10 +21,10 @@ pub struct TokensByWalletEntry {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenMetadata {
-    pub symbol: String,
+    pub symbol: Option<String>,
     #[serde(default)]
-    pub decimals: u8,
-    pub name: String,
+    pub decimals: Option<u8>,
+    pub name: Option<String>,
     pub logo: Option<String>,
 }
 
@@ -44,6 +44,16 @@ pub struct TokenBalancesByWalletEntry {
     token_address: Address,
     #[serde(rename = "tokenBalance")]
     token_balance: U256,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AlchemyData<T> {
+    pub data: T,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TokensByWallet {
+    pub tokens: Vec<TokensByWalletEntry>,
 }
 
 pub struct Alchemy;
@@ -151,23 +161,17 @@ impl Alchemy {
                 .header("content-type", "application/json")
                 .json(&body) // send JSON body
                 .send() // execute the request
-                .await? // await the response
-                .json::<Value>() // Parse the JSON into serde_json::Value
                 .await?;
 
-            let response = response
-                .get("data")
-                .ok_or(Error::InternalError(format!(
-                    "'data' not present in response {response:?}"
-                )))?
-                .get("tokens")
-                .ok_or(Error::InternalError(format!(
-                    "'tokens' not present in response {response:?}"
-                )))?;
+            // let text = response.text().await?;
 
-            let parsed: Vec<TokensByWalletEntry> = serde_json::from_value(response.clone())
-                .map_err(|e| crate::Error::SerdeJsonWithValue(e, response.clone()))?;
-            result.extend(parsed);
+            // Err(Error::InternalError(format!("Response: {:?}", text)))?;
+
+            let parsed = response
+                .serde_parse_custom::<AlchemyData<TokensByWallet>>()
+                .await?;
+
+            result.extend(parsed.data.tokens);
         }
 
         Ok(result)

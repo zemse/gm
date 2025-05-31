@@ -23,7 +23,7 @@ pub struct Balance {
     token_address: Option<Address>,
     network: String,
     value: U256,
-    symbol: String,
+    symbol: Option<String>,
     name: String,
     decimals: u8,
     usd_price: Option<f64>,
@@ -33,14 +33,15 @@ impl Display for Balance {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let formatted_value = self.formatted_value();
         let usd_value = self.usd_value();
+        let symbol = self.symbol.as_deref().unwrap_or("UNKNOWN");
         if let Some(usd_value) = usd_value {
             write!(
                 f,
-                "{formatted_value} {} {} (${usd_value:.2})",
-                self.symbol, self.network
+                "{formatted_value} {symbol} {} (${usd_value:.2})",
+                self.network
             )
         } else {
-            write!(f, "{formatted_value} {} {}", self.symbol, self.network)
+            write!(f, "{formatted_value} {symbol} {}", self.network)
         }
     }
 }
@@ -80,7 +81,7 @@ pub fn get_all_balances() {
         .into_iter()
         .map(|entry| Balance {
             wallet_address,
-            token_address: Some(entry.token_address),
+            token_address: entry.token_address,
             network: networks
                 .get_by_name(&entry.network)
                 .expect("must exist")
@@ -88,8 +89,8 @@ pub fn get_all_balances() {
                 .clone(),
             value: entry.token_balance,
             symbol: entry.token_metadata.symbol,
-            name: entry.token_metadata.name,
-            decimals: entry.token_metadata.decimals,
+            name: entry.token_metadata.name.unwrap_or("UNKNOWN".to_string()),
+            decimals: entry.token_metadata.decimals.unwrap_or_default(),
             usd_price: entry.token_prices.first().map(|p| {
                 assert_eq!(p.currency, "usd");
                 p.value.parse().unwrap()
@@ -103,7 +104,7 @@ pub fn get_all_balances() {
             networks.register_token(
                 &balance.network,
                 token_address,
-                &balance.symbol,
+                balance.symbol.as_deref(),
                 &balance.name,
                 balance.decimals,
             );
@@ -144,7 +145,7 @@ pub fn get_all_balances() {
                 token_address: None,
                 network: network.name.clone(),
                 value: balance,
-                symbol: network.symbol.clone().unwrap_or("ETH".to_string()),
+                symbol: Some(network.symbol.clone().unwrap_or("ETH".to_string())),
                 name: network.name.clone(),
                 decimals: 18,
                 usd_price,

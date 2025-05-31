@@ -134,7 +134,10 @@ impl Component for SendMessagePage {
                 && event.is_space_or_enter_pressed()
             {
                 self.address_book_popup
-                    .open(Some(AddressBookMenuItem::get_menu(false)));
+                    .open(Some(AddressBookMenuItem::get_menu(
+                        false,
+                        shared_state.recent_addresses.clone(),
+                    )));
             } else if self.form.is_focused(FormItem::Network) && event.is_space_or_enter_pressed() {
                 self.networks_popup
                     .open(Some(NetworkStore::load_networks(shared_state.testnet_mode)));

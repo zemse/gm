@@ -29,6 +29,7 @@ pub enum AddressBookMenuItem {
     Create,
     View(AddressBookEntry),
     UnnamedOwned(Address),
+    RecentlyInteracted(Address),
 }
 
 impl Display for AddressBookMenuItem {
@@ -39,12 +40,18 @@ impl Display for AddressBookMenuItem {
             AddressBookMenuItem::UnnamedOwned(address) => {
                 write!(f, "Un-named: {}", address)
             }
+            AddressBookMenuItem::RecentlyInteracted(address) => {
+                write!(f, "Recently interacted: {}", address)
+            }
         }
     }
 }
 
 impl AddressBookMenuItem {
-    pub fn get_menu(with_create: bool) -> Vec<AddressBookMenuItem> {
+    pub fn get_menu(
+        with_create: bool,
+        recently_interacted: Option<Vec<Address>>,
+    ) -> Vec<AddressBookMenuItem> {
         let mut entries = vec![];
 
         if with_create {
@@ -74,9 +81,33 @@ impl AddressBookMenuItem {
                 .collect::<Vec<AddressBookMenuItem>>(),
         );
 
+        if let Some(recently_interacted) = recently_interacted {
+            entries.extend(
+                recently_interacted
+                    .into_iter()
+                    .filter(|address| {
+                        !entries
+                            .iter()
+                            .any(|entry| Some(address) == entry.address().as_ref())
+                    })
+                    .map(AddressBookMenuItem::RecentlyInteracted)
+                    .collect::<Vec<AddressBookMenuItem>>(),
+            );
+        }
+
         entries
     }
 
+    pub fn address(&self) -> Option<Address> {
+        match self {
+            AddressBookMenuItem::Create => None,
+            AddressBookMenuItem::View(entry) => Some(entry.address),
+            AddressBookMenuItem::UnnamedOwned(address) => Some(*address),
+            AddressBookMenuItem::RecentlyInteracted(address) => Some(*address),
+        }
+    }
+
+    // TODO remove
     // Must only be used if you are sure that the list will not contain Create
     pub fn address_unwrap(&self) -> Address {
         match self {
@@ -85,6 +116,7 @@ impl AddressBookMenuItem {
             }
             AddressBookMenuItem::View(entry) => entry.address,
             AddressBookMenuItem::UnnamedOwned(address) => *address,
+            AddressBookMenuItem::RecentlyInteracted(address) => *address,
         }
     }
 }
@@ -99,7 +131,7 @@ pub struct AddressBookPage {
 impl Default for AddressBookPage {
     fn default() -> Self {
         Self {
-            full_list: AddressBookMenuItem::get_menu(true),
+            full_list: AddressBookMenuItem::get_menu(true, None),
             search_string: String::new(),
             cursor: Cursor::default(),
             focus: true,
@@ -169,6 +201,12 @@ impl Component for AddressBookPage {
                         AddressBookMenuItem::UnnamedOwned(address) => Page::AddressBookCreate(
                             AddressBookCreatePage::new(String::new(), address.to_string()),
                         ),
+                        AddressBookMenuItem::RecentlyInteracted(address) => {
+                            Page::AddressBookCreate(AddressBookCreatePage::new(
+                                String::new(),
+                                address.to_string(),
+                            ))
+                        }
                     }),
                     _ => {}
                 }

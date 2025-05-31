@@ -145,7 +145,10 @@ impl Component for AssetTransferPage {
                 && event.is_space_or_enter_pressed()
             {
                 self.address_book_popup
-                    .open(Some(AddressBookMenuItem::get_menu(false)));
+                    .open(Some(AddressBookMenuItem::get_menu(
+                        false,
+                        shared_state.recent_addresses.clone(),
+                    )));
                 result.esc_ignores = 1;
             } else if self.form.is_focused(FormItem::AssetType) && event.is_space_or_enter_pressed()
             {

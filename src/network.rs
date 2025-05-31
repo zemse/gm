@@ -188,7 +188,7 @@ impl NetworkStore {
         &mut self,
         network_name: &str,
         token_address: Address,
-        token_symbol: &str,
+        token_symbol: Option<&str>,
         token_name: &str,
         token_decimals: u8,
     ) {
@@ -212,7 +212,7 @@ impl NetworkStore {
         if result.is_none() {
             network.tokens.push(Token {
                 name: token_name.to_string(),
-                symbol: token_symbol.to_string(),
+                symbol: token_symbol.unwrap_or("UNKNOWN").to_string(),
                 decimals: token_decimals,
                 contract_address: token_address,
             });

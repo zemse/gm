@@ -45,6 +45,7 @@ pub enum Focus {
 pub struct SharedState {
     pub online: Option<bool>,
     pub assets: Option<Vec<Asset>>,
+    pub recent_addresses: Option<Vec<Address>>,
     pub testnet_mode: bool,
     pub current_account: Option<Address>,
     pub alchemy_api_key_available: bool,
@@ -67,6 +68,7 @@ pub struct App {
     pub input_thread: Option<std::thread::JoinHandle<()>>,
     pub eth_price_thread: Option<tokio::task::JoinHandle<()>>,
     pub assets_thread: Option<tokio::task::JoinHandle<()>>,
+    pub recent_addresses_thread: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl Default for App {
@@ -85,6 +87,7 @@ impl Default for App {
 
             shared_state: SharedState {
                 assets: None,
+                recent_addresses: None,
                 current_account: config.current_account,
                 alchemy_api_key_available: config.alchemy_api_key.is_some(),
                 online: None,
@@ -96,6 +99,7 @@ impl Default for App {
             input_thread: None,
             eth_price_thread: None,
             assets_thread: None,
+            recent_addresses_thread: None,
         }
     }
 }
@@ -122,7 +126,7 @@ impl App {
         }));
     }
 
-    fn start_assets_thread(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
+    fn start_other_threads(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
         if self.assets_thread.is_none() {
             let tr_assets = tr.clone();
             let shutdown_signal = sd.clone();
@@ -130,17 +134,34 @@ impl App {
                 events::assets::watch_assets(tr_assets, shutdown_signal).await
             }));
         }
+
+        if self.recent_addresses_thread.is_none() {
+            let tr_recent_addresses = tr.clone();
+            let shutdown_signal = sd.clone();
+            self.recent_addresses_thread = Some(tokio::spawn(async move {
+                events::recent_addresses::watch_recent_addresses(
+                    tr_recent_addresses,
+                    shutdown_signal,
+                )
+                .await
+            }));
+        }
     }
 
-    async fn stop_assets_thread(&mut self) {
+    async fn stop_other_threads(&mut self) {
         if let Some(thread) = self.assets_thread.take() {
+            thread.abort();
+            let _ = thread.await;
+        }
+
+        if let Some(thread) = self.recent_addresses_thread.take() {
             thread.abort();
             let _ = thread.await;
         }
     }
 
     fn set_online(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
-        self.start_assets_thread(tr, sd);
+        self.start_other_threads(tr, sd);
 
         self.shared_state.online = Some(true);
     }
@@ -148,7 +169,7 @@ impl App {
     async fn set_offline(&mut self) {
         self.shared_state.online = Some(false);
 
-        self.stop_assets_thread().await;
+        self.stop_other_threads().await;
     }
 
     pub async fn exit_threads(&mut self) {
@@ -328,6 +349,13 @@ impl App {
                 if !silence_error {
                     self.fatal_error_popup.set_text(error);
                 }
+            }
+
+            Event::RecentAddressesUpdate(addresses) => {
+                self.shared_state.recent_addresses = Some(addresses);
+            }
+            Event::RecentAddressesUpdateError(error) => {
+                self.fatal_error_popup.set_text(error);
             }
 
             // Candles API
