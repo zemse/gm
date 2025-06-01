@@ -85,5 +85,5 @@ where
     serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(
         &response.text().await?,
     ))
-    .map_err(crate::Error::SerdePathToError)
+    .map_err(|e| crate::Error::SerdePathToError(Box::new(e)))
 }

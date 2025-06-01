@@ -24,17 +24,17 @@ pub enum Error {
     TomlDeError(toml::de::Error),
     TomlSerError(toml::ser::Error),
     YamlError(serde_yaml::Error),
-    ReqwestError(reqwest::Error),
-    SerdeJson(serde_json::Error),
-    SerdePathToError(serde_path_to_error::Error<serde_json::Error>),
-    SerdeJsonWithValue(serde_json::Error, Value),
-    SerdeJsonWithString(serde_json::Error, String),
+    ReqwestError(Box<reqwest::Error>),
+    SerdeJson(Box<serde_json::Error>),
+    SerdePathToError(Box<serde_path_to_error::Error<serde_json::Error>>),
+    SerdeJsonWithValue(Box<serde_json::Error>, Box<Value>),
+    SerdeJsonWithString(Box<serde_json::Error>, String),
     MpscRecvError(std::sync::mpsc::RecvError),
     MpscSendError(std::sync::mpsc::SendError<crate::tui::Event>),
     MnemonicError(coins_bip39::MnemonicError),
     AlloyLocalSignerError(alloy::signers::local::LocalSignerError),
     FromUtf8Error(std::string::FromUtf8Error),
-    RpcError(alloy::transports::RpcError<alloy::transports::TransportErrorKind>),
+    RpcError(Box<alloy::transports::RpcError<alloy::transports::TransportErrorKind>>),
     UnitsError(alloy::primitives::utils::UnitsError),
     AlloySignerError(alloy::signers::Error),
     AlloyPendingTransactionError(alloy::providers::PendingTransactionError),
@@ -144,13 +144,13 @@ impl From<serde_yaml::Error> for Error {
 
 impl From<reqwest::Error> for Error {
     fn from(e: reqwest::Error) -> Self {
-        Error::ReqwestError(e)
+        Error::ReqwestError(Box::new(e))
     }
 }
 
 impl From<serde_json::Error> for Error {
     fn from(e: serde_json::Error) -> Self {
-        Error::SerdeJson(e)
+        Error::SerdeJson(Box::new(e))
     }
 }
 
@@ -186,7 +186,7 @@ impl From<std::string::FromUtf8Error> for Error {
 
 impl From<alloy::transports::RpcError<alloy::transports::TransportErrorKind>> for Error {
     fn from(e: alloy::transports::RpcError<alloy::transports::TransportErrorKind>) -> Self {
-        Error::RpcError(e)
+        Error::RpcError(Box::new(e))
     }
 }
 

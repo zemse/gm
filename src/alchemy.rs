@@ -215,7 +215,9 @@ impl Alchemy {
             .expect("'tokens' not present in response");
 
         let parsed: Vec<TokenBalancesByWalletEntry> = serde_json::from_value(response.clone())
-            .map_err(|e| crate::Error::SerdeJsonWithValue(e, response.clone()))?;
+            .map_err(|e| {
+                crate::Error::SerdeJsonWithValue(Box::new(e), Box::new(response.clone()))
+            })?;
         Ok(parsed)
     }
 }
