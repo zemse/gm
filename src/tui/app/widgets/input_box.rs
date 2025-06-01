@@ -144,10 +144,8 @@ impl InputBox<'_> {
         let inner_area = block.inner(area_used);
         block.render(area_used, buf);
 
-        if lines.len() == 1
-            && !lines.last().unwrap().is_empty()
-            && let Some(currency) = self.currency
-        {
+        if lines.len() == 1 && !lines.last().unwrap().is_empty() && self.currency.is_some() {
+            let currency = self.currency.unwrap();
             Span::from(currency).render(
                 inner_area.offset(Offset {
                     x: lines.last().unwrap().len() as i32 + 1,

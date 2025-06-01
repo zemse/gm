@@ -232,8 +232,9 @@ impl App {
 
         // supply events to pages
         let mut esc_ignores = if (!event.is_input() || !self.fatal_error_popup.is_shown())
-            && let Some(page) = self.context.last_mut()
+            && self.context.last().is_some()
         {
+            let page = self.context.last_mut().unwrap();
             let result = page.handle_event(&event, body_area, tr, sd, &self.shared_state);
             self.process_result(result).await?
         } else {
@@ -373,9 +374,8 @@ impl Widget for &App {
 
         if let Some(page) = self.current_page() {
             // Render Body
-            if page.is_main_menu()
-                && let Some(main_menu_item) = page.main_menu_focused_item()
-            {
+            if page.is_main_menu() && page.main_menu_focused_item().is_some() {
+                let main_menu_item = page.main_menu_focused_item().unwrap();
                 let [left_area, right_area] =
                     Layout::horizontal([Constraint::Length(15), Constraint::Min(2)])
                         .areas(body_area);

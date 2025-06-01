@@ -57,9 +57,8 @@ impl<Item: Display> FilterSelectPopup<Item> {
     {
         let mut result = HandleResult::default();
 
-        if self.open
-            && let Some(items) = &self.items
-        {
+        if self.open && self.items.is_some() {
+            let items = self.items.as_ref().unwrap();
             let cursor_max = items.len();
             self.cursor.handle(event, cursor_max);
 

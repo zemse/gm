@@ -1,4 +1,3 @@
-#![feature(let_chains)]
 #[macro_use]
 pub mod actions;
 pub mod alchemy;
