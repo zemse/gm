@@ -10,11 +10,9 @@ use std::{
 
 use alloy::primitives::Address;
 
-use crate::{
-    blockscout::{BlockScout, BlockScoutNetwork},
-    disk::Config,
-    error::FmtError,
-};
+use crate::{disk::Config, error::FmtError};
+
+use data3::{blockscout::BlockScout, network::Network};
 
 use super::Event;
 
@@ -55,11 +53,9 @@ async fn get_recent_addresses() -> crate::Result<Option<Vec<Address>>> {
     };
 
     // TODO support all networks
-    let result = BlockScout {
-        network: BlockScoutNetwork::Arbitrum,
-    }
-    .address_transactions(current_address)
-    .await?;
+    let result = BlockScout::from_network(Network::ArbitrumMainnet)
+        .address_transactions(current_address)
+        .await?;
 
     Ok(Some(
         result

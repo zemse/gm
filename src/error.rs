@@ -40,6 +40,7 @@ pub enum Error {
     AlloyPendingTransactionError(alloy::providers::PendingTransactionError),
     Abort(&'static str),
     UrlParseError(url::ParseError),
+    Data3Error(data3::error::Error),
 }
 
 impl Error {
@@ -210,6 +211,12 @@ impl From<alloy::providers::PendingTransactionError> for Error {
 impl From<url::ParseError> for Error {
     fn from(e: url::ParseError) -> Self {
         Error::UrlParseError(e)
+    }
+}
+
+impl From<data3::error::Error> for Error {
+    fn from(e: data3::error::Error) -> Self {
+        Error::Data3Error(e)
     }
 }
 
