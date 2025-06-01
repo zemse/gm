@@ -250,7 +250,7 @@ mod macos {
             )
             .unwrap();
 
-        println!("Wallet created with address: {}", address);
+        println!("Wallet created with address: {address}");
         println!("The private key is stored securely in your keychain.");
 
         address

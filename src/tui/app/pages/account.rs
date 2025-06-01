@@ -33,7 +33,7 @@ impl Display for AccountSelect {
         match self {
             AccountSelect::Create => write!(f, "Create new wallet"),
             AccountSelect::Import => write!(f, "Import existing wallet"),
-            AccountSelect::Existing(address) => write!(f, "{}", address),
+            AccountSelect::Existing(address) => write!(f, "{address}"),
         }
     }
 }

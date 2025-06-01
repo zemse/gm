@@ -253,7 +253,7 @@ impl Widget for &CandleChart {
                         (chart_width as usize - ((idx + 1) * self.zoom as usize)) as isize
                             - (rendered.len() / 2) as isize
                             - 1,
-                        format!(" {} ", rendered),
+                        format!(" {rendered} "),
                         false,
                     );
 
@@ -393,7 +393,7 @@ impl Display for Interval {
             Interval::OneWeek => "1w",
             Interval::OneMonth => "1M",
         };
-        write!(f, "{}", interval)
+        write!(f, "{interval}")
     }
 }
 impl Interval {
@@ -522,7 +522,7 @@ fn overwrite_chars(chars: &mut Vec<char>, idx: isize, value: String, overlap: bo
 fn numeric_format(value: f64) -> String {
     let precision = 9;
     let scale = 3;
-    format!("{0:>precision$.scale$}", value)
+    format!("{value:>precision$.scale$}")
 }
 #[derive(Clone, Debug, Default)]
 pub struct Candle {

@@ -38,10 +38,10 @@ impl Display for AddressBookMenuItem {
             AddressBookMenuItem::Create => write!(f, "Create new address book entry"),
             AddressBookMenuItem::View(entry) => write!(f, "{} - {}", entry.name, entry.address),
             AddressBookMenuItem::UnnamedOwned(address) => {
-                write!(f, "Self: {}", address)
+                write!(f, "Self: {address}")
             }
             AddressBookMenuItem::RecentlyInteracted(address) => {
-                write!(f, "Recent: {}", address)
+                write!(f, "Recent: {address}")
             }
         }
     }

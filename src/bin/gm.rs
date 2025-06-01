@@ -62,7 +62,7 @@ fn gm_art() {
 
     // Print the result
     match figure {
-        Some(art) => println!("{}", art),
+        Some(art) => println!("{art}"),
         None => println!("Failed to generate ASCII text."),
     }
 }

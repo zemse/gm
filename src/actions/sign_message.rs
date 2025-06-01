@@ -11,8 +11,8 @@ pub fn sign_message(msg: String) {
         .sign_message_sync(msg.as_bytes())
         .expect("signing failed");
 
-    println!("\nMessage: {:?}", msg);
-    println!("Account: {:?}", current_account);
+    println!("\nMessage: {msg:?}");
+    println!("Account: {current_account:?}");
     println!(
         "Signature: {}\n",
         hex::encode_prefixed(signature.as_bytes())

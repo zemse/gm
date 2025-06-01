@@ -266,7 +266,7 @@ impl Handle<AddressBookViewCarryOn> for AddressBookViewActions {
                 let qr_display = qr.render::<unicode::Dense1x2>().quiet_zone(false).build();
 
                 println!("\n{}'s Address:\n{}\n", entry.name, entry.address);
-                println!("QR Code:\n{}\n", qr_display);
+                println!("QR Code:\n{qr_display}\n");
             }
         }
     }

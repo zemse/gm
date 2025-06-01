@@ -41,8 +41,8 @@ pub async fn watch_eth_price_change(transmitter: Sender<Event>, shutdown_signal:
 
 fn format_decimal_string(input: String) -> String {
     match input.parse::<f64>() {
-        Ok(f) => format!("{:.2}", f), // 2 decimal places
-        Err(_) => input.to_string(),  // fallback: return as-is
+        Ok(f) => format!("{f:.2}"),  // 2 decimal places
+        Err(_) => input.to_string(), // fallback: return as-is
     }
 }
 

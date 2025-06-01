@@ -60,12 +60,11 @@ impl Component for AccountImportPage {
 
                     match import_result {
                         Ok(address) => {
-                            self.display =
-                                Some(format!("Successfully imported wallet: {}", address));
+                            self.display = Some(format!("Successfully imported wallet: {address}"));
                             self.success = true;
                         }
                         Err(err) => {
-                            self.display = Some(format!("Error importing wallet: {}", err));
+                            self.display = Some(format!("Error importing wallet: {err}"));
                         }
                     }
                 }

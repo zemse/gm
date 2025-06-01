@@ -81,7 +81,7 @@ impl Component for SignMessagePage {
                     .ok_or(crate::Error::CurrentAccountNotSet)?;
                 let wallet = load_wallet(wallet_address)?;
                 let signature = wallet.sign_message_sync(message.as_bytes())?;
-                *form.get_text_mut(FormItem::Signature) = format!("Signature:\n{}", signature);
+                *form.get_text_mut(FormItem::Signature) = format!("Signature:\n{signature}");
             }
             Ok(())
         })?;

@@ -19,7 +19,7 @@ pub async fn send_message(to: String, msg: String, network: Option<Network>) {
 
     // Validate recipient address
     if !to.starts_with("0x") || to.len() != 42 {
-        eprintln!("❌ Error: Invalid Ethereum address format: {}", to);
+        eprintln!("❌ Error: Invalid Ethereum address format: {to}");
         std::process::exit(1);
     }
     let to_address: Address = to

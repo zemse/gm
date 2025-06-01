@@ -329,13 +329,13 @@ impl Component for TransactionPage {
                 "Signing and sending transaction...".render(area, buf);
             }
             TxStatus::Pending(tx_hash) => {
-                format!("Transaction pending... Hash: {}", tx_hash).render(area, buf);
+                format!("Transaction pending... Hash: {tx_hash}").render(area, buf);
             }
             TxStatus::Confirmed(tx_hash) => {
-                format!("Transaction confirmed! Hash: {}", tx_hash).render(area, buf);
+                format!("Transaction confirmed! Hash: {tx_hash}").render(area, buf);
             }
             TxStatus::Failed(tx_hash) => {
-                format!("Transaction failed! Hash: {}", tx_hash).render(area, buf);
+                format!("Transaction failed! Hash: {tx_hash}").render(area, buf);
             }
         }
 
