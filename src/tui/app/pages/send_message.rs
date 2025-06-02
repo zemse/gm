@@ -1,9 +1,10 @@
 use crate::disk::DiskInterface;
-use crate::network::{Network, NetworkStore};
+use crate::network::NetworkStore;
 
-use crate::tui::app::widgets::filter_select_popup::FilterSelectPopup;
+use crate::tui::app::widgets::address_book_popup::AddressBookPopup;
 use crate::tui::app::widgets::form::FormItemIndex;
 
+use crate::tui::app::widgets::networks_popup::NetworksPopup;
 use crate::tui::app::SharedState;
 use crate::tui::{
     app::widgets::form::{Form, FormWidget}, // <- Using your custom form system
@@ -68,16 +69,16 @@ impl From<FormItem> for FormWidget {
 
 pub struct SendMessagePage {
     pub form: Form<FormItem>,
-    pub address_book_popup: FilterSelectPopup<AddressBookMenuItem>,
-    pub networks_popup: FilterSelectPopup<Network>,
+    pub address_book_popup: AddressBookPopup,
+    pub networks_popup: NetworksPopup,
 }
 
 impl Default for SendMessagePage {
     fn default() -> Self {
         Self {
             form: Form::init(|_| {}),
-            address_book_popup: FilterSelectPopup::new("Address Book"),
-            networks_popup: FilterSelectPopup::new("Networks"),
+            address_book_popup: AddressBookPopup::default(),
+            networks_popup: NetworksPopup::default(),
         }
     }
 }

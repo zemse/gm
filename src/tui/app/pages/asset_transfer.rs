@@ -1,6 +1,7 @@
 use crate::tui::app::pages::transaction::TransactionPage;
 use crate::tui::app::pages::Page;
-use crate::tui::app::widgets::filter_select_popup::FilterSelectPopup;
+use crate::tui::app::widgets::address_book_popup::AddressBookPopup;
+use crate::tui::app::widgets::assets_popup::AssetsPopup;
 use crate::tui::app::widgets::form::FormItemIndex;
 use crate::tui::app::SharedState;
 use crate::tui::{
@@ -65,8 +66,8 @@ impl From<FormItem> for FormWidget {
 pub struct AssetTransferPage {
     pub form: Form<FormItem>,
     pub asset: Option<Asset>, // TODO see if we can avoid this here
-    pub address_book_popup: FilterSelectPopup<AddressBookMenuItem>,
-    pub asset_popup: FilterSelectPopup<Asset>,
+    pub address_book_popup: AddressBookPopup,
+    pub asset_popup: AssetsPopup,
 }
 
 impl Default for AssetTransferPage {
@@ -74,8 +75,8 @@ impl Default for AssetTransferPage {
         Self {
             form: Form::init(|_| {}),
             asset: None,
-            address_book_popup: FilterSelectPopup::new("Select destination address"),
-            asset_popup: FilterSelectPopup::new("Choose asset to transfer"),
+            address_book_popup: AddressBookPopup::default(),
+            asset_popup: AssetsPopup::default(),
         }
     }
 }

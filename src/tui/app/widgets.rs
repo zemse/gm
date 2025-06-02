@@ -1,3 +1,5 @@
+pub mod address_book_popup;
+pub mod assets_popup;
 pub mod button;
 pub mod candle_chart;
 pub mod filter_select;
@@ -5,6 +7,7 @@ pub mod filter_select_popup;
 pub mod footer;
 pub mod form;
 pub mod input_box;
+pub mod networks_popup;
 pub mod popup;
 pub mod scroll_bar;
 pub mod select;

@@ -15,6 +15,7 @@ use super::{filter_select::FilterSelect, popup::Popup};
 
 pub struct FilterSelectPopup<Item: Display> {
     title: &'static str,
+    empty_text: Option<&'static str>,
     open: bool,
     items: Option<Vec<Item>>,
     cursor: Cursor,
@@ -22,9 +23,10 @@ pub struct FilterSelectPopup<Item: Display> {
 }
 
 impl<Item: Display> FilterSelectPopup<Item> {
-    pub fn new(title: &'static str) -> Self {
+    pub fn new(title: &'static str, empty_text: Option<&'static str>) -> Self {
         Self {
             title,
+            empty_text,
             open: false,
             items: None,
             cursor: Cursor::default(),
@@ -105,14 +107,22 @@ impl<Item: Display> Widget for &FilterSelectPopup<Item> {
             block.render(inner_area, buf);
 
             if let Some(items) = &self.items {
-                FilterSelect {
-                    full_list: items,
-                    cursor: &self.cursor,
-                    search_string: &self.search_string,
-                    focus: true,
-                    focus_style: Some(Style::default().remove_modifier(Modifier::REVERSED)),
+                if items.is_empty() {
+                    if let Some(empty_text) = self.empty_text {
+                        empty_text.render(block_inner_area, buf);
+                    } else {
+                        "The list is empty.".render(block_inner_area, buf);
+                    }
+                } else {
+                    FilterSelect {
+                        full_list: items,
+                        cursor: &self.cursor,
+                        search_string: &self.search_string,
+                        focus: true,
+                        focus_style: Some(Style::default().remove_modifier(Modifier::REVERSED)),
+                    }
+                    .render(block_inner_area, buf);
                 }
-                .render(block_inner_area, buf);
             } else {
                 "Loading...".render(block_inner_area, buf);
             }
