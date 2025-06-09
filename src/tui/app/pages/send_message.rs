@@ -39,9 +39,10 @@ impl FormItemIndex for FormItem {
         self as usize
     }
 }
-impl From<FormItem> for FormWidget {
-    fn from(value: FormItem) -> Self {
-        match value {
+impl TryFrom<FormItem> for FormWidget {
+    type Error = crate::Error;
+    fn try_from(value: FormItem) -> crate::Result<Self> {
+        let widget = match value {
             FormItem::Heading => FormWidget::Heading("Send a Message"),
             FormItem::To => FormWidget::InputBox {
                 label: "To",
@@ -63,7 +64,8 @@ impl From<FormItem> for FormWidget {
             FormItem::SendMessageButton => FormWidget::Button {
                 label: "Send Message",
             },
-        }
+        };
+        Ok(widget)
     }
 }
 
@@ -73,13 +75,13 @@ pub struct SendMessagePage {
     pub networks_popup: NetworksPopup,
 }
 
-impl Default for SendMessagePage {
-    fn default() -> Self {
-        Self {
-            form: Form::init(|_| {}),
+impl SendMessagePage {
+    pub fn new() -> crate::Result<Self> {
+        Ok(Self {
+            form: Form::init(|_| Ok(()))?,
             address_book_popup: AddressBookPopup::default(),
             networks_popup: NetworksPopup::default(),
-        }
+        })
     }
 }
 
@@ -102,7 +104,7 @@ impl Component for SendMessagePage {
         match event {
             Event::ConfigUpdate => {
                 let network_name = self.form.get_text(FormItem::Network);
-                let network_store = NetworkStore::load();
+                let network_store = NetworkStore::load()?;
                 let network = network_store
                     .get_by_name(network_name)
                     .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))?;
@@ -136,10 +138,11 @@ impl Component for SendMessagePage {
                     .open(Some(AddressBookMenuItem::get_menu(
                         false,
                         shared_state.recent_addresses.clone(),
-                    )));
+                    )?));
             } else if self.form.is_focused(FormItem::Network) && event.is_space_or_enter_pressed() {
-                self.networks_popup
-                    .open(Some(NetworkStore::load_networks(shared_state.testnet_mode)));
+                self.networks_popup.open(Some(NetworkStore::load_networks(
+                    shared_state.testnet_mode,
+                )?));
             } else {
                 self.form.handle_event(event, |label, form| {
                     if label == FormItem::SendMessageButton {

@@ -66,9 +66,10 @@ impl Component for AccountPage {
         self.focus = focus;
     }
 
-    fn reload(&mut self) {
+    fn reload(&mut self, _ss: &SharedState) -> crate::Result<()> {
         let fresh = Self::default();
         self.list = fresh.list;
+        Ok(())
     }
 
     fn handle_event(
@@ -99,9 +100,9 @@ impl Component for AccountPage {
                                 .push(Page::AccountImport(AccountImportPage::default()));
                         }
                         AccountSelect::Existing(address) => {
-                            let mut config = Config::load();
+                            let mut config = Config::load()?;
                             config.current_account = Some(*address);
-                            config.save();
+                            config.save()?;
                             transmitter.send(Event::AccountChange(*address))?;
                             transmitter.send(Event::ConfigUpdate)?;
                             result.page_pops = 1;

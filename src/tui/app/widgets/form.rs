@@ -73,7 +73,7 @@ impl FormWidget {
     }
 }
 
-pub struct Form<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> {
+pub struct Form<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>> {
     pub cursor: usize,
     pub text_cursor: usize,
     pub form_focus: bool,
@@ -83,18 +83,20 @@ pub struct Form<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> {
     pub _phantom: PhantomData<E>,
 }
 
-impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
+impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>> Form<E> {
     // TODO remove the cursor parameter, and guess it as the first item that is
     // not heading or static text or similar
-    pub fn init<F>(set_values_closure: F) -> Self
+    pub fn init<F>(set_values_closure: F) -> crate::Result<Self>
     where
-        F: FnOnce(&mut Self),
+        F: FnOnce(&mut Self) -> crate::Result<()>,
     {
         let mut form = Self {
             cursor: 0,
             text_cursor: 0,
             form_focus: true,
-            items: E::iter().map(|item| item.into()).collect(),
+            items: E::iter()
+                .map(|item| item.try_into())
+                .collect::<Result<Vec<FormWidget>, _>>()?,
             hide: HashMap::new(),
             everything_empty: false,
             _phantom: PhantomData,
@@ -106,10 +108,10 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
                 form.cursor += 1;
             }
         }
-        set_values_closure(&mut form);
+        set_values_closure(&mut form)?;
         form.text_cursor = form.items[form.cursor].max_cursor();
 
-        form
+        Ok(form)
     }
 
     pub fn set_form_focus(&mut self, focus: bool) {
@@ -297,7 +299,9 @@ impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Form<E> {
     }
 }
 
-impl<E: IntoEnumIterator + FormItemIndex + Into<FormWidget>> Widget for &Form<E> {
+impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>> Widget
+    for &Form<E>
+{
     fn render(self, mut area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,

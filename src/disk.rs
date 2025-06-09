@@ -19,48 +19,59 @@ where
     const FORMAT: FileFormat;
 
     /// Get the path to the file
-    fn path() -> PathBuf {
-        let dirs = BaseDirs::new().expect("Failed to get base directories");
-        dirs.home_dir()
+    fn path() -> crate::Result<PathBuf> {
+        let dirs =
+            BaseDirs::new().ok_or(Error::InternalErrorStr("Failed to get base directories"))?;
+        let path = dirs
+            .home_dir()
             .join(".gm")
             .join(Self::FILE_NAME)
             .with_extension(match Self::FORMAT {
                 FileFormat::TOML => "toml".to_string(),
                 FileFormat::YAML => "yaml".to_string(),
-            })
+            });
+        Ok(path)
     }
 
     /// Load the content from the file
-    fn load() -> Self {
-        let path = Self::path();
+    fn load() -> crate::Result<Self> {
+        let path = Self::path()?;
 
         if path.exists() {
-            let content = fs::read_to_string(&path).unwrap_or_else(|_| "{}".to_string());
+            let content = fs::read_to_string(&path)?;
             match Self::FORMAT {
                 FileFormat::TOML => toml::from_str(&content).map_err(Error::from),
                 FileFormat::YAML => serde_yaml::from_str(&content).map_err(Error::from),
             }
-            .unwrap_or_else(|err| panic!("Err({err:?}) while deserializing content at {path:?}"))
+            .map_err(|err| {
+                Error::DiskError(format!(
+                    "Err({err:?}) while deserializing content at {path:?}"
+                ))
+            })
         } else {
-            Self::default()
+            Ok(Self::default())
         }
     }
 
     /// Save settings to a file
-    fn save(&self) {
-        let path = Self::path();
+    fn save(&self) -> crate::Result<()> {
+        let path = Self::path()?;
 
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).ok(); // Ensure config directory exists
+            fs::create_dir_all(parent)?; // Ensure config directory exists
         }
 
         let content = match Self::FORMAT {
             FileFormat::TOML => toml::to_string_pretty(self).map_err(Error::from),
             FileFormat::YAML => serde_yaml::to_string(self).map_err(Error::from),
         }
-        .unwrap_or_else(|err| panic!("Err({err:?}) while serializing {path:?}: {self:?}"));
+        .map_err(|err| {
+            Error::DiskError(format!("Err({err:?}) while serializing {path:?}: {self:?}"))
+        })?;
 
-        fs::write(path, content).expect("Failed to write file");
+        fs::write(path, content)?;
+
+        Ok(())
     }
 }
 
@@ -84,26 +95,24 @@ pub struct AddressBookEntry {
 impl AddressBook {
     pub fn add(&mut self, entry: AddressBookEntry) -> Result<(), Error> {
         if self.find_by_name(&entry.name).is_some() {
-            return Err(Error::AddressBook(
-                "Name already exists in the addressbook".into(),
-            ));
+            return Err(Error::AddressBook("Name already exists in the addressbook"));
         }
 
         if self.find_by_address(&entry.address).is_some() {
             return Err(Error::AddressBook(
-                "Address already exists in the addressbook".into(),
+                "Address already exists in the addressbook",
             ));
         }
 
         self.entries.push(entry);
-        self.save();
+        self.save()?;
 
         Ok(())
     }
 
-    pub fn remove(&mut self, index: usize) {
+    pub fn remove(&mut self, index: usize) -> crate::Result<()> {
         self.entries.remove(index);
-        self.save();
+        self.save()
     }
 
     pub fn find_by_address(&self, address: &Address) -> Option<(usize, AddressBookEntry)> {
@@ -131,23 +140,23 @@ impl AddressBook {
         id: &Option<usize>,
         address: &Option<Address>,
         name: &Option<&String>,
-    ) -> Option<(usize, AddressBookEntry)> {
+    ) -> crate::Result<Option<(usize, AddressBookEntry)>> {
         if let Some(address) = address {
-            self.find_by_address(address)
+            Ok(self.find_by_address(address))
         } else if let Some(name) = name {
-            self.find_by_name(name)
+            Ok(self.find_by_name(name))
         } else if let Some(id) = id {
             let index = *id - 1;
-            let entry = AddressBook::load().list()[index].clone();
-            Some((*id, entry))
+            let entry = AddressBook::load()?.list()[index].clone();
+            Ok(Some((*id, entry)))
         } else {
-            None
+            Ok(None)
         }
     }
 
-    pub fn update(&mut self, id: usize, new_entry: AddressBookEntry) {
+    pub fn update(&mut self, id: usize, new_entry: AddressBookEntry) -> crate::Result<()> {
         self.entries[id - 1] = new_entry;
-        self.save();
+        self.save()
     }
 
     pub fn list(&self) -> &Vec<AddressBookEntry> {
@@ -158,8 +167,8 @@ impl AddressBook {
         self.entries
     }
 
-    pub fn load_list() -> Vec<AddressBookEntry> {
-        AddressBook::load().list_owned()
+    pub fn load_list() -> crate::Result<Vec<AddressBookEntry>> {
+        Ok(AddressBook::load()?.list_owned())
     }
 }
 
@@ -167,6 +176,8 @@ impl AddressBook {
 pub struct Config {
     pub current_account: Option<Address>,
     pub testnet_mode: bool,
+    #[serde(default)]
+    pub developer_mode: bool,
     pub alchemy_api_key: Option<String>,
 }
 
@@ -176,26 +187,28 @@ impl DiskInterface for Config {
 }
 
 impl Config {
-    pub fn current_account() -> Option<Address> {
-        Config::load().current_account
+    pub fn current_account() -> crate::Result<Option<Address>> {
+        Ok(Config::load()?.current_account)
     }
 
-    pub fn set_current_account(address: Address) {
-        let mut config = Config::load();
+    pub fn set_current_account(address: Address) -> crate::Result<()> {
+        let mut config = Config::load()?;
         config.current_account = Some(address);
-        config.save();
+        config.save()?;
+        Ok(())
     }
 
     pub fn alchemy_api_key() -> crate::Result<String> {
-        Config::load()
+        Config::load()?
             .alchemy_api_key
             .ok_or(crate::Error::AlchemyApiKeyNotSet)
     }
 
-    pub fn set_alchemy_api_key(alchemy_api_key: String) {
-        let mut config = Config::load();
+    pub fn set_alchemy_api_key(alchemy_api_key: String) -> crate::Result<()> {
+        let mut config = Config::load()?;
         config.alchemy_api_key = Some(alchemy_api_key);
-        config.save();
+        config.save()?;
+        Ok(())
     }
 }
 

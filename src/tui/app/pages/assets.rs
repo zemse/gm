@@ -48,7 +48,7 @@ impl Component for AssetsPage {
                     #[allow(clippy::field_reassign_with_default)]
                     if let Some(assets) = shared_state.assets.as_ref() {
                         handle_result.page_inserts.push(Page::AssetTransfer(
-                            AssetTransferPage::new(&assets[self.cursor.current]),
+                            AssetTransferPage::new(&assets[self.cursor.current])?,
                         ));
                     }
                 }

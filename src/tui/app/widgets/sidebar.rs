@@ -45,9 +45,9 @@ impl Component for Sidebar {
                     KeyCode::Enter => match self.cursor.current {
                         0 => result.page_inserts.push(Page::Trade(TradePage::default())),
                         1 => {
-                            let mut config = Config::load();
+                            let mut config = Config::load()?;
                             config.testnet_mode = !shared_state.testnet_mode;
-                            config.save();
+                            config.save()?;
                             transmitter.send(Event::ConfigUpdate)?;
 
                             result.reload = true;

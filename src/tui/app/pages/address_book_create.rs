@@ -26,9 +26,10 @@ impl FormItemIndex for FormItem {
         self as usize
     }
 }
-impl From<FormItem> for FormWidget {
-    fn from(value: FormItem) -> Self {
-        match value {
+impl TryFrom<FormItem> for FormWidget {
+    type Error = crate::Error;
+    fn try_from(value: FormItem) -> crate::Result<Self> {
+        let widget = match value {
             FormItem::Heading => FormWidget::Heading("Edit AddressBook entry"),
             FormItem::Name => FormWidget::InputBox {
                 label: "name",
@@ -44,7 +45,8 @@ impl From<FormItem> for FormWidget {
             },
             FormItem::SaveButton => FormWidget::Button { label: "Save" },
             FormItem::ErrorText => FormWidget::ErrorText(String::new()),
-        }
+        };
+        Ok(widget)
     }
 }
 
@@ -53,13 +55,14 @@ pub struct AddressBookCreatePage {
 }
 
 impl AddressBookCreatePage {
-    pub fn new(name: String, address: String) -> Self {
-        Self {
+    pub fn new(name: String, address: String) -> crate::Result<Self> {
+        Ok(Self {
             form: Form::init(|form| {
                 *form.get_text_mut(FormItem::Name) = name;
                 *form.get_text_mut(FormItem::Address) = address;
-            }),
-        }
+                Ok(())
+            })?,
+        })
     }
 }
 
@@ -81,7 +84,7 @@ impl Component for AddressBookCreatePage {
                     let error = form.get_text_mut(FormItem::ErrorText);
                     *error = "Please enter name, you cannot leave it empty".to_string();
                 } else {
-                    let mut address_book = AddressBook::load();
+                    let mut address_book = AddressBook::load()?;
 
                     let address = form.get_text(FormItem::Address);
 

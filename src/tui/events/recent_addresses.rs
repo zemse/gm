@@ -48,7 +48,7 @@ pub async fn watch_recent_addresses(transmitter: Sender<Event>, shutdown_signal:
 }
 
 async fn get_recent_addresses() -> crate::Result<Option<Vec<Address>>> {
-    let Some(current_address) = Config::current_account() else {
+    let Some(current_address) = Config::current_account()? else {
         return Ok(None);
     };
 

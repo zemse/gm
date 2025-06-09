@@ -98,12 +98,12 @@ impl Display for Asset {
 }
 
 pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
-    let config = Config::load();
+    let config = Config::load()?;
     let wallet_address = config
         .current_account
         .ok_or(crate::Error::CurrentAccountNotSet)?;
 
-    let mut networks = NetworkStore::load();
+    let mut networks = NetworkStore::load()?;
 
     let mut balances: Vec<Asset> = Alchemy::get_tokens_by_wallet(
         wallet_address,
@@ -151,7 +151,7 @@ pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
             );
         }
     }
-    networks.save();
+    networks.save()?;
 
     for network in networks.get_iter(config.testnet_mode) {
         let provider = network.get_provider()?;

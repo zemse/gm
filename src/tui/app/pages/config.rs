@@ -20,6 +20,7 @@ pub enum FormItem {
     Heading,
     AlchemyApiKey,
     TestnetMode,
+    DeveloperMode,
     SaveButton,
     DisplayText,
 }
@@ -28,9 +29,10 @@ impl FormItemIndex for FormItem {
         self as usize
     }
 }
-impl From<FormItem> for FormWidget {
-    fn from(value: FormItem) -> Self {
-        match value {
+impl TryFrom<FormItem> for FormWidget {
+    type Error = crate::Error;
+    fn try_from(value: FormItem) -> crate::Result<Self> {
+        let widget = match value {
             FormItem::Heading => FormWidget::Heading("Configuration"),
             FormItem::AlchemyApiKey => FormWidget::InputBox {
                 label: "Alchemy API key",
@@ -42,9 +44,14 @@ impl From<FormItem> for FormWidget {
                 label: "Testnet Mode",
                 value: false,
             },
+            FormItem::DeveloperMode => FormWidget::BooleanInput {
+                label: "Developer Mode",
+                value: false,
+            },
             FormItem::SaveButton => FormWidget::Button { label: "Save" },
             FormItem::DisplayText => FormWidget::DisplayText(String::new()),
-        }
+        };
+        Ok(widget)
     }
 }
 
@@ -52,16 +59,17 @@ pub struct ConfigPage {
     pub form: Form<FormItem>,
 }
 
-impl Default for ConfigPage {
-    fn default() -> Self {
+impl ConfigPage {
+    pub fn new() -> crate::Result<Self> {
         let form = Form::init(|form| {
-            let config = Config::load();
+            let config = Config::load()?;
             *form.get_text_mut(FormItem::AlchemyApiKey) =
                 config.alchemy_api_key.clone().unwrap_or_default();
             *form.get_boolean_mut(FormItem::TestnetMode) = config.testnet_mode;
-        });
+            Ok(())
+        })?;
 
-        Self { form }
+        Ok(Self { form })
     }
 }
 
@@ -74,7 +82,7 @@ impl Component for ConfigPage {
         &mut self,
         event: &Event,
         _area: Rect,
-        transmitter: &mpsc::Sender<Event>,
+        _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
@@ -86,11 +94,11 @@ impl Component for ConfigPage {
         self.form.handle_event(event, |_, form| {
             handle_result.reload = true;
 
-            let mut config = Config::load();
+            let mut config = Config::load()?;
             config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
             config.testnet_mode = form.get_boolean(FormItem::TestnetMode);
-            config.save();
-            transmitter.send(Event::ConfigUpdate)?;
+            config.developer_mode = form.get_boolean(FormItem::DeveloperMode);
+            config.save()?;
 
             let display_text = form.get_text_mut(FormItem::DisplayText);
             *display_text = "Configuration saved".to_string();

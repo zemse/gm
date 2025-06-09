@@ -36,9 +36,10 @@ impl FormItemIndex for FormItem {
         self as usize
     }
 }
-impl From<FormItem> for FormWidget {
-    fn from(value: FormItem) -> Self {
-        match value {
+impl TryFrom<FormItem> for FormWidget {
+    type Error = crate::Error;
+    fn try_from(value: FormItem) -> crate::Result<Self> {
+        let widget = match value {
             FormItem::Heading => FormWidget::Heading("Transfer Assets"),
             FormItem::To => FormWidget::InputBox {
                 label: "To",
@@ -59,7 +60,8 @@ impl From<FormItem> for FormWidget {
             },
             FormItem::ErrorText => FormWidget::ErrorText(String::new()),
             FormItem::TransferButton => FormWidget::Button { label: "Transfer" },
-        }
+        };
+        Ok(widget)
     }
 }
 
@@ -70,21 +72,21 @@ pub struct AssetTransferPage {
     pub asset_popup: AssetsPopup,
 }
 
-impl Default for AssetTransferPage {
-    fn default() -> Self {
-        Self {
-            form: Form::init(|_| {}),
+impl AssetTransferPage {
+    fn try_default() -> crate::Result<Self> {
+        Ok(Self {
+            form: Form::init(|_| Ok(()))?,
             asset: None,
             address_book_popup: AddressBookPopup::default(),
             asset_popup: AssetsPopup::default(),
-        }
+        })
     }
 }
 
 impl AssetTransferPage {
     #[allow(clippy::field_reassign_with_default)]
-    pub fn new(asset: &Asset) -> Self {
-        let mut page = Self::default();
+    pub fn new(asset: &Asset) -> crate::Result<Self> {
+        let mut page = Self::try_default()?;
         page.asset = Some(asset.clone());
 
         // Update the form with the asset type, this is because the `asset` is
@@ -96,7 +98,7 @@ impl AssetTransferPage {
             .expect("currency not found in this input entry, please check idx") =
             Some(asset.r#type.symbol.clone());
 
-        page
+        Ok(page)
     }
 }
 
@@ -141,7 +143,7 @@ impl Component for AssetTransferPage {
                     .open(Some(AddressBookMenuItem::get_menu(
                         false,
                         shared_state.recent_addresses.clone(),
-                    )));
+                    )?));
                 result.esc_ignores = 1;
             } else if self.form.is_focused(FormItem::AssetType) && event.is_space_or_enter_pressed()
             {

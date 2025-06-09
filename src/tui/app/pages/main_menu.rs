@@ -5,7 +5,6 @@ use ratatui::{layout::Rect, widgets::Widget};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
 use crate::{
-    actions::setup::get_setup_menu,
     disk::Config,
     tui::{
         app::{widgets::select::Select, SharedState},
@@ -17,7 +16,8 @@ use crate::{
 
 use super::{
     account::AccountPage, address_book::AddressBookPage, assets::AssetsPage, config::ConfigPage,
-    send_message::SendMessagePage, setup::SetupPage, sign_message::SignMessagePage, Page,
+    dev_key_capture::DevKeyCapturePage, send_message::SendMessagePage, setup::SetupPage,
+    sign_message::SignMessagePage, Page,
 };
 
 #[derive(Display, EnumIter)]
@@ -29,19 +29,21 @@ pub enum MainMenuItem {
     SignMessage,
     SendMessage,
     Config,
+    DevKeyInput,
 }
 
 impl MainMenuItem {
-    pub fn get_page(&self) -> Page {
-        match self {
-            MainMenuItem::Setup => Page::Setup(SetupPage::default()),
+    pub fn get_page(&self) -> crate::Result<Page> {
+        Ok(match self {
+            MainMenuItem::Setup => Page::Setup(SetupPage::new()?),
             MainMenuItem::Portfolio => Page::Assets(AssetsPage::default()),
             MainMenuItem::Accounts => Page::Account(AccountPage::default()),
-            MainMenuItem::AddressBook => Page::AddressBook(AddressBookPage::default()),
-            MainMenuItem::SignMessage => Page::SignMessage(SignMessagePage::default()),
-            MainMenuItem::SendMessage => Page::SendMessage(SendMessagePage::default()),
-            MainMenuItem::Config => Page::Config(ConfigPage::default()),
-        }
+            MainMenuItem::AddressBook => Page::AddressBook(AddressBookPage::new()?),
+            MainMenuItem::SignMessage => Page::SignMessage(SignMessagePage::new()?),
+            MainMenuItem::SendMessage => Page::SendMessage(SendMessagePage::new()?),
+            MainMenuItem::Config => Page::Config(ConfigPage::new()?),
+            MainMenuItem::DevKeyInput => Page::DevKeyCapture(DevKeyCapturePage::default()),
+        })
     }
 
     pub fn depends_on_current_account(&self) -> bool {
@@ -49,30 +51,46 @@ impl MainMenuItem {
             MainMenuItem::Setup
             | MainMenuItem::AddressBook
             | MainMenuItem::Accounts
-            | MainMenuItem::Config => false,
+            | MainMenuItem::Config
+            | MainMenuItem::DevKeyInput => false,
 
             MainMenuItem::Portfolio | MainMenuItem::SignMessage | MainMenuItem::SendMessage => true,
         }
     }
 
-    pub fn get_menu() -> Vec<MainMenuItem> {
+    pub fn only_on_developer_mode(&self) -> bool {
+        match self {
+            MainMenuItem::Setup
+            | MainMenuItem::Portfolio
+            | MainMenuItem::Accounts
+            | MainMenuItem::AddressBook
+            | MainMenuItem::SignMessage
+            | MainMenuItem::SendMessage
+            | MainMenuItem::Config => false,
+            MainMenuItem::DevKeyInput => true,
+        }
+    }
+
+    pub fn get_menu(developer_mode: bool) -> crate::Result<Vec<MainMenuItem>> {
         let mut all_options: Vec<MainMenuItem> = MainMenuItem::iter().collect();
 
-        let setup_menu = get_setup_menu();
-        if setup_menu.is_empty() {
+        let temp_setup_page = SetupPage::new()?;
+        if temp_setup_page.form.visible_count() == 0 {
             all_options.remove(0);
         }
 
-        let current_account_exists = Config::current_account().is_some();
+        let current_account_exists = Config::current_account()?.is_some();
         let mut options = vec![];
 
         for option in all_options {
-            if !option.depends_on_current_account() || current_account_exists {
+            if (!option.depends_on_current_account() || current_account_exists)
+                && (developer_mode || !option.only_on_developer_mode())
+            {
                 options.push(option);
             }
         }
 
-        options
+        Ok(options)
     }
 }
 
@@ -89,19 +107,21 @@ impl MainMenuPage {
     }
 }
 
-impl Default for MainMenuPage {
-    fn default() -> Self {
-        Self {
-            list: MainMenuItem::get_menu(),
+// TODO I am trying to hide the dev key capture page
+impl MainMenuPage {
+    pub fn new(developer_mode: bool) -> crate::Result<Self> {
+        Ok(Self {
+            list: MainMenuItem::get_menu(developer_mode)?,
             cursor: Cursor::default(),
-        }
+        })
     }
 }
 
 impl Component for MainMenuPage {
-    fn reload(&mut self) {
-        let fresh = Self::default();
+    fn reload(&mut self, shared_state: &SharedState) -> crate::Result<()> {
+        let fresh = Self::new(shared_state.developer_mode)?;
         self.list = fresh.list;
+        Ok(())
     }
 
     fn handle_event(
@@ -121,7 +141,7 @@ impl Component for MainMenuPage {
                 #[allow(clippy::single_match)]
                 match key_event.code {
                     KeyCode::Enter => {
-                        let mut page = self.list[self.cursor.current].get_page();
+                        let mut page = self.list[self.cursor.current].get_page()?;
                         page.set_focus(true);
                         result.page_inserts.push(page);
                     }

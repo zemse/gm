@@ -61,9 +61,8 @@ pub enum Action {
 
         /// Message to send
         msg: Option<String>,
-
         // Network to use
-        network: Option<Network>,
+        // network: Option<Network>,
     },
 
     #[command(alias = "cfg")]

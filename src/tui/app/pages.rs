@@ -9,6 +9,7 @@ use address_book_display::AddressBookDisplayPage;
 use asset_transfer::AssetTransferPage;
 use assets::AssetsPage;
 use config::ConfigPage;
+use dev_key_capture::DevKeyCapturePage;
 use main_menu::{MainMenuItem, MainMenuPage};
 use send_message::SendMessagePage;
 use setup::SetupPage;
@@ -33,6 +34,7 @@ pub mod address_book_display;
 pub mod asset_transfer;
 pub mod assets;
 pub mod config;
+pub mod dev_key_capture;
 pub mod main_menu;
 pub mod send_message;
 pub mod setup;
@@ -65,6 +67,7 @@ pub enum Page {
     Trade(TradePage),
 
     Text(TextPage),
+    DevKeyCapture(DevKeyCapturePage),
 }
 
 impl Page {
@@ -116,6 +119,7 @@ impl Component for Page {
             Page::Trade(page) => page.set_focus(focus),
 
             Page::Text(page) => page.set_focus(focus),
+            Page::DevKeyCapture(page) => page.set_focus(focus),
         }
     }
 
@@ -143,33 +147,35 @@ impl Component for Page {
             Page::Trade(page) => page.exit_threads().await,
 
             Page::Text(page) => page.exit_threads().await,
+            Page::DevKeyCapture(page) => page.exit_threads().await,
         }
     }
 
-    fn reload(&mut self) {
+    fn reload(&mut self, ss: &SharedState) -> crate::Result<()> {
         match self {
-            Page::MainMenu(page) => page.reload(),
-            Page::Setup(page) => page.reload(),
+            Page::MainMenu(page) => page.reload(ss),
+            Page::Setup(page) => page.reload(ss),
 
-            Page::AddressBook(page) => page.reload(),
-            Page::AddressBookCreate(page) => page.reload(),
-            Page::AddressBookDisplay(page) => page.reload(),
+            Page::AddressBook(page) => page.reload(ss),
+            Page::AddressBookCreate(page) => page.reload(ss),
+            Page::AddressBookDisplay(page) => page.reload(ss),
 
-            Page::Account(page) => page.reload(),
-            Page::AccountCreate(page) => page.reload(),
-            Page::AccountImport(page) => page.reload(),
+            Page::Account(page) => page.reload(ss),
+            Page::AccountCreate(page) => page.reload(ss),
+            Page::AccountImport(page) => page.reload(ss),
 
-            Page::Assets(page) => page.reload(),
-            Page::AssetTransfer(page) => page.reload(),
+            Page::Assets(page) => page.reload(ss),
+            Page::AssetTransfer(page) => page.reload(ss),
 
-            Page::Config(page) => page.reload(),
-            Page::SendMessage(page) => page.reload(),
-            Page::SignMessage(page) => page.reload(),
-            Page::Transaction(page) => page.reload(),
+            Page::Config(page) => page.reload(ss),
+            Page::SendMessage(page) => page.reload(ss),
+            Page::SignMessage(page) => page.reload(ss),
+            Page::Transaction(page) => page.reload(ss),
 
-            Page::Trade(page) => page.reload(),
+            Page::Trade(page) => page.reload(ss),
 
-            Page::Text(page) => page.reload(),
+            Page::Text(page) => page.reload(ss),
+            Page::DevKeyCapture(page) => page.reload(ss),
         }
     }
 
@@ -204,6 +210,7 @@ impl Component for Page {
             Page::Trade(page) => page.handle_event(event, area, tr, sd, ss),
 
             Page::Text(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::DevKeyCapture(page) => page.handle_event(event, area, tr, sd, ss),
         }
     }
 
@@ -239,6 +246,7 @@ impl Component for Page {
             Page::Trade(page) => page.render_component(area, buf, shared_state),
 
             Page::Text(page) => page.render_component(area, buf, shared_state),
+            Page::DevKeyCapture(page) => page.render_component(area, buf, shared_state),
         }
     }
 }

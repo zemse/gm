@@ -30,14 +30,15 @@ impl FormItemIndex for FormItem {
     }
 }
 
-impl From<FormItem> for FormWidget {
-    fn from(value: FormItem) -> Self {
-        match value {
+impl TryFrom<FormItem> for FormWidget {
+    type Error = crate::Error;
+    fn try_from(value: FormItem) -> crate::Result<Self> {
+        let widget = match value {
             FormItem::CreateOrImportWallet => FormWidget::Button {
                 label: "Create or Import Wallet",
             },
             FormItem::AlchemyApiKey => {
-                let mut config = Config::load();
+                let mut config = Config::load()?;
                 if config.alchemy_api_key.is_none() {
                     config.alchemy_api_key = Some("".to_string());
                 };
@@ -51,7 +52,8 @@ impl From<FormItem> for FormWidget {
             }
             FormItem::Save => FormWidget::Button { label: "Save" },
             FormItem::Display => FormWidget::DisplayText(String::new()),
-        }
+        };
+        Ok(widget)
     }
 }
 
@@ -59,11 +61,11 @@ pub struct SetupPage {
     pub form: Form<FormItem>,
 }
 
-impl Default for SetupPage {
-    fn default() -> Self {
-        Self {
+impl SetupPage {
+    pub fn new() -> crate::Result<Self> {
+        Ok(Self {
             form: Form::init(|form| {
-                let config = Config::load();
+                let config = Config::load()?;
                 if config.current_account.is_some() {
                     form.hide_item(FormItem::CreateOrImportWallet);
                 }
@@ -76,8 +78,9 @@ impl Default for SetupPage {
                     form.hide_item(FormItem::Save);
                     form.hide_item(FormItem::Display);
                 }
-            }),
-        }
+                Ok(())
+            })?,
+        })
     }
 }
 impl Component for SetupPage {
@@ -85,9 +88,10 @@ impl Component for SetupPage {
         self.form.set_form_focus(focus);
     }
 
-    fn reload(&mut self) {
-        let fresh = Self::default();
+    fn reload(&mut self, _ss: &SharedState) -> crate::Result<()> {
+        let fresh = Self::new()?;
         self.form = fresh.form;
+        Ok(())
     }
 
     fn handle_event(
@@ -111,9 +115,9 @@ impl Component for SetupPage {
             } else {
                 handle_result.reload = true;
 
-                let mut config = Config::load();
+                let mut config = Config::load()?;
                 config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
-                config.save();
+                config.save()?;
                 transmitter.send(Event::ConfigUpdate)?;
 
                 let display_text = form.get_text_mut(FormItem::Display);

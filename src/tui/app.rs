@@ -7,6 +7,7 @@ use alloy::primitives::Address;
 use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
 use pages::{
     config::ConfigPage,
+    dev_key_capture::DevKeyCapturePage,
     main_menu::{MainMenuItem, MainMenuPage},
     text::TextPage,
     trade::TradePage,
@@ -47,6 +48,7 @@ pub struct SharedState {
     pub assets: Option<Vec<Asset>>,
     pub recent_addresses: Option<Vec<Address>>,
     pub testnet_mode: bool,
+    pub developer_mode: bool,
     pub current_account: Option<Address>,
     pub alchemy_api_key_available: bool,
     pub eth_price: Option<String>,
@@ -68,12 +70,12 @@ pub struct App {
     pub recent_addresses_thread: Option<tokio::task::JoinHandle<()>>,
 }
 
-impl Default for App {
-    fn default() -> Self {
-        let config = Config::load();
+impl App {
+    pub fn new() -> crate::Result<Self> {
+        let config = Config::load()?;
 
-        Self {
-            context: vec![Page::MainMenu(MainMenuPage::default())],
+        Ok(Self {
+            context: vec![Page::MainMenu(MainMenuPage::new(config.developer_mode)?)],
             preview_page: None,
 
             exit: false,
@@ -84,6 +86,7 @@ impl Default for App {
                 assets: None,
                 recent_addresses: None,
                 current_account: config.current_account,
+                developer_mode: config.developer_mode,
                 alchemy_api_key_available: config.alchemy_api_key.is_some(),
                 online: None,
                 eth_price: None,
@@ -94,7 +97,7 @@ impl Default for App {
             eth_price_thread: None,
             assets_thread: None,
             recent_addresses_thread: None,
-        }
+        })
     }
 }
 
@@ -182,15 +185,17 @@ impl App {
         }
     }
 
-    pub fn reload(&mut self) {
-        let config = Config::load();
+    pub fn reload(&mut self) -> crate::Result<()> {
+        let config = Config::load()?;
         self.shared_state.testnet_mode = config.testnet_mode;
         self.shared_state.alchemy_api_key_available = config.alchemy_api_key.is_some();
         self.shared_state.current_account = config.current_account;
 
         for page in &mut self.context {
-            page.reload();
+            page.reload(&self.shared_state)?;
         }
+
+        Ok(())
     }
 
     async fn process_result(
@@ -208,9 +213,9 @@ impl App {
             self.context.pop();
         }
         if result.reload {
-            self.reload();
-            if let Some(page) = self.current_page_mut() {
-                page.reload();
+            self.reload()?;
+            if let Some(page) = self.context.last_mut() {
+                page.reload(&self.shared_state)?;
             }
         }
         if result.refresh_assets {
@@ -295,7 +300,7 @@ impl App {
             }
 
             Event::ConfigUpdate => {
-                self.reload();
+                self.reload()?;
             }
 
             // ETH Price API
@@ -348,6 +353,9 @@ impl App {
         self.context.last()
     }
 
+    // TODO using this triggers rust borrow checks, as we are not able to do
+    // immutable borrows once self is borrowed mutably
+    #[allow(dead_code)]
     fn current_page_mut(&mut self) -> Option<&mut Page> {
         self.context.last_mut()
     }
@@ -389,14 +397,18 @@ impl Widget for &App {
 
                 let page = match main_menu_item {
                     MainMenuItem::Portfolio => {
-                        let mut preview_page = main_menu_item.get_page();
+                        let mut preview_page = main_menu_item
+                            .get_page()
+                            .expect("main_menu_item.get_page() failed");
                         preview_page.set_focus(false);
                         preview_page
                     }
                     MainMenuItem::Config => Page::Config(ConfigPage {
                         form: Form::init(|form| {
                             form.show_everything_empty(true);
-                        }),
+                            Ok(())
+                        })
+                        .unwrap(),
                     }),
                     MainMenuItem::Setup => Page::Text(TextPage::new(
                         "Setup some of the essential stuff to get the most out of gm".to_string(),
@@ -413,6 +425,7 @@ impl Widget for &App {
                     MainMenuItem::SendMessage => {
                         Page::Text(TextPage::new("Send onchain message to someone".to_string()))
                     }
+                    MainMenuItem::DevKeyInput => Page::DevKeyCapture(DevKeyCapturePage::default()),
                 };
 
                 page.render_component_with_block(

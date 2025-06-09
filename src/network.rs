@@ -82,15 +82,15 @@ impl DiskInterface for NetworkStore {
 }
 
 impl NetworkStore {
-    pub fn load_networks(testnet_mode: bool) -> Vec<Network> {
-        NetworkStore::load()
+    pub fn load_networks(testnet_mode: bool) -> crate::Result<Vec<Network>> {
+        Ok(NetworkStore::load()?
             .networks
             .into_iter()
             .filter(|n| n.is_testnet == testnet_mode)
-            .collect()
+            .collect())
     }
 
-    pub fn sort_config() -> Self {
+    pub fn sort_config() -> crate::Result<Self> {
         let mut networks = HashMap::<u32, Network>::new();
 
         let merge_tokens = |a: Vec<Token>, b: Vec<Token>| {
@@ -133,7 +133,7 @@ impl NetworkStore {
 
         // load networks from disk and override defaults
         // TODO too many .clone() used here, improve it
-        let store = NetworkStore::load();
+        let store = NetworkStore::load()?;
         for network in &store.networks {
             insert(network.clone());
         }
@@ -150,8 +150,8 @@ impl NetworkStore {
             networks: networks.clone(),
         };
 
-        store.save();
-        store
+        store.save()?;
+        Ok(store)
     }
 
     pub fn get_by_name(&self, network_name: &str) -> Option<Network> {
@@ -220,10 +220,14 @@ impl NetworkStore {
     }
 }
 
-impl From<String> for Network {
-    fn from(value: String) -> Self {
-        let networks = NetworkStore::load();
-        networks.get_by_name(&value).expect("network not found")
+impl TryFrom<String> for Network {
+    type Error = crate::Error;
+
+    fn try_from(value: String) -> crate::Result<Self> {
+        let networks = NetworkStore::load()?;
+        networks
+            .get_by_name(&value)
+            .ok_or(crate::Error::NetworkNotFound(value))
     }
 }
 

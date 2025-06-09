@@ -18,7 +18,7 @@ pub async fn run() -> crate::Result<()> {
 
     let mut terminal = ratatui::init();
 
-    let mut app = App::default();
+    let mut app = App::new()?;
 
     app.init_threads(&event_tr, &shutdown);
 

@@ -21,7 +21,6 @@ use ratatui::{buffer::Buffer, layout::Rect, style::Stylize, text::Line, widgets:
 use tokio::task::JoinHandle;
 
 use crate::{
-    actions::account::load_wallet,
     disk::DiskInterface,
     error::FmtError,
     network::{Network, NetworkStore},
@@ -30,6 +29,7 @@ use crate::{
         events::Event,
         traits::{Component, CustomRender, HandleResult, RectUtil},
     },
+    utils::account::AccountManager,
 };
 
 #[derive(Clone, Default, Debug, PartialEq)]
@@ -61,7 +61,7 @@ impl TransactionPage {
         calldata: Bytes,
         value: U256,
     ) -> crate::Result<Self> {
-        let network_store = NetworkStore::load();
+        let network_store = NetworkStore::load()?;
         let network = network_store
             .get_by_name(network_name)
             .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))?;
@@ -119,7 +119,7 @@ impl TransactionPage {
             ) -> crate::Result<FixedBytes<32>> {
                 let provider = network.get_provider()?;
 
-                let wallet = load_wallet(sender_account)?;
+                let wallet = AccountManager::load_wallet(&sender_account)?;
 
                 let mut tx = TxEip1559 {
                     to,

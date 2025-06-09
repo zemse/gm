@@ -51,7 +51,7 @@ impl AddressBookMenuItem {
     pub fn get_menu(
         with_create: bool,
         recently_interacted: Option<Vec<Address>>,
-    ) -> Vec<AddressBookMenuItem> {
+    ) -> crate::Result<Vec<AddressBookMenuItem>> {
         let mut entries = vec![];
 
         if with_create {
@@ -60,7 +60,7 @@ impl AddressBookMenuItem {
 
         // From address book
         entries.extend(
-            AddressBook::load()
+            AddressBook::load()?
                 .list_owned()
                 .into_iter()
                 .map(AddressBookMenuItem::View)
@@ -95,7 +95,7 @@ impl AddressBookMenuItem {
             );
         }
 
-        entries
+        Ok(entries)
     }
 
     pub fn address(&self) -> Option<Address> {
@@ -128,14 +128,14 @@ pub struct AddressBookPage {
     focus: bool,
 }
 
-impl Default for AddressBookPage {
-    fn default() -> Self {
-        Self {
-            full_list: AddressBookMenuItem::get_menu(true, None),
+impl AddressBookPage {
+    pub fn new() -> crate::Result<Self> {
+        Ok(Self {
+            full_list: AddressBookMenuItem::get_menu(true, None)?,
             search_string: String::new(),
             cursor: Cursor::default(),
             focus: true,
-        }
+        })
     }
 }
 
@@ -144,9 +144,10 @@ impl Component for AddressBookPage {
         self.focus = focus;
     }
 
-    fn reload(&mut self) {
-        let fresh = Self::default();
+    fn reload(&mut self, _ss: &SharedState) -> crate::Result<()> {
+        let fresh = Self::new()?;
         self.full_list = fresh.full_list;
+        Ok(())
     }
 
     fn text_input_mut(&mut self) -> Option<&mut String> {
@@ -186,26 +187,26 @@ impl Component for AddressBookPage {
                     }
                     KeyCode::Enter => result.page_inserts.push(match &list[self.cursor.current] {
                         AddressBookMenuItem::Create => Page::AddressBookCreate(
-                            AddressBookCreatePage::new(String::new(), String::new()),
+                            AddressBookCreatePage::new(String::new(), String::new())?,
                         ),
                         AddressBookMenuItem::View(entry) => {
-                            let (id, entry) = AddressBook::load()
-                                .find(&None, &Some(entry.address), &Some(&entry.name))
-                                .expect("entry not found");
+                            let (id, entry) = AddressBook::load()?
+                                .find(&None, &Some(entry.address), &Some(&entry.name))?
+                                .ok_or(crate::Error::AddressBook("entry not found"))?;
                             Page::AddressBookDisplay(AddressBookDisplayPage::new(
                                 id,
                                 entry.name,
                                 entry.address.to_string(),
-                            ))
+                            )?)
                         }
                         AddressBookMenuItem::UnnamedOwned(address) => Page::AddressBookCreate(
-                            AddressBookCreatePage::new(String::new(), address.to_string()),
+                            AddressBookCreatePage::new(String::new(), address.to_string())?,
                         ),
                         AddressBookMenuItem::RecentlyInteracted(address) => {
                             Page::AddressBookCreate(AddressBookCreatePage::new(
                                 String::new(),
                                 address.to_string(),
-                            ))
+                            )?)
                         }
                     }),
                     _ => {}

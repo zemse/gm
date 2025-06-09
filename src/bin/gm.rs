@@ -1,19 +1,14 @@
 use clap::Parser;
 use figlet_rs::FIGfont;
-use gm_lib::{actions::Action, disk::Config, network::NetworkStore, tui, utils::Handle};
-use inquire::Confirm;
+use gm_lib::{network::NetworkStore, tui};
 
 #[tokio::main]
 async fn main() -> gm_lib::Result<()> {
     preload_hook();
 
-    let cli = Cli::parse();
+    // let cli = Cli::parse();
 
-    if cli.is_empty() {
-        tui::run().await?;
-    } else {
-        cli.handle();
-    }
+    tui::run().await?;
 
     Ok(())
 }
@@ -22,37 +17,9 @@ async fn main() -> gm_lib::Result<()> {
 #[derive(Parser)]
 #[command(name = "gm")]
 #[command(about = "CLI tool for managing accounts and transactions")]
-pub struct Cli {
-    #[command(subcommand)]
-    action: Option<Action>,
-}
+pub struct Cli;
 
-impl Cli {
-    pub fn handle(&self) {
-        if self.action.is_none() {
-            gm_art();
-            println!("Welcome to GM CLI tool!");
-
-            println!("Current account: {:?}\n", Config::current_account());
-
-            let result = Confirm::new("Open menu?")
-                .with_default(true)
-                .with_help_message("Press ESC if you want to quit")
-                .prompt();
-
-            if let Ok(true) = result {
-                Action::handle_optn_inquire(&None, ());
-            }
-        } else {
-            Action::handle_optn_inquire(&self.action, ());
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.action.is_none()
-    }
-}
-
+#[allow(dead_code)]
 fn gm_art() {
     // Load the standard font
     let standard_font = FIGfont::standard().unwrap();
@@ -69,5 +36,5 @@ fn gm_art() {
 
 fn preload_hook() {
     // TODO its better to do it when it is needed instead of always
-    NetworkStore::sort_config();
+    NetworkStore::sort_config().expect("NetworkStore::sort_config() failed");
 }

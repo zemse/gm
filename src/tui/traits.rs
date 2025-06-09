@@ -66,7 +66,9 @@ impl HandleResult {
 
 pub trait Component {
     // TODO rename to `reload` or `refresh_component`
-    fn reload(&mut self) {}
+    fn reload(&mut self, _shared_state: &SharedState) -> crate::Result<()> {
+        Ok(())
+    }
 
     fn text_input_mut(&mut self) -> Option<&mut String> {
         None

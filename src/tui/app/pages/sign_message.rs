@@ -5,7 +5,6 @@ use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use strum::EnumIter;
 
 use crate::{
-    actions::account::load_wallet,
     tui::{
         app::{
             widgets::form::{Form, FormItemIndex, FormWidget},
@@ -14,6 +13,7 @@ use crate::{
         events::Event,
         traits::{Component, HandleResult},
     },
+    utils::account::AccountManager,
 };
 
 #[derive(EnumIter, PartialEq)]
@@ -32,9 +32,10 @@ impl FormItemIndex for FormItem {
         self as usize
     }
 }
-impl From<FormItem> for FormWidget {
-    fn from(value: FormItem) -> Self {
-        match value {
+impl TryFrom<FormItem> for FormWidget {
+    type Error = crate::Error;
+    fn try_from(value: FormItem) -> crate::Result<Self> {
+        let widget = match value {
             FormItem::Heading => FormWidget::Heading("Sign a Message"),
             FormItem::Message => FormWidget::InputBox {
                 label: "Message",
@@ -46,15 +47,16 @@ impl From<FormItem> for FormWidget {
                 label: "Sign Message",
             },
             FormItem::Signature => FormWidget::DisplayText(String::new()),
-        }
+        };
+        Ok(widget)
     }
 }
 
-impl Default for SignMessagePage {
-    fn default() -> Self {
-        Self {
-            form: Form::init(|_| {}),
-        }
+impl SignMessagePage {
+    pub fn new() -> crate::Result<Self> {
+        Ok(Self {
+            form: Form::init(|_| Ok(()))?,
+        })
     }
 }
 
@@ -79,7 +81,7 @@ impl Component for SignMessagePage {
                 let wallet_address = shared_state
                     .current_account
                     .ok_or(crate::Error::CurrentAccountNotSet)?;
-                let wallet = load_wallet(wallet_address)?;
+                let wallet = AccountManager::load_wallet(&wallet_address)?;
                 let signature = wallet.sign_message_sync(message.as_bytes())?;
                 *form.get_text_mut(FormItem::Signature) = format!("Signature:\n{signature}");
             }
