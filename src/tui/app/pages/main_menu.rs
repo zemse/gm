@@ -28,8 +28,8 @@ pub enum MainMenuItem {
     AddressBook,
     SignMessage,
     SendMessage,
-    Config,
     DevKeyInput,
+    Config,
 }
 
 impl MainMenuItem {
@@ -41,8 +41,8 @@ impl MainMenuItem {
             MainMenuItem::AddressBook => Page::AddressBook(AddressBookPage::new()?),
             MainMenuItem::SignMessage => Page::SignMessage(SignMessagePage::new()?),
             MainMenuItem::SendMessage => Page::SendMessage(SendMessagePage::new()?),
-            MainMenuItem::Config => Page::Config(ConfigPage::new()?),
             MainMenuItem::DevKeyInput => Page::DevKeyCapture(DevKeyCapturePage::default()),
+            MainMenuItem::Config => Page::Config(ConfigPage::new()?),
         })
     }
 
@@ -51,8 +51,8 @@ impl MainMenuItem {
             MainMenuItem::Setup
             | MainMenuItem::AddressBook
             | MainMenuItem::Accounts
-            | MainMenuItem::Config
-            | MainMenuItem::DevKeyInput => false,
+            | MainMenuItem::DevKeyInput
+            | MainMenuItem::Config => false,
 
             MainMenuItem::Portfolio | MainMenuItem::SignMessage | MainMenuItem::SendMessage => true,
         }
@@ -84,7 +84,7 @@ impl MainMenuItem {
 
         for option in all_options {
             if (!option.depends_on_current_account() || current_account_exists)
-                && (developer_mode || !option.only_on_developer_mode())
+                && (!option.only_on_developer_mode() || developer_mode)
             {
                 options.push(option);
             }
@@ -121,6 +121,9 @@ impl Component for MainMenuPage {
     fn reload(&mut self, shared_state: &SharedState) -> crate::Result<()> {
         let fresh = Self::new(shared_state.developer_mode)?;
         self.list = fresh.list;
+        if self.cursor.current >= self.list.len() {
+            self.cursor.current = self.list.len() - 1;
+        }
         Ok(())
     }
 

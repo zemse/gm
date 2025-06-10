@@ -66,6 +66,7 @@ impl ConfigPage {
             *form.get_text_mut(FormItem::AlchemyApiKey) =
                 config.alchemy_api_key.clone().unwrap_or_default();
             *form.get_boolean_mut(FormItem::TestnetMode) = config.testnet_mode;
+            *form.get_boolean_mut(FormItem::DeveloperMode) = config.developer_mode;
             Ok(())
         })?;
 

@@ -190,6 +190,7 @@ impl App {
         self.shared_state.testnet_mode = config.testnet_mode;
         self.shared_state.alchemy_api_key_available = config.alchemy_api_key.is_some();
         self.shared_state.current_account = config.current_account;
+        self.shared_state.developer_mode = config.developer_mode;
 
         for page in &mut self.context {
             page.reload(&self.shared_state)?;
