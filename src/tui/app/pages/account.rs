@@ -44,20 +44,20 @@ pub struct AccountPage {
     list: Vec<AccountSelect>,
 }
 
-impl Default for AccountPage {
-    fn default() -> Self {
+impl AccountPage {
+    pub fn new() -> crate::Result<Self> {
         let mut list = vec![AccountSelect::Create, AccountSelect::Import];
         list.extend(
-            AccountManager::get_account_list()
+            AccountManager::get_account_list()?
                 .into_iter()
                 .map(AccountSelect::Existing)
                 .collect::<Vec<_>>(),
         );
-        Self {
+        Ok(Self {
             cursor: Cursor::default(),
             focus: true,
             list,
-        }
+        })
     }
 }
 
@@ -67,7 +67,7 @@ impl Component for AccountPage {
     }
 
     fn reload(&mut self, _ss: &SharedState) -> crate::Result<()> {
-        let fresh = Self::default();
+        let fresh = Self::new()?;
         self.list = fresh.list;
         Ok(())
     }

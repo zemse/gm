@@ -24,7 +24,7 @@ pub trait AccountUtils {
 
     fn store_private_key(private_key: &FieldBytes, address: Address) -> crate::Result<()>;
 
-    fn get_account_list() -> Vec<Address>;
+    fn get_account_list() -> crate::Result<Vec<Address>>;
 
     fn get_secret(address: &Address) -> crate::Result<Secret>;
 }
@@ -77,7 +77,7 @@ impl AccountUtils for AccountManager {
         return linux_insecure::LinuxInsecure::store_private_key(private_key, address);
     }
 
-    fn get_account_list() -> Vec<Address> {
+    fn get_account_list() -> crate::Result<Vec<Address>> {
         #[cfg(target_os = "macos")]
         return macos::Macos::get_account_list();
 
@@ -220,7 +220,7 @@ mod macos {
         item::{ItemClass, ItemSearchOptions, SearchResult},
         os::macos::keychain::SecKeychain,
     };
-    use std::{collections::HashMap, str::FromStr};
+    use std::collections::HashMap;
 
     use super::*;
 
@@ -255,7 +255,7 @@ mod macos {
             Ok(())
         }
 
-        fn get_account_list() -> Vec<Address> {
+        fn get_account_list() -> crate::Result<Vec<Address>> {
             let mut search = ItemSearchOptions::default();
             search.class(ItemClass::generic_password());
             // TODO configure this as this search misses some keys if user has more keychain items.
@@ -273,14 +273,14 @@ mod macos {
                             if service.starts_with("gm") {
                                 let addr_str =
                                     item.get("acct").expect("must have an account address");
-                                accounts.push(Address::from_str(addr_str).unwrap());
+                                accounts.push(addr_str.parse()?);
                             }
                         }
                     }
                 }
             }
 
-            accounts
+            Ok(accounts)
         }
 
         fn get_secret(address: &Address) -> crate::Result<Secret> {
@@ -358,7 +358,6 @@ mod macos {
     }
 }
 
-#[cfg(target_os = "linux")]
 pub mod linux_insecure {
     use crate::disk::{DiskInterface, FileFormat};
 
@@ -368,21 +367,19 @@ pub mod linux_insecure {
 
     impl AccountUtils for LinuxInsecure {
         fn store_mnemonic_wallet(phrase: &str, address: Address) -> crate::Result<()> {
-            InsecurePrivateKeyStore::load().add(address, Secret::Mnemonic(phrase.to_string()));
-            Ok(())
+            InsecurePrivateKeyStore::load()?.add(address, Secret::Mnemonic(phrase.to_string()))
         }
 
         fn store_private_key(private_key: &FieldBytes, address: Address) -> crate::Result<()> {
-            InsecurePrivateKeyStore::load().add(address, Secret::PrivateKey(*private_key));
-            Ok(())
+            InsecurePrivateKeyStore::load()?.add(address, Secret::PrivateKey(*private_key))
         }
 
-        fn get_account_list() -> Vec<Address> {
-            InsecurePrivateKeyStore::load().list()
+        fn get_account_list() -> crate::Result<Vec<Address>> {
+            Ok(InsecurePrivateKeyStore::load()?.list())
         }
 
         fn get_secret(address: &Address) -> crate::Result<Secret> {
-            InsecurePrivateKeyStore::load()
+            InsecurePrivateKeyStore::load()?
                 .find_by_address(address)
                 .ok_or(crate::Error::SecretNotFound(*address))
         }
@@ -400,9 +397,9 @@ pub mod linux_insecure {
     }
 
     impl InsecurePrivateKeyStore {
-        pub fn add(&mut self, address: Address, key: Secret) {
+        pub fn add(&mut self, address: Address, key: Secret) -> crate::Result<()> {
             self.keys.push((address, key));
-            self.save();
+            self.save()
         }
 
         pub fn find_by_address(&self, address: &Address) -> Option<Secret> {

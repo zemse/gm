@@ -69,7 +69,7 @@ impl AddressBookMenuItem {
 
         // Self accounts that do not exist in the address book
         entries.extend(
-            AccountManager::get_account_list()
+            AccountManager::get_account_list()?
                 .into_iter()
                 .filter(|address| {
                     !entries.iter().any(|entry| match entry {

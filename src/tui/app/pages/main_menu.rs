@@ -37,7 +37,7 @@ impl MainMenuItem {
         Ok(match self {
             MainMenuItem::Setup => Page::Setup(SetupPage::new()?),
             MainMenuItem::Portfolio => Page::Assets(AssetsPage::default()),
-            MainMenuItem::Accounts => Page::Account(AccountPage::default()),
+            MainMenuItem::Accounts => Page::Account(AccountPage::new()?),
             MainMenuItem::AddressBook => Page::AddressBook(AddressBookPage::new()?),
             MainMenuItem::SignMessage => Page::SignMessage(SignMessagePage::new()?),
             MainMenuItem::SendMessage => Page::SendMessage(SendMessagePage::new()?),

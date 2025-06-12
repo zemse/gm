@@ -111,7 +111,7 @@ impl Component for SetupPage {
             if label == FormItem::CreateOrImportWallet {
                 handle_result
                     .page_inserts
-                    .push(Page::Account(AccountPage::default()));
+                    .push(Page::Account(AccountPage::new()?));
             } else {
                 handle_result.reload = true;
 
