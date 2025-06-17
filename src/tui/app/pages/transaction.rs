@@ -119,7 +119,7 @@ impl TransactionPage {
             ) -> crate::Result<FixedBytes<32>> {
                 let provider = network.get_provider()?;
 
-                let wallet = AccountManager::load_wallet(&sender_account)?;
+                let wallet = AccountManager::load_wallet(&sender_account,None)?;
 
                 let mut tx = TxEip1559 {
                     to,

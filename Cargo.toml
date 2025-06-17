@@ -54,3 +54,6 @@ url = "2.5.4"
 serde_plain = "1.0.2"
 serde_path_to_error = "0.1.17"
 data3 = "0.1.0"
+dirs = "6"
+alloy-signer-local = "1.0" 
+

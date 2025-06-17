@@ -56,7 +56,7 @@ impl Component for AccountImportPage {
                 }
                 KeyCode::Enter => {
                     let import_result = AccountManager::import_mnemonic_wallet(&self.input)
-                        .or_else(|_| AccountManager::import_private_key(&self.input));
+                        .or_else(|_| AccountManager::import_private_key(&self.input,None));
 
                     match import_result {
                         Ok(address) => {
