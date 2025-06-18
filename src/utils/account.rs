@@ -18,7 +18,6 @@ use alloy::{
 use coins_bip39::{English, Mnemonic};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use inquire;
 use super::fs_keystore;
 
 use crate::Error;
@@ -61,12 +60,8 @@ impl AccountManager {
         }
         #[cfg(target_os = "linux")]
         {
-            let pwd = password.unwrap_or_else(|| {
-        inquire::Password::new("Keystore password:")
-            .without_confirmation()
-            .prompt()
-            .expect("Failed to read password")
-    });
+            let pwd = password.expect("Password must be supplied for keystore operations");
+
             let stored_addr = fs_keystore::FsKeystore::store_private_key(
                 &raw,
                 &pwd,
