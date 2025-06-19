@@ -179,6 +179,7 @@ pub struct Config {
     #[serde(default)]
     pub developer_mode: bool,
     pub alchemy_api_key: Option<String>,
+    pub theme_name: String,
 }
 
 impl DiskInterface for Config {

@@ -3,6 +3,7 @@ mod events;
 mod traits;
 mod app;
 mod impls;
+mod theme;
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},

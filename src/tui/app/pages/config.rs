@@ -11,6 +11,7 @@ use crate::{
             SharedState,
         },
         events::Event,
+        theme,
         traits::{Component, HandleResult},
     },
 };
@@ -21,6 +22,7 @@ pub enum FormItem {
     AlchemyApiKey,
     TestnetMode,
     DeveloperMode,
+    ThemeName,
     SaveButton,
     DisplayText,
 }
@@ -48,6 +50,12 @@ impl TryFrom<FormItem> for FormWidget {
                 label: "Developer Mode",
                 value: false,
             },
+            FormItem::ThemeName => FormWidget::InputBox {
+                label: "Theme Name",
+                text: "Monochrome".to_string(),
+                empty_text: Some("Enter a theme name."),
+                currency: None,
+            },
             FormItem::SaveButton => FormWidget::Button { label: "Save" },
             FormItem::DisplayText => FormWidget::DisplayText(String::new()),
         };
@@ -67,6 +75,7 @@ impl ConfigPage {
                 config.alchemy_api_key.clone().unwrap_or_default();
             *form.get_boolean_mut(FormItem::TestnetMode) = config.testnet_mode;
             *form.get_boolean_mut(FormItem::DeveloperMode) = config.developer_mode;
+            *form.get_text_mut(FormItem::ThemeName) = config.theme_name;
             Ok(())
         })?;
 
@@ -99,6 +108,9 @@ impl Component for ConfigPage {
             config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
             config.testnet_mode = form.get_boolean(FormItem::TestnetMode);
             config.developer_mode = form.get_boolean(FormItem::DeveloperMode);
+            let theme_name = form.get_text(FormItem::ThemeName).clone();
+            config.theme_name = theme::ThemeName::from_str(&theme_name).to_string();
+
             config.save()?;
 
             let display_text = form.get_text_mut(FormItem::DisplayText);
