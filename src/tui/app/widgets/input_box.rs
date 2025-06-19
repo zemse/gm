@@ -193,16 +193,3 @@ impl WidgetHeight for InputBox<'_> {
         (2 + lines.len()) as u16
     }
 }
-
-#[cfg(test)]
-mod test {
-    use crate::utils::text::split_string;
-
-    #[test]
-    fn test_split_string() {
-        assert_eq!(
-            split_string("hello what is up", 6),
-            vec!["hello ", "what i", "s up"]
-        );
-    }
-}

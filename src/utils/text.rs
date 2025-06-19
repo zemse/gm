@@ -18,3 +18,16 @@ pub fn split_string(s: &str, max_width: usize) -> Vec<&str> {
 
     lines
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_split_string() {
+        assert_eq!(
+            split_string("hello what is up", 6),
+            vec!["hello ", "what i", "s up"]
+        );
+    }
+}
