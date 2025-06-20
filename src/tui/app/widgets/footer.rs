@@ -1,4 +1,3 @@
-use crate::tui::app::SharedState;
 use crate::tui::theme::Theme;
 use ratatui::{layout::Rect, text::Line, widgets::Widget};
 

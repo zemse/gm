@@ -231,9 +231,9 @@ impl Component for AssetTransferPage {
     {
         self.form.render(area, buf);
 
-        self.address_book_popup.render(area, buf);
+        self.address_book_popup.render(area, buf, &_shared_state.theme);
 
-        self.asset_popup.render(area, buf);
+        self.asset_popup.render(area, buf, &_shared_state.theme);
 
         area
     }

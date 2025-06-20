@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
-    style::{Modifier, Style},
     widgets::{Block, Widget},
 };
 
@@ -12,6 +11,7 @@ use crate::{
     tui::{traits::HandleResult, Event},
     utils::cursor::Cursor,
 };
+use crate::tui::app::SharedState;
 
 pub struct FilterSelectPopup<Item: Display> {
     title: &'static str,
@@ -20,7 +20,6 @@ pub struct FilterSelectPopup<Item: Display> {
     items: Option<Vec<Item>>,
     cursor: Cursor,
     search_string: String,
-    theme: Theme,
 }
 
 impl<Item: Display> FilterSelectPopup<Item> {
@@ -32,7 +31,6 @@ impl<Item: Display> FilterSelectPopup<Item> {
             items: None,
             cursor: Cursor::default(),
             search_string: String::new(),
-            theme: Theme::default(),
         }
     }
     pub fn is_open(&self) -> bool {
@@ -93,10 +91,7 @@ impl<Item: Display> FilterSelectPopup<Item> {
 
         Ok(result)
     }
-}
-
-impl<Item: Display> Widget for &FilterSelectPopup<Item> {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
+    pub fn render(&self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, theme: &Theme)
     where
         Self: Sized,
     {
@@ -104,7 +99,7 @@ impl<Item: Display> Widget for &FilterSelectPopup<Item> {
             Popup.render(area, buf);
 
             let inner_area = Popup::inner_area(area);
-            let block = Block::bordered().style(&self.theme).title(self.title);
+            let block = Block::bordered().style(theme).title(self.title);
             let block_inner_area = block.inner(inner_area);
             block.render(inner_area, buf);
 
@@ -121,7 +116,7 @@ impl<Item: Display> Widget for &FilterSelectPopup<Item> {
                         cursor: &self.cursor,
                         search_string: &self.search_string,
                         focus: true,
-                        focus_style: Some(self.theme.select_popup()),
+                        focus_style: Some(theme.select_popup()),
                     }
                     .render(block_inner_area, buf);
                 }

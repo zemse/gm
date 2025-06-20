@@ -181,9 +181,9 @@ impl Component for SendMessagePage {
     {
         self.form.render(area, buf);
 
-        self.address_book_popup.render(area, buf);
+        self.address_book_popup.render(area, buf, &_shared_state.theme);
 
-        self.networks_popup.render(area, buf);
+        self.networks_popup.render(area, buf, &_shared_state.theme);
 
         area
     }

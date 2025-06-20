@@ -17,7 +17,6 @@ use crate::{
 };
 use alloy::primitives::Address;
 use crossterm::event::{KeyCode, KeyEventKind};
-use ratatui::style::Style;
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 
 use super::{account_create::AccountCreatePage, account_import::AccountImportPage, Page};
