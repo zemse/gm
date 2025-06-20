@@ -233,10 +233,10 @@ impl Component for TransactionPage {
         async move {
             if let Some(thread) = send_tx_thread {
                 thread.abort();
-                thread.await.unwrap();
+                let _ = thread.await;
             }
             if let Some(thread) = watch_tx_thread {
-                thread.await.unwrap();
+                let _ = thread.await;
             }
         }
     }
@@ -319,7 +319,7 @@ impl Component for TransactionPage {
         area = area.consume_height(area_1.height);
 
         match self.status {
-            TxStatus::NotSent => Button {
+            TxStatus::NotSent => Button::<false> {
                 label: "Send Transaction",
                 focus: true,
             }

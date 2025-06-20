@@ -2,6 +2,7 @@ pub mod address_book_popup;
 pub mod assets_popup;
 pub mod button;
 pub mod candle_chart;
+pub mod confirm_popup;
 pub mod filter_select;
 pub mod filter_select_popup;
 pub mod footer;

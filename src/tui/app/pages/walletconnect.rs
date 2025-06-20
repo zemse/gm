@@ -1,0 +1,352 @@
+use std::{
+    sync::{atomic::AtomicBool, mpsc, Arc},
+    time::Duration,
+};
+
+use ratatui::{
+    layout::Rect,
+    text::Text,
+    widgets::{Paragraph, Widget, Wrap},
+};
+use strum::EnumIter;
+use tokio::task::JoinHandle;
+use walletconnect_sdk::{
+    pairing::{Pairing, Topic},
+    types::{Metadata, SessionProposeParams},
+    wc_message::WcMessage,
+    Connection,
+};
+
+use crate::tui::{
+    app::{
+        widgets::{
+            confirm_popup::ConfirmPopup,
+            form::{Form, FormItemIndex, FormWidget},
+        },
+        SharedState,
+    },
+    traits::{Component, HandleResult},
+    Event,
+};
+
+#[derive(Clone, Debug)]
+pub enum WalletConnectStatus {
+    Idle,
+    Initializing,
+    ProposalReceived(Box<(Pairing, WcMessage)>),
+    SessionSettleInProgress,
+    SessionSettleDone,
+    SessionSettleFailed,
+    SessionSettleCancelled,
+}
+
+impl WalletConnectStatus {
+    pub fn proposal(&self) -> Option<(&Pairing, &WcMessage)> {
+        match self {
+            WalletConnectStatus::ProposalReceived(boxxed) => {
+                let (pairing, wc_message) = boxxed.as_ref();
+                Some((pairing, wc_message))
+            }
+            _ => None,
+        }
+    }
+}
+
+#[derive(EnumIter, PartialEq)]
+enum FormItem {
+    Heading,
+    UriInput,
+    ConnectButton,
+}
+
+impl FormItemIndex for FormItem {
+    fn index(self) -> usize {
+        self as usize
+    }
+}
+
+impl TryFrom<FormItem> for FormWidget {
+    type Error = crate::Error;
+    fn try_from(value: FormItem) -> crate::Result<Self> {
+        let widget = match value {
+            FormItem::Heading => FormWidget::Heading("Wallet Connect"),
+            FormItem::UriInput => FormWidget::InputBox {
+                label: "URI",
+                text: String::new(),
+                empty_text: Some("Paste Walletconnect URI from dapp"),
+                currency: None,
+            },
+            FormItem::ConnectButton => FormWidget::Button { label: "Connect" },
+        };
+        Ok(widget)
+    }
+}
+
+pub struct WalletConnectPage {
+    form: Form<FormItem>,
+    thread: Option<JoinHandle<()>>,
+    messages: Vec<WcMessage>,
+    status: WalletConnectStatus,
+    confirm_popup: ConfirmPopup,
+    watch_thread: Option<JoinHandle<()>>,
+}
+
+impl WalletConnectPage {
+    pub fn new() -> crate::Result<Self> {
+        Ok(Self {
+            form: Form::init(|_| Ok(()))?,
+            thread: None,
+            messages: vec![],
+            status: WalletConnectStatus::Idle,
+            confirm_popup: ConfirmPopup::new("WalletConnect", String::new(), "Approve", "Reject"),
+            watch_thread: None,
+        })
+    }
+}
+
+impl Component for WalletConnectPage {
+    async fn exit_threads(&mut self) {
+        let watch_thread = self.watch_thread.take();
+
+        async move {
+            if let Some(thread) = watch_thread {
+                thread.abort();
+                let _ = thread.await;
+            }
+        }
+        .await;
+    }
+
+    fn handle_event(
+        &mut self,
+        event: &Event,
+        area: Rect,
+        tr: &mpsc::Sender<Event>,
+        _shutdown_signal: &Arc<AtomicBool>,
+        shared_state: &SharedState,
+    ) -> crate::Result<crate::tui::traits::HandleResult> {
+        match event {
+            Event::WalletConnectMessage(_addr, msg) => self.messages.push(*msg.clone()),
+            Event::WalletConnectStatus(status) => {
+                self.status = status.clone();
+                if let Some((_, proposal)) = status.proposal() {
+                    let proposal = proposal.data.as_session_propose().ok_or(
+                        crate::Error::InternalErrorStr("Not proposal, should not happen"),
+                    )?;
+
+                    let text = self.confirm_popup.text_mut();
+                    *text = format_proposal(proposal);
+                    self.confirm_popup.open();
+                }
+            }
+            _ => {}
+        }
+
+        let handle_result = match self.status {
+            WalletConnectStatus::Idle => {
+                self.form.handle_event(event, |item, form| {
+                    if item == FormItem::ConnectButton && self.thread.is_none() {
+                        let uri_input = form.get_text(FormItem::UriInput).clone();
+                        let current_account = shared_state.current_account.unwrap(); // TODO ensure we can see this page only if account exists
+                        let tr = tr.clone();
+
+                        let client_seed = [123u8; 32];
+                        let project_id: &str = "46c07e56a92e34fe567dcc951fba3f3e";
+
+                        let conn = Connection::new(
+                            "https://relay.walletconnect.org/rpc",
+                            "https://relay.walletconnect.org",
+                            // TODO take project ID and client seed from config
+                            project_id,
+                            client_seed,
+                            Metadata {
+                                name: "gm wallet".to_string(),
+                                description: "gm is a TUI based ethereum wallet".to_string(),
+                                url: "https://github.com/zemse/gm".to_string(),
+                                icons: vec![],
+                            },
+                        );
+
+                        tokio::spawn(async move {
+                            let _ = tr.send(Event::WalletConnectStatus(
+                                WalletConnectStatus::Initializing,
+                            ));
+
+                            match conn.init_pairing(&uri_input).await {
+                                Ok((pairing, proposal)) => {
+                                    let _ = tr.send(Event::WalletConnectStatus(
+                                        WalletConnectStatus::ProposalReceived(Box::new((
+                                            pairing, proposal,
+                                        ))),
+                                    ));
+                                }
+                                Err(error) => {
+                                    let _ = tr.send(Event::WalletConnectError(
+                                        current_account,
+                                        format!("{error:?}"),
+                                    ));
+                                }
+                            };
+                        });
+                    }
+
+                    Ok(())
+                })?
+            }
+            WalletConnectStatus::ProposalReceived(_) => self.confirm_popup.handle_event(
+                event,
+                area,
+                || {
+                    let mut pairing = self
+                        .status
+                        .proposal()
+                        .ok_or(crate::Error::InternalErrorStr(
+                            "proposal not found, cant happen",
+                        ))?
+                        .0
+                        .clone();
+
+                    let addr = shared_state.current_account.unwrap();
+                    let tr = tr.clone();
+                    self.watch_thread = Some(tokio::spawn(async move {
+                        let _ = tr.send(Event::WalletConnectStatus(
+                            WalletConnectStatus::SessionSettleInProgress,
+                        ));
+
+                        let Ok(msgs) = pairing.approve_with_session_settle(addr).await else {
+                            let _ = tr.send(Event::WalletConnectStatus(
+                                WalletConnectStatus::SessionSettleFailed,
+                            ));
+                            return;
+                        };
+
+                        let _ = tr.send(Event::WalletConnectStatus(
+                            WalletConnectStatus::SessionSettleDone,
+                        ));
+
+                        for msg in msgs {
+                            let _ = tr.send(Event::WalletConnectMessage(addr, Box::new(msg)));
+                        }
+
+                        loop {
+                            let messages =
+                                pairing.watch_messages(Topic::Derived, None).await.unwrap();
+
+                            for msg in messages {
+                                let _ = tr.send(Event::WalletConnectMessage(addr, Box::new(msg)));
+                            }
+
+                            tokio::time::sleep(Duration::from_secs(1)).await;
+                        }
+                    }));
+                    Ok(())
+                },
+                || {
+                    let _ = tr.send(Event::WalletConnectStatus(
+                        WalletConnectStatus::SessionSettleCancelled,
+                    ));
+                    Ok(())
+                },
+            )?,
+            _ => HandleResult::default(),
+        };
+
+        Ok(handle_result)
+    }
+
+    fn render_component(
+        &self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        shared_state: &crate::tui::app::SharedState,
+    ) -> ratatui::prelude::Rect
+    where
+        Self: Sized,
+    {
+        match &self.status {
+            WalletConnectStatus::Idle => {
+                self.form.render(area, buf, &shared_state.theme);
+            }
+            WalletConnectStatus::Initializing => {
+                "Initializing connection...".render(area, buf);
+            }
+            WalletConnectStatus::ProposalReceived(_) => {
+                self.confirm_popup.render(area, buf, &shared_state.theme);
+            }
+            WalletConnectStatus::SessionSettleInProgress => {
+                "Settling session...".render(area, buf);
+            }
+            WalletConnectStatus::SessionSettleFailed => {
+                "Settling session failed".render(area, buf);
+            }
+            WalletConnectStatus::SessionSettleCancelled => {
+                "Settling session cancelled".render(area, buf);
+            }
+            WalletConnectStatus::SessionSettleDone => {
+                if self.messages.is_empty() {
+                    "Connected! Waiting for actions".render(area, buf);
+                } else {
+                    let mut s = String::new();
+                    for msg in &self.messages {
+                        s.push_str(&format!("{msg:?}\n"));
+                    }
+                    Paragraph::new(Text::raw(&s))
+                        .wrap(Wrap { trim: false })
+                        .to_owned()
+                        .render(area, buf);
+                }
+            }
+        }
+        self.confirm_popup.render(area, buf, &shared_state.theme);
+
+        area
+    }
+}
+
+fn format_proposal(params: &SessionProposeParams) -> String {
+    let metadata = &params.proposer.metadata;
+    let mut output = format!(
+        "dApp Name: {name}\n{desc}\n{url}\n\nRequested Permissions\n",
+        name = metadata.name,
+        desc = metadata.description,
+        url = metadata.url
+    );
+
+    for (ns_key, ns) in params
+        .required_namespaces
+        .iter()
+        .chain(params.optional_namespaces.iter())
+    {
+        output.push_str(&format!("\n1. {ns_key}\n"));
+
+        if let Some(accounts) = &ns.accounts {
+            output.push_str("   - Accounts:\n");
+            for a in accounts {
+                output.push_str(&format!("     • {a}\n"));
+            }
+        }
+
+        if !ns.chains.is_empty() {
+            output.push_str("   - Chains:\n");
+            for c in &ns.chains {
+                output.push_str(&format!("     • {c}\n"));
+            }
+        }
+
+        if !ns.methods.is_empty() {
+            output.push_str("   - Methods:\n");
+            for m in &ns.methods {
+                output.push_str(&format!("     • {m}\n"));
+            }
+        }
+
+        if !ns.events.is_empty() {
+            output.push_str("   - Events:\n");
+            for e in &ns.events {
+                output.push_str(&format!("     • {e}\n"));
+            }
+        }
+    }
+
+    output
+}

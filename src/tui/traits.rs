@@ -36,6 +36,10 @@ pub trait RectUtil {
     fn change_height(self, height: u16) -> ratatui::prelude::Rect;
 
     fn margin_h(self, m: u16) -> ratatui::prelude::Rect;
+
+    fn margin_down(self, m: u16) -> ratatui::prelude::Rect;
+
+    fn block_inner(self) -> ratatui::prelude::Rect;
 }
 
 #[derive(Default)]

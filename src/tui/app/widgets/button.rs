@@ -7,12 +7,12 @@ use ratatui::{
     widgets::Block,
 };
 
-pub struct Button {
+pub struct Button<const REVERSED: bool = false> {
     pub focus: bool,
     pub label: &'static str,
 }
 
-impl Button {
+impl<const REVERSED: bool> Button<REVERSED> {
     pub fn render(
         &self,
         area: ratatui::prelude::Rect,
@@ -34,7 +34,11 @@ impl Button {
             Block::bordered()
                 .border_type(theme.into())
                 .style(if self.focus {
-                    Style::default().add_modifier(Modifier::REVERSED)
+                    if REVERSED {
+                        Style::default().remove_modifier(Modifier::REVERSED)
+                    } else {
+                        Style::default().add_modifier(Modifier::REVERSED)
+                    }
                 } else {
                     Style::default()
                 }),

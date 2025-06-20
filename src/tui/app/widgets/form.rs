@@ -13,7 +13,7 @@ use strum::IntoEnumIterator;
 use crate::tui::{
     app::widgets::filter_select_popup::FilterSelectPopup,
     theme::Theme,
-    traits::{RectUtil, WidgetHeight},
+    traits::{HandleResult, RectUtil, WidgetHeight},
     Event,
 };
 
@@ -85,7 +85,10 @@ impl FormWidget {
     }
 }
 
-pub struct Form<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>> {
+pub struct Form<
+    E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>,
+    const REVERSED: bool = false,
+> {
     pub cursor: usize,
     pub text_cursor: usize,
     pub form_focus: bool,
@@ -95,7 +98,11 @@ pub struct Form<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error 
     pub _phantom: PhantomData<E>,
 }
 
-impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>> Form<E> {
+impl<
+        E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>,
+        const REVERSED: bool,
+    > Form<E, REVERSED>
+{
     // TODO remove the cursor parameter, and guess it as the first item that is
     // not heading or static text or similar
     pub fn init<F>(set_values_closure: F) -> crate::Result<Self>
@@ -259,7 +266,11 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
             .any(|item| matches!(item, FormWidget::SelectInput { popup, .. } if popup.is_open()))
     }
 
-    pub fn handle_event<F>(&mut self, event: &Event, mut on_button: F) -> crate::Result<()>
+    pub fn handle_event<F>(
+        &mut self,
+        event: &Event,
+        mut on_button: F,
+    ) -> crate::Result<HandleResult>
     where
         F: FnMut(E, &mut Self) -> crate::Result<()>,
     {
@@ -326,7 +337,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                 }
             }
         }
-        Ok(())
+        Ok(HandleResult::default())
     }
 
     pub fn render(&self, mut area: Rect, buf: &mut Buffer, theme: &Theme)
@@ -432,7 +443,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                     area.y += height_used;
                 }
                 FormWidget::Button { label } => {
-                    Button {
+                    Button::<REVERSED> {
                         focus: self.form_focus && self.cursor == i,
                         label,
                     }

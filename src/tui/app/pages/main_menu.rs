@@ -17,7 +17,7 @@ use crate::{
 use super::{
     account::AccountPage, address_book::AddressBookPage, assets::AssetsPage, config::ConfigPage,
     dev_key_capture::DevKeyCapturePage, send_message::SendMessagePage, setup::SetupPage,
-    sign_message::SignMessagePage, Page,
+    sign_message::SignMessagePage, walletconnect::WalletConnectPage, Page,
 };
 
 #[derive(Display, EnumIter)]
@@ -26,6 +26,7 @@ pub enum MainMenuItem {
     Portfolio,
     Accounts,
     AddressBook,
+    WalletConnect,
     SignMessage,
     SendMessage,
     DevKeyInput,
@@ -39,6 +40,7 @@ impl MainMenuItem {
             MainMenuItem::Portfolio => Page::Assets(AssetsPage::default()),
             MainMenuItem::Accounts => Page::Account(AccountPage::new()?),
             MainMenuItem::AddressBook => Page::AddressBook(AddressBookPage::new()?),
+            MainMenuItem::WalletConnect => Page::WalletConnect(WalletConnectPage::new()?),
             MainMenuItem::SignMessage => Page::SignMessage(SignMessagePage::new()?),
             MainMenuItem::SendMessage => Page::SendMessage(SendMessagePage::new()?),
             MainMenuItem::DevKeyInput => Page::DevKeyCapture(DevKeyCapturePage::default()),
@@ -51,6 +53,7 @@ impl MainMenuItem {
             MainMenuItem::Setup
             | MainMenuItem::AddressBook
             | MainMenuItem::Accounts
+            | MainMenuItem::WalletConnect
             | MainMenuItem::DevKeyInput
             | MainMenuItem::Config => false,
 
@@ -64,6 +67,7 @@ impl MainMenuItem {
             | MainMenuItem::Portfolio
             | MainMenuItem::Accounts
             | MainMenuItem::AddressBook
+            | MainMenuItem::WalletConnect
             | MainMenuItem::SignMessage
             | MainMenuItem::SendMessage
             | MainMenuItem::Config => false,

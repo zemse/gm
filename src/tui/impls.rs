@@ -99,4 +99,22 @@ impl RectUtil for Rect {
             height: self.height,
         }
     }
+
+    fn margin_down(self, m: u16) -> Rect {
+        Rect {
+            x: self.x,
+            y: self.y,
+            width: self.width,
+            height: self.height - m,
+        }
+    }
+
+    fn block_inner(self) -> Rect {
+        Rect {
+            x: self.x + 1,
+            y: self.y + 1,
+            width: self.width - 2,
+            height: self.height - 2,
+        }
+    }
 }

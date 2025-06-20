@@ -35,6 +35,7 @@ security-framework = "3.2"
 # file system
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_plain = "1.0.2"
 toml = "0.8"
 serde_yaml = "0.9.34"
 directories = "5.0"
@@ -51,6 +52,8 @@ coins-bip32 = "0.12.0"
 humantime = "2.2.0"
 chrono = "0.4.41"
 url = "2.5.4"
-serde_plain = "1.0.2"
 serde_path_to_error = "0.1.17"
 data3 = "0.1.0"
+# TODO replace with published crate
+walletconnect-sdk = { git = "https://github.com/zemse/walletconnect-sdk-rs" }
+# walletconnect-sdk = { path = "../walletconnect-sdk" }

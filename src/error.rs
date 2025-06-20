@@ -42,6 +42,7 @@ pub enum Error {
     Abort(&'static str),
     UrlParseError(Box<url::ParseError>),
     Data3Error(Box<data3::error::Error>),
+    WalletConnectError(walletconnect_sdk::Error),
 }
 
 impl Error {
@@ -217,6 +218,12 @@ impl From<url::ParseError> for Error {
 impl From<data3::error::Error> for Error {
     fn from(e: data3::error::Error) -> Self {
         Error::Data3Error(Box::new(e))
+    }
+}
+
+impl From<walletconnect_sdk::Error> for Error {
+    fn from(e: walletconnect_sdk::Error) -> Self {
+        Error::WalletConnectError(e)
     }
 }
 

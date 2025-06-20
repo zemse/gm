@@ -4,13 +4,14 @@ use alloy::{
     primitives::{Address, FixedBytes},
     signers::k256::ecdsa::SigningKey,
 };
+use walletconnect_sdk::wc_message::WcMessage;
 
 use crate::utils::assets::Asset;
 
 use reqwest::Error as ReqwestError;
 
 use super::app::{
-    pages::transaction::TxStatus,
+    pages::{transaction::TxStatus, walletconnect::WalletConnectStatus},
     widgets::candle_chart::{Candle, Interval},
 };
 
@@ -47,6 +48,10 @@ pub enum Event {
 
     TxStatus(TxStatus),
     TxStatusError(String),
+
+    WalletConnectStatus(WalletConnectStatus),
+    WalletConnectMessage(Address, Box<WcMessage>),
+    WalletConnectError(Address, String),
 }
 
 impl Event {

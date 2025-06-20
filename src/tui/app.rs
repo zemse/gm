@@ -24,7 +24,7 @@ use widgets::{footer::Footer, form::Form, popup::Popup, text_popup::TextPopup, t
 
 use super::{
     events::{self, Event},
-    traits::{Component, HandleResult},
+    traits::{Component, HandleResult, RectUtil},
 };
 use crate::tui::theme::{Theme, ThemeName};
 use crate::{
@@ -246,7 +246,8 @@ impl App {
             && self.context.last().is_some()
         {
             let page = self.context.last_mut().unwrap();
-            let result = page.handle_event(&event, body_area, tr, sd, &self.shared_state);
+            let result =
+                page.handle_event(&event, body_area.block_inner(), tr, sd, &self.shared_state);
             self.process_result(result).await?
         } else {
             0
@@ -349,6 +350,10 @@ impl App {
             Event::TxSubmitError(error) => self.fatal_error_popup.set_text(error),
             Event::TxStatusError(error) => self.fatal_error_popup.set_text(error),
 
+            Event::WalletConnectError(_, error) => {
+                self.fatal_error_popup.set_text(error);
+            }
+
             _ => {}
         };
 
@@ -424,6 +429,13 @@ impl Widget for &App {
                     }
                     MainMenuItem::AddressBook => {
                         Page::Text(TextPage::new("Manage familiar addresses".to_string()))
+                    }
+                    MainMenuItem::WalletConnect => {
+                        let mut preview_page = main_menu_item
+                            .get_page()
+                            .expect("main_menu_item.get_page() failed");
+                        preview_page.set_focus(false);
+                        preview_page
                     }
                     MainMenuItem::SignMessage => Page::Text(TextPage::new(
                         "Sign a message and prove ownership to somebody".to_string(),
