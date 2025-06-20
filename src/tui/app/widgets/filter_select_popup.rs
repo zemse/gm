@@ -1,9 +1,7 @@
 use std::fmt::Display;
 
 use crossterm::event::{KeyCode, KeyEventKind};
-use ratatui::{
-    widgets::{Block, Widget},
-};
+use ratatui::widgets::{Block, Widget};
 
 use super::{filter_select::FilterSelect, popup::Popup};
 use crate::tui::theme::Theme;
@@ -11,7 +9,6 @@ use crate::{
     tui::{traits::HandleResult, Event},
     utils::cursor::Cursor,
 };
-use crate::tui::app::SharedState;
 
 pub struct FilterSelectPopup<Item: Display> {
     title: &'static str,
@@ -91,8 +88,12 @@ impl<Item: Display> FilterSelectPopup<Item> {
 
         Ok(result)
     }
-    pub fn render(&self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, theme: &Theme)
-    where
+    pub fn render(
+        &self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        theme: &Theme,
+    ) where
         Self: Sized,
     {
         if self.is_open() {
