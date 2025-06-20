@@ -54,19 +54,19 @@ impl Default for Theme {
         }
     }
 }
-impl Into<Style> for &Theme {
-    fn into(self) -> Style {
-        Style::default().bg(self.bg).fg(self.text)
+impl From<&Theme> for Style {
+    fn from(val: &Theme) -> Self {
+        Style::default().bg(val.bg).fg(val.text)
     }
 }
-impl Into<Style> for &mut Theme {
-    fn into(self) -> Style {
-        Style::default().bg(self.bg).fg(self.text)
+impl From<&mut Theme> for Style {
+    fn from(val: &mut Theme) -> Self {
+        Style::default().bg(val.bg).fg(val.text)
     }
 }
-impl Into<BorderType> for &Theme {
-    fn into(self) -> BorderType {
-        match self.borders {
+impl From<&Theme> for BorderType {
+    fn from(val: &Theme) -> Self {
+        match val.borders {
             Borders::Square => BorderType::Plain,
             Borders::Rounded => BorderType::Rounded,
         }
@@ -99,11 +99,7 @@ impl Theme {
         }
     }
     pub fn select(&self) -> Option<Style> {
-        if let Some(select) = self.select {
-            Some(Into::<Style>::into(self).bg(select))
-        } else {
-            None
-        }
+        self.select.map(|select| Into::<Style>::into(self).bg(select))
     }
     pub fn select_popup(&self) -> Style {
         if let Some(select_popup) = self.select_popup {
