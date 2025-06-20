@@ -1,10 +1,14 @@
+use crate::utils::account::Secret;
+use crate::{Error, Result};
+use alloy::primitives::Address;
+use alloy::signers::local::PrivateKeySigner;
 use rand::rngs::OsRng;
 use std::{fs, path::PathBuf};
-use alloy::primitives::Address;
-use crate::{Result, Error};
-use crate::utils::account::Secret;
-use alloy::signers::local::PrivateKeySigner;
-//use alloy::signers::keystore::KeystoreSigner; 
+//use alloy::signers::keystore::KeystoreSigner;
+use alloy::signers::local::LocalSigner;
+
+
+
 
 pub struct FsKeystore;
 
@@ -27,29 +31,29 @@ impl FsKeystore {
         Ok(signer.address())
     }
 
-   pub fn list_addresses() -> Result<Vec<Address>> {
-    let dir = Self::init_dir()?;
-    let mut out = Vec::new();
+    pub fn list_addresses() -> Result<Vec<Address>> {
+        let dir = Self::init_dir()?;
+        let mut out = Vec::new();
 
-    for entry in fs::read_dir(dir)? {
-        let p = entry?.path();
-        if p.extension().and_then(|e| e.to_str()) == Some("json") {
-            if let Ok(data) = fs::read_to_string(&p) {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data) {
-                    if let Some(addr_str) = json.get("address").and_then(|v| v.as_str()) {
-                        // Ethereum V3 keystores Standard
-                        let addr = format!("0x{}", addr_str);
-                        if let Ok(addr) = addr.parse::<Address>() {
-                            out.push(addr);
+        for entry in fs::read_dir(dir)? {
+            let p = entry?.path();
+            if p.extension().and_then(|e| e.to_str()) == Some("json") {
+                if let Ok(data) = fs::read_to_string(&p) {
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data) {
+                        if let Some(addr_str) = json.get("address").and_then(|v| v.as_str()) {
+                            // Ethereum V3 keystores Standard
+                            let addr = format!("0x{}", addr_str);
+                            if let Ok(addr) = addr.parse::<Address>() {
+                                out.push(addr);
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
-    Ok(out)
-}
+        Ok(out)
+    }
 
     pub fn load_secret(addr: &Address, password: &str) -> Result<Secret> {
         for entry in fs::read_dir(Self::init_dir()?)? {

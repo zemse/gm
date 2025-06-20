@@ -1,8 +1,8 @@
 pub mod account;
 pub mod assets;
 pub mod cursor;
-pub mod text;
 pub mod fs_keystore;
+pub mod text;
 
 pub trait Inquire<DefaultValue = ()>
 where

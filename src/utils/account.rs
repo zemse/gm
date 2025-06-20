@@ -6,22 +6,21 @@ use std::{
     time::{Duration, Instant},
 };
 
+use super::fs_keystore;
 use alloy::{
     hex,
     primitives::{address, Address, U256},
     signers::{
         k256::{ecdsa::SigningKey, FieldBytes},
-        local::{MnemonicBuilder, PrivateKeySigner,LocalSigner},
+        local::{LocalSigner, MnemonicBuilder, PrivateKeySigner},
         utils::secret_key_to_address,
     },
 };
 use coins_bip39::{English, Mnemonic};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use super::fs_keystore;
 
 use crate::Error;
-
 
 pub trait AccountUtils {
     fn store_mnemonic_wallet(phrase: &str, address: Address) -> crate::Result<()>;
@@ -82,11 +81,11 @@ impl AccountManager {
         #[cfg(target_os = "linux")]
         let secret = {
             let pwd = password.unwrap_or_else(|| {
-        inquire::Password::new("Keystore password:")
-            .without_confirmation()
-            .prompt()
-            .expect("Failed to read password")
-    });
+                inquire::Password::new("Keystore password:")
+                    .without_confirmation()
+                    .prompt()
+                    .expect("Failed to read password")
+            });
             fs_keystore::FsKeystore::load_secret(address, &pwd)?
         };
 
@@ -99,7 +98,6 @@ impl AccountManager {
         }
     }
 }
-
 
 impl AccountUtils for AccountManager {
     fn store_mnemonic_wallet(phrase: &str, address: Address) -> crate::Result<()> {
@@ -157,13 +155,12 @@ impl AccountUtils for AccountManager {
         #[cfg(target_os = "linux")]
         {
             let pwd = inquire::Password::new("Keystore password:")
-        .without_confirmation()
-        .prompt()?;
+                .without_confirmation()
+                .prompt()?;
             fs_keystore::FsKeystore::load_secret(address, &pwd)
         }
     }
 }
-
 
 fn random_mnemonic() -> crate::Result<String> {
     let mnemonic = Mnemonic::<English>::new_with_count(&mut OsRng, 24)?;
@@ -428,4 +425,3 @@ mod macos {
         }
     }
 }
-
