@@ -1,8 +1,11 @@
+use crate::tui::app::SharedState;
+use crate::tui::theme::Theme;
 use ratatui::{layout::Rect, text::Line, widgets::Widget};
 
 pub struct Footer<'a> {
     pub exit: &'a bool,
     pub is_main_menu: &'a bool,
+    pub theme: &'a Theme,
 }
 
 impl Widget for Footer<'_> {
@@ -19,7 +22,7 @@ impl Widget for Footer<'_> {
         } else {
             "press control c to quit | press [ESC] to go back"
         };
-        Line::from(footer_text).render(
+        Line::from(footer_text).style(self.theme).render(
             Rect {
                 x: area.x + 1,
                 y: area.y,

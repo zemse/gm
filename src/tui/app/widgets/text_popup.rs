@@ -1,24 +1,26 @@
 use crossterm::event::KeyCode;
 use ratatui::widgets::{Block, Widget};
 
+use super::{popup::Popup, text_scroll::TextScroll};
+use crate::tui::theme::Theme;
 use crate::tui::{
     traits::{BorderedWidget, HandleResult},
     Event,
 };
 
-use super::{popup::Popup, text_scroll::TextScroll};
-
 pub struct TextPopup {
     title: &'static str,
     text_scroll: TextScroll,
+    theme: Theme,
 }
 
 impl TextPopup {
-    pub fn new(title: &'static str) -> Self {
+    pub fn new(title: &'static str, theme: Theme) -> Self {
         let text = String::new();
         Self {
             title,
             text_scroll: TextScroll::new(text),
+            theme,
         }
     }
 
@@ -76,6 +78,7 @@ impl Widget for &TextPopup {
         let popup_inner_area = Popup::inner_area(area);
 
         let block = Block::bordered()
+            .style(&self.theme)
             .title(self.title)
             .title_bottom("press ESC to dismiss");
 

@@ -37,7 +37,10 @@ impl Component for Title {
                 .unwrap_or("wallet".to_string())
         );
 
-        Line::from(welcome_string).bold().render(area, buf);
+        Line::from(welcome_string)
+            .style(&shared_state.theme)
+            .bold()
+            .render(area, buf);
 
         let display = if shared_state.online == Some(false) {
             "offline".to_string()
@@ -51,7 +54,11 @@ impl Component for Title {
                 .unwrap_or("loading...".to_string())
         };
 
-        Line::from(display).bold().right_aligned().render(area, buf);
+        Line::from(display)
+            .style(&shared_state.theme)
+            .bold()
+            .right_aligned()
+            .render(area, buf);
 
         // let pkg_version = env!("CARGO_PKG_VERSION");
         // Line::from(

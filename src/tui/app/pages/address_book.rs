@@ -231,7 +231,7 @@ impl Component for AddressBookPage {
             cursor: &self.cursor,
             search_string: &self.search_string,
             focus: self.focus,
-            focus_style: None,
+            focus_style: _shared_state.theme.select(),
         }
         .render(area, buf);
         area

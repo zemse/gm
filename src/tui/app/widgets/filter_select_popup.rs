@@ -6,12 +6,12 @@ use ratatui::{
     widgets::{Block, Widget},
 };
 
+use super::{filter_select::FilterSelect, popup::Popup};
+use crate::tui::theme::Theme;
 use crate::{
     tui::{traits::HandleResult, Event},
     utils::cursor::Cursor,
 };
-
-use super::{filter_select::FilterSelect, popup::Popup};
 
 pub struct FilterSelectPopup<Item: Display> {
     title: &'static str,
@@ -20,6 +20,7 @@ pub struct FilterSelectPopup<Item: Display> {
     items: Option<Vec<Item>>,
     cursor: Cursor,
     search_string: String,
+    theme: Theme,
 }
 
 impl<Item: Display> FilterSelectPopup<Item> {
@@ -31,6 +32,7 @@ impl<Item: Display> FilterSelectPopup<Item> {
             items: None,
             cursor: Cursor::default(),
             search_string: String::new(),
+            theme: Theme::default(),
         }
     }
     pub fn is_open(&self) -> bool {
@@ -102,7 +104,7 @@ impl<Item: Display> Widget for &FilterSelectPopup<Item> {
             Popup.render(area, buf);
 
             let inner_area = Popup::inner_area(area);
-            let block = Block::bordered().title(self.title);
+            let block = Block::bordered().style(&self.theme).title(self.title);
             let block_inner_area = block.inner(inner_area);
             block.render(inner_area, buf);
 
@@ -119,7 +121,7 @@ impl<Item: Display> Widget for &FilterSelectPopup<Item> {
                         cursor: &self.cursor,
                         search_string: &self.search_string,
                         focus: true,
-                        focus_style: Some(Style::default().remove_modifier(Modifier::REVERSED)),
+                        focus_style: Some(self.theme.select_popup()),
                     }
                     .render(block_inner_area, buf);
                 }

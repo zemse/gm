@@ -169,7 +169,7 @@ impl Component for MainMenuPage {
             list: &self.list,
             cursor: &self.cursor,
             focus: true,
-            focus_style: None,
+            focus_style: _shared_state.theme.select(),
         }
         .render(area, buf);
 

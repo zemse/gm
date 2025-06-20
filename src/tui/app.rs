@@ -82,7 +82,7 @@ impl App {
 
             exit: false,
             // fatal_error: None,
-            fatal_error_popup: TextPopup::new("Fatal Error"),
+            fatal_error_popup: TextPopup::new("Fatal Error", theme.clone().error_popup()),
             shared_state: SharedState {
                 assets: None,
                 recent_addresses: None,
@@ -451,6 +451,7 @@ impl Widget for &App {
             Footer {
                 exit: &self.exit,
                 is_main_menu: &page.is_main_menu(),
+                theme: &self.shared_state.theme,
             }
             .render(footer_area, buf);
         }
