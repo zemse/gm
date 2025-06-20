@@ -13,7 +13,7 @@ use strum::IntoEnumIterator;
 use crate::tui::{
     app::widgets::filter_select_popup::FilterSelectPopup,
     theme::Theme,
-    traits::{HandleResult, RectUtil, WidgetHeight},
+    traits::{RectUtil, WidgetHeight},
     Event,
 };
 
@@ -266,11 +266,7 @@ impl<
             .any(|item| matches!(item, FormWidget::SelectInput { popup, .. } if popup.is_open()))
     }
 
-    pub fn handle_event<F>(
-        &mut self,
-        event: &Event,
-        mut on_button: F,
-    ) -> crate::Result<HandleResult>
+    pub fn handle_event<F>(&mut self, event: &Event, mut on_button: F) -> crate::Result<()>
     where
         F: FnMut(E, &mut Self) -> crate::Result<()>,
     {
@@ -337,7 +333,7 @@ impl<
                 }
             }
         }
-        Ok(HandleResult::default())
+        Ok(())
     }
 
     pub fn render(&self, mut area: Rect, buf: &mut Buffer, theme: &Theme)
