@@ -20,7 +20,7 @@ use ratatui::{
     widgets::{Block, Widget},
     DefaultTerminal,
 };
-use widgets::{footer::Footer, form::Form, popup::Popup, text_popup::TextPopup, title::Title};
+use widgets::{footer::Footer, form::Form, text_popup::TextPopup, title::Title};
 
 use super::{
     events::{self, Event},
@@ -254,9 +254,7 @@ impl App {
         };
 
         // suppy event to fatal error popup
-        let result = self
-            .fatal_error_popup
-            .handle_event(&event, Popup::inner_area(area));
+        let result = self.fatal_error_popup.handle_event(&event, area);
         esc_ignores += self.process_result(result).await?;
 
         if self.context.is_empty() {

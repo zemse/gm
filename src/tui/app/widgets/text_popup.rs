@@ -42,7 +42,12 @@ impl TextPopup {
     ) -> crate::Result<HandleResult> {
         let mut result = HandleResult::default();
 
-        result.merge(self.text_scroll.handle_event(event, area)?);
+        if self.is_shown() {
+            result.esc_ignores = 1;
+        }
+
+        let popup_inner_area = Popup::inner_area(area);
+        result.merge(self.text_scroll.handle_event(event, popup_inner_area)?);
 
         #[allow(clippy::single_match)]
         match event {
@@ -53,10 +58,6 @@ impl TextPopup {
                 _ => {}
             },
             _ => {}
-        }
-
-        if self.is_shown() {
-            result.esc_ignores = 1;
         }
 
         Ok(result)
