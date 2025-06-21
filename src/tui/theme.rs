@@ -2,8 +2,10 @@ use ratatui::prelude::Color;
 use ratatui::style::{Modifier, Style};
 use ratatui::widgets::BorderType;
 use std::fmt::Formatter;
+use strum::EnumIter;
+use strum::IntoEnumIterator;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, EnumIter)]
 pub enum ThemeName {
     #[default]
     Monochrome,
@@ -27,6 +29,10 @@ impl ThemeName {
             "DarkModern" => Self::DarkModern,
             _ => Default::default(),
         }
+    }
+
+    pub fn list() -> Vec<String> {
+        Self::iter().map(|theme| theme.to_string()).collect()
     }
 }
 

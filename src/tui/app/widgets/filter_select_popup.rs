@@ -10,6 +10,7 @@ use crate::{
     utils::cursor::Cursor,
 };
 
+#[derive(Clone, Debug)]
 pub struct FilterSelectPopup<Item: Display> {
     title: &'static str,
     empty_text: Option<&'static str>,
@@ -30,16 +31,34 @@ impl<Item: Display> FilterSelectPopup<Item> {
             search_string: String::new(),
         }
     }
+
+    pub fn set_items(&mut self, items: Option<Vec<Item>>) {
+        self.items = items;
+    }
+
+    pub fn set_cursor(&mut self, item: &Item) {
+        if let Some(items) = &self.items {
+            if let Some(index) = items.iter().position(|i| i.to_string() == item.to_string()) {
+                self.cursor.current = index;
+            }
+        }
+    }
+
+    pub fn current_selection(&self) -> Option<&Item> {
+        self.items
+            .as_ref()
+            .and_then(|items| items.get(self.cursor.current))
+    }
+
     pub fn is_open(&self) -> bool {
         self.open
     }
 
     // Opens the popup with the fresh items.
-    pub fn open(&mut self, items: Option<Vec<Item>>) {
+    pub fn open(&mut self) {
         self.open = true;
         self.cursor.reset();
         self.search_string.clear();
-        self.items = items;
     }
 
     pub fn close(&mut self) {

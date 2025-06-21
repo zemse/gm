@@ -1,7 +1,7 @@
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
 use alloy::signers::SignerSync;
-use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
+use ratatui::{buffer::Buffer, layout::Rect};
 use strum::EnumIter;
 
 use crate::{
@@ -90,11 +90,11 @@ impl Component for SignMessagePage {
         Ok(HandleResult::default())
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, _: &SharedState) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, ss: &SharedState) -> Rect
     where
         Self: Sized,
     {
-        self.form.render(area, buf);
+        self.form.render(area, buf, &ss.theme);
 
         area
     }

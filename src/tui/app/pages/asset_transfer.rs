@@ -15,7 +15,6 @@ use alloy::primitives::utils::parse_units;
 use alloy::primitives::{Bytes, TxKind, U256};
 use alloy::sol;
 use alloy::sol_types::SolCall;
-use ratatui::widgets::Widget;
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use strum::EnumIter;
@@ -139,15 +138,17 @@ impl Component for AssetTransferPage {
                 && self.form.get_text(FormItem::To).is_empty()
                 && event.is_space_or_enter_pressed()
             {
+                self.address_book_popup.open();
                 self.address_book_popup
-                    .open(Some(AddressBookMenuItem::get_menu(
+                    .set_items(Some(AddressBookMenuItem::get_menu(
                         false,
                         shared_state.recent_addresses.clone(),
                     )?));
                 result.esc_ignores = 1;
             } else if self.form.is_focused(FormItem::AssetType) && event.is_space_or_enter_pressed()
             {
-                self.asset_popup.open(shared_state.assets.clone());
+                self.asset_popup.open();
+                self.asset_popup.set_items(shared_state.assets.clone());
                 result.esc_ignores = 1;
             } else {
                 self.form.handle_event(event, |label, form| {
@@ -229,7 +230,7 @@ impl Component for AssetTransferPage {
     where
         Self: Sized,
     {
-        self.form.render(area, buf);
+        self.form.render(area, buf, &shared_state.theme);
 
         self.address_book_popup
             .render(area, buf, &shared_state.theme);
