@@ -89,6 +89,7 @@ pub struct WalletConnectPage {
     messages: Vec<WcMessage>,
     status: WalletConnectStatus,
     confirm_popup: ConfirmPopup,
+    wait_popup: ConfirmPopup,
     watch_thread: Option<JoinHandle<()>>,
 }
 
@@ -100,6 +101,13 @@ impl WalletConnectPage {
             messages: vec![],
             status: WalletConnectStatus::Idle,
             confirm_popup: ConfirmPopup::new("WalletConnect", String::new(), "Approve", "Reject"),
+            wait_popup: ConfirmPopup::new(
+                "Warning",
+                "The WalletConnect session will be ended if you go back. You can also press ESC to go back. If you want to continue session you can choose to wait."
+                    .to_string(),
+                "Wait",
+                "End",
+            ),
             watch_thread: None,
         })
     }
@@ -127,11 +135,6 @@ impl Component for WalletConnectPage {
         shared_state: &SharedState,
     ) -> crate::Result<crate::tui::traits::HandleResult> {
         match event {
-            Event::Input(key) => {
-                if key.code == KeyCode::Char('a') {
-                    self.confirm_popup.open();
-                }
-            }
             Event::WalletConnectMessage(_addr, msg) => self.messages.push(*msg.clone()),
             Event::WalletConnectStatus(status) => {
                 self.status = status.clone();
@@ -146,7 +149,7 @@ impl Component for WalletConnectPage {
                 }
             }
             Event::WalletConnectError(_, _) => {
-                // self.status = WalletConnectStatus::Idle;
+                self.status = WalletConnectStatus::Idle;
             }
             _ => {}
         }
@@ -214,13 +217,13 @@ impl Component for WalletConnectPage {
                     .0
                     .clone();
 
+                let _ = tr.send(Event::WalletConnectStatus(
+                    WalletConnectStatus::SessionSettleInProgress,
+                ));
+
                 let addr = shared_state.current_account.unwrap();
                 let tr = tr.clone();
                 self.watch_thread = Some(tokio::spawn(async move {
-                    let _ = tr.send(Event::WalletConnectStatus(
-                        WalletConnectStatus::SessionSettleInProgress,
-                    ));
-
                     let Ok(msgs) = pairing.approve_with_session_settle(addr).await else {
                         let _ = tr.send(Event::WalletConnectStatus(
                             WalletConnectStatus::SessionSettleFailed,
@@ -256,7 +259,42 @@ impl Component for WalletConnectPage {
             },
         )?;
 
-        if self.confirm_popup.is_open() {
+        let mut go_back = false;
+
+        let r = self.wait_popup.handle_event(
+            event,
+            area,
+            || Ok(()),
+            || {
+                go_back = true;
+                handle_result.page_pops += 1;
+                Ok(())
+            },
+        )?;
+        handle_result.merge(r);
+
+        if let Event::Input(key_event) = event {
+            match key_event.code {
+                KeyCode::Enter => {
+                    if let WalletConnectStatus::ProposalReceived(_) = self.status {
+                        if !self.confirm_popup.is_open() && self.watch_thread.is_none() {
+                            self.confirm_popup.open();
+                        }
+                    }
+                }
+                KeyCode::Esc => {
+                    if self.status != WalletConnectStatus::Idle
+                        // && !go_back
+                        && (!self.confirm_popup.is_open() || !self.wait_popup.is_open())
+                    {
+                        self.wait_popup.open();
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if !go_back {
             handle_result.esc_ignores = 1;
         }
 
@@ -280,7 +318,7 @@ impl Component for WalletConnectPage {
                 "Initializing connection...".render(area, buf);
             }
             WalletConnectStatus::ProposalReceived(_) => {
-                self.confirm_popup.render(area, buf, &shared_state.theme);
+                "Please confirm pairing details using the popup".render(area, buf);
             }
             WalletConnectStatus::SessionSettleInProgress => {
                 "Settling session...".render(area, buf);
@@ -306,7 +344,9 @@ impl Component for WalletConnectPage {
                 }
             }
         }
+
         self.confirm_popup.render(area, buf, &shared_state.theme);
+        self.wait_popup.render(area, buf, &shared_state.theme);
 
         area
     }

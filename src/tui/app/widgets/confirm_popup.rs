@@ -62,11 +62,11 @@ impl ConfirmPopup {
         event: &crate::tui::Event,
         area: Rect,
         mut on_confirm: F1,
-        on_cancel: F2,
+        mut on_cancel: F2,
     ) -> crate::Result<HandleResult>
     where
         F1: FnMut() -> crate::Result<()>,
-        F2: Fn() -> crate::Result<()>,
+        F2: FnMut() -> crate::Result<()>,
     {
         let mut result = HandleResult::default();
 
@@ -91,13 +91,13 @@ impl ConfirmPopup {
                             }
                             self.close();
                         }
+                        KeyCode::Esc => {
+                            on_cancel()?;
+                            self.close();
+                        }
                         _ => {}
                     }
                 }
-            }
-
-            if event.is_key_pressed(KeyCode::Esc) {
-                self.close();
             }
 
             result.esc_ignores = 1;
