@@ -109,7 +109,10 @@ pub trait Component {
         Self: Sized,
     {
         let inner_area = block.inner(area);
-        block.render(area, buf);
+        block
+            .style(&shared_state.theme)
+            .border_type((&shared_state.theme).into())
+            .render(area, buf);
         self.render_component(inner_area, buf, shared_state);
         area
     }

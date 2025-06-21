@@ -289,7 +289,6 @@ impl Widget for &CandleChart {
             .enumerate()
         {
             let candle = visible_candles.get(visible_candles.len() - i - 1).unwrap();
-            // buf.set_string(x, 0,  "╽", Style::default());
             let [y_open, y_high, y_low, y_close] = candle.calc_y(y_scale, y_min_all);
             let y_max = std::cmp::max_by(y_open, y_close, f64::total_cmp);
             let y_min = std::cmp::min_by(y_open, y_close, f64::total_cmp);
@@ -361,11 +360,6 @@ impl Widget for &CandleChart {
                     candle.bear_bull(),
                 );
             }
-
-            //buf.set_string(area.width - i as u16 - 1, area.height - y - 1,  "┃", candle.bear_bull());
-            //│ ╻ ╹ ╷ ╵
-            // buf.set_string(x, 2,  "┃", Style::default());
-            // buf.set_string(x, 3,  "╿", Style::default());
         }
     }
 }

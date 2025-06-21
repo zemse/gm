@@ -2,6 +2,8 @@ use std::{collections::HashMap, marker::PhantomData};
 
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
     style::Stylize,
     text::Text,
     widgets::{Paragraph, Widget, Wrap},
@@ -9,6 +11,8 @@ use ratatui::{
 use strum::IntoEnumIterator;
 
 use crate::tui::{
+    app::widgets::filter_select_popup::FilterSelectPopup,
+    theme::Theme,
     traits::{RectUtil, WidgetHeight},
     Event,
 };
@@ -38,6 +42,12 @@ pub enum FormWidget {
         text: String,
         empty_text: Option<&'static str>,
     },
+    SelectInput {
+        label: &'static str,
+        text: String,
+        empty_text: Option<&'static str>,
+        popup: FilterSelectPopup<String>,
+    },
     Button {
         label: &'static str,
     },
@@ -52,6 +62,7 @@ impl FormWidget {
             FormWidget::DisplayBox { label, .. } => Some(label),
             FormWidget::BooleanInput { label, .. } => Some(label),
             FormWidget::Button { label } => Some(label),
+            FormWidget::SelectInput { label, .. } => Some(label),
             FormWidget::Heading(_)
             | FormWidget::StaticText(_)
             | FormWidget::DisplayText(_)
@@ -61,10 +72,11 @@ impl FormWidget {
 
     pub fn max_cursor(&self) -> usize {
         match self {
-            FormWidget::InputBox { text, .. } => text.len(),
-            FormWidget::DisplayBox { text, .. } => text.len(),
+            FormWidget::InputBox { text, .. }
+            | FormWidget::DisplayBox { text, .. }
+            | FormWidget::SelectInput { text, .. } => text.len(),
+            FormWidget::BooleanInput { value, .. } => value.to_string().len(),
             FormWidget::Button { .. }
-            | FormWidget::BooleanInput { .. }
             | FormWidget::Heading(_)
             | FormWidget::StaticText(_)
             | FormWidget::DisplayText(_)
@@ -141,7 +153,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
     pub fn advance_cursor(&mut self) {
         loop {
             self.cursor = (self.cursor + 1) % self.items.len();
-            self.text_cursor = self.items[self.cursor].max_cursor();
+            self.update_text_cursor();
 
             if self.is_valid_cursor(self.cursor) {
                 break;
@@ -152,12 +164,16 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
     pub fn retreat_cursor(&mut self) {
         loop {
             self.cursor = (self.cursor + self.items.len() - 1) % self.items.len();
-            self.text_cursor = self.items[self.cursor].max_cursor();
+            self.update_text_cursor();
 
             if self.is_valid_cursor(self.cursor) {
                 break;
             }
         }
+    }
+
+    pub fn update_text_cursor(&mut self) {
+        self.text_cursor = self.items[self.cursor].max_cursor();
     }
 
     pub fn is_valid_cursor(&self, idx: usize) -> bool {
@@ -174,6 +190,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
             FormWidget::InputBox { .. }
             | FormWidget::DisplayBox { .. }
             | FormWidget::BooleanInput { .. }
+            | FormWidget::SelectInput { .. }
             | FormWidget::Button { .. } => true,
         }
     }
@@ -184,6 +201,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
             FormWidget::DisplayBox { text, .. } => text,
             FormWidget::DisplayText(text) => text,
             FormWidget::ErrorText(text) => text,
+            FormWidget::SelectInput { text, .. } => text,
             _ => unreachable!(),
         }
     }
@@ -194,6 +212,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
             FormWidget::DisplayBox { text, .. } => text,
             FormWidget::DisplayText(text) => text,
             FormWidget::ErrorText(text) => text,
+            FormWidget::SelectInput { text, .. } => text,
             _ => unreachable!(),
         }
     }
@@ -219,6 +238,13 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         }
     }
 
+    pub fn get_popup_mut(&mut self, idx: E) -> &mut FilterSelectPopup<String> {
+        match &mut self.items[idx.index()] {
+            FormWidget::SelectInput { popup, .. } => popup,
+            _ => unreachable!(),
+        }
+    }
+
     pub fn is_focused(&self, idx: E) -> bool {
         self.cursor == idx.index()
     }
@@ -227,46 +253,34 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         matches!(self.items[self.cursor], FormWidget::Button { .. })
     }
 
+    pub fn is_some_popup_open(&self) -> bool {
+        self.items
+            .iter()
+            .any(|item| matches!(item, FormWidget::SelectInput { popup, .. } if popup.is_open()))
+    }
+
     pub fn handle_event<F>(&mut self, event: &Event, mut on_button: F) -> crate::Result<()>
     where
         F: FnMut(E, &mut Self) -> crate::Result<()>,
     {
         if let Event::Input(key_event) = event {
             if key_event.kind == KeyEventKind::Press {
-                match key_event.code {
-                    KeyCode::Up => loop {
-                        self.retreat_cursor();
-
-                        if !self.hide.contains_key(&self.cursor) {
-                            match &self.items[self.cursor] {
-                                FormWidget::InputBox { .. }
-                                | FormWidget::DisplayBox { .. }
-                                | FormWidget::BooleanInput { .. }
-                                | FormWidget::Button { .. } => break,
-                                _ => {}
+                if !self.is_some_popup_open() {
+                    match key_event.code {
+                        KeyCode::Up => {
+                            self.retreat_cursor();
+                        }
+                        KeyCode::Down | KeyCode::Tab => {
+                            self.advance_cursor();
+                        }
+                        KeyCode::Enter => {
+                            if !self.is_button_focused() {
+                                self.advance_cursor();
                             }
                         }
-                    },
-                    KeyCode::Down | KeyCode::Tab => loop {
-                        self.advance_cursor();
 
-                        if self.is_valid_cursor(self.cursor) {
-                            break;
-                        }
-                    },
-                    KeyCode::Enter => {
-                        if !self.is_button_focused() {
-                            loop {
-                                self.cursor = (self.cursor + 1) % self.items.len();
-
-                                if self.is_valid_cursor(self.cursor) {
-                                    break;
-                                }
-                            }
-                        }
+                        _ => {}
                     }
-
-                    _ => {}
                 }
 
                 match &mut self.items[self.cursor] {
@@ -281,7 +295,24 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                             key_event.code,
                             KeyCode::Char(_) | KeyCode::Left | KeyCode::Right | KeyCode::Backspace
                         ) {
-                            *value = !*value
+                            *value = !*value;
+                            self.text_cursor = value.to_string().len();
+                        }
+                    }
+                    FormWidget::SelectInput { text, popup, .. } => {
+                        // self.update_text_cursor();
+                        popup.handle_event(event, |selected| {
+                            *text = selected.clone();
+                            self.text_cursor = selected.len();
+                        })?;
+
+                        if !popup.is_open() {
+                            match key_event.code {
+                                KeyCode::Backspace | KeyCode::Char(_) => {
+                                    popup.open();
+                                }
+                                _ => {}
+                            }
                         }
                     }
                     FormWidget::Button { .. } => {
@@ -297,15 +328,13 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         }
         Ok(())
     }
-}
 
-impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>> Widget
-    for &Form<E>
-{
-    fn render(self, mut area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
+    pub fn render(&self, mut area: Rect, buf: &mut Buffer, theme: &Theme)
     where
         Self: Sized,
     {
+        let full_area = area;
+
         for (i, item) in self.items.iter().enumerate() {
             if self.hide.contains_key(&i) {
                 continue; // skip hidden items
@@ -342,7 +371,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: currency.as_ref(),
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf, &self.text_cursor);
+                    widget.render(area, buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
                 FormWidget::DisplayBox {
@@ -366,7 +395,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf, &self.text_cursor);
+                    widget.render(area, buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
                 FormWidget::BooleanInput { label, value } => {
@@ -382,7 +411,24 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf, &self.text_cursor);
+                    widget.render(area, buf, &self.text_cursor, theme);
+                    area.y += height_used;
+                }
+                FormWidget::SelectInput {
+                    label,
+                    text,
+                    empty_text,
+                    ..
+                } => {
+                    let widget = InputBox {
+                        focus: self.form_focus && self.cursor == i,
+                        label,
+                        text,
+                        empty_text: *empty_text,
+                        currency: None,
+                    };
+                    let height_used = widget.height_used(area); // to see height based on width
+                    widget.render(area, buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
                 FormWidget::Button { label } => {
@@ -390,7 +436,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         focus: self.form_focus && self.cursor == i,
                         label,
                     }
-                    .render(area, buf);
+                    .render(area, buf, theme);
                     area.y += 4;
                 }
                 FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
@@ -402,6 +448,17 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         area.y += (text.len() as u16).div_ceil(area.width) + 1;
                     }
                 }
+            }
+        }
+
+        // Render popups at the end so they appear on the top
+        for item in &self.items {
+            #[allow(clippy::single_match)]
+            match item {
+                FormWidget::SelectInput { popup, .. } => {
+                    popup.render(full_area, buf, theme);
+                }
+                _ => {}
             }
         }
     }

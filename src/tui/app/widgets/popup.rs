@@ -1,6 +1,6 @@
+use crate::tui::theme::Theme;
 use ratatui::{
     layout::{Margin, Rect},
-    style::{Modifier, Style},
     widgets::{Block, Clear, Widget},
 };
 
@@ -23,11 +23,13 @@ impl Popup {
     pub fn inner_area(full_area: Rect) -> Rect {
         Self::area(full_area).inner(Margin::new(2, 1))
     }
-}
 
-impl Widget for Popup {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
+    pub fn render(
+        self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        theme: &Theme,
+    ) where
         Self: Sized,
     {
         let popup_area = Popup::area(area);
@@ -36,7 +38,8 @@ impl Widget for Popup {
         Clear.render(popup_area, buf);
 
         Block::default()
-            .style(Style::default().add_modifier(Modifier::REVERSED))
+            .style(theme)
+            .border_type(theme.into())
             .render(popup_area, buf);
     }
 }

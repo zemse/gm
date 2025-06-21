@@ -129,7 +129,7 @@ impl Component for SetupPage {
         Ok(handle_result)
     }
 
-    fn render_component(&self, mut area: Rect, buf: &mut Buffer, _: &SharedState) -> Rect
+    fn render_component(&self, mut area: Rect, buf: &mut Buffer, ss: &SharedState) -> Rect
     where
         Self: Sized,
     {
@@ -143,7 +143,7 @@ impl Component for SetupPage {
             "Complete the following steps to get started:".render(area, buf);
             area = area.consume_height(2);
 
-            self.form.render(area, buf);
+            self.form.render(area, buf, &ss.theme);
         }
         area
     }

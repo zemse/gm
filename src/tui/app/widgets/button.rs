@@ -1,20 +1,24 @@
+use crate::tui::theme::Theme;
+use crate::tui::traits::BorderedWidget;
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
     text::Line,
-    widgets::{Block, Widget},
+    widgets::Block,
 };
-
-use crate::tui::traits::BorderedWidget;
 
 pub struct Button {
     pub focus: bool,
     pub label: &'static str,
 }
 
-impl Widget for Button {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
+impl Button {
+    pub fn render(
+        &self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        theme: &Theme,
+    ) where
         Self: Sized,
     {
         let button_area = Rect {
@@ -27,11 +31,13 @@ impl Widget for Button {
         Line::from(self.label).render_with_block(
             button_area,
             buf,
-            Block::bordered().style(if self.focus {
-                Style::default().add_modifier(Modifier::REVERSED)
-            } else {
-                Style::default()
-            }),
+            Block::bordered()
+                .border_type(theme.into())
+                .style(if self.focus {
+                    Style::default().add_modifier(Modifier::REVERSED)
+                } else {
+                    Style::default()
+                }),
         );
     }
 }

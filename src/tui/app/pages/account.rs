@@ -3,10 +3,6 @@ use std::{
     sync::{atomic::AtomicBool, mpsc, Arc},
 };
 
-use alloy::primitives::Address;
-use crossterm::event::{KeyCode, KeyEventKind};
-use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
-
 use crate::{
     disk::{Config, DiskInterface},
     tui::{
@@ -19,6 +15,9 @@ use crate::{
         cursor::Cursor,
     },
 };
+use alloy::primitives::Address;
+use crossterm::event::{KeyCode, KeyEventKind};
+use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 
 use super::{account_create::AccountCreatePage, account_import::AccountImportPage, Page};
 
@@ -116,7 +115,7 @@ impl Component for AccountPage {
         Ok(result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, _shared_state: &SharedState) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
     where
         Self: Sized,
     {
@@ -124,7 +123,7 @@ impl Component for AccountPage {
             list: &self.list,
             cursor: &self.cursor,
             focus: self.focus,
-            focus_style: None,
+            focus_style: shared_state.theme.select(),
         }
         .render(area, buf);
         area
