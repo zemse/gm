@@ -1,5 +1,5 @@
 use crossterm::event::KeyCode;
-use ratatui::widgets::{Block, Widget};
+use ratatui::widgets::Block;
 
 use super::{popup::Popup, text_scroll::TextScroll};
 use crate::tui::theme::Theme;
