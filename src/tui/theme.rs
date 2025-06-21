@@ -99,7 +99,8 @@ impl Theme {
         }
     }
     pub fn select(&self) -> Option<Style> {
-        self.select.map(|select| Into::<Style>::into(self).bg(select))
+        self.select
+            .map(|select| Into::<Style>::into(self).bg(select))
     }
     pub fn select_popup(&self) -> Style {
         if let Some(select_popup) = self.select_popup {
