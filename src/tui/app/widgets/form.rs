@@ -153,7 +153,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
     pub fn advance_cursor(&mut self) {
         loop {
             self.cursor = (self.cursor + 1) % self.items.len();
-            self.text_cursor = self.items[self.cursor].max_cursor();
+            self.update_text_cursor();
 
             if self.is_valid_cursor(self.cursor) {
                 break;
@@ -164,12 +164,16 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
     pub fn retreat_cursor(&mut self) {
         loop {
             self.cursor = (self.cursor + self.items.len() - 1) % self.items.len();
-            self.text_cursor = self.items[self.cursor].max_cursor();
+            self.update_text_cursor();
 
             if self.is_valid_cursor(self.cursor) {
                 break;
             }
         }
+    }
+
+    pub fn update_text_cursor(&mut self) {
+        self.text_cursor = self.items[self.cursor].max_cursor();
     }
 
     pub fn is_valid_cursor(&self, idx: usize) -> bool {
@@ -291,11 +295,16 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                             key_event.code,
                             KeyCode::Char(_) | KeyCode::Left | KeyCode::Right | KeyCode::Backspace
                         ) {
-                            *value = !*value
+                            *value = !*value;
+                            self.text_cursor = value.to_string().len();
                         }
                     }
                     FormWidget::SelectInput { text, popup, .. } => {
-                        popup.handle_event(event, |selected| *text = selected.clone())?;
+                        // self.update_text_cursor();
+                        popup.handle_event(event, |selected| {
+                            *text = selected.clone();
+                            self.text_cursor = selected.len();
+                        })?;
 
                         if !popup.is_open() {
                             match key_event.code {
