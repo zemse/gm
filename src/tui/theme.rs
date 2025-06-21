@@ -1,5 +1,5 @@
 use ratatui::prelude::Color;
-use ratatui::style::{Modifier, Style};
+use ratatui::style::Style;
 use ratatui::widgets::BorderType;
 use std::fmt::Formatter;
 use strum::EnumIter;
@@ -41,8 +41,8 @@ pub struct Theme {
     pub text: Color,
     pub bg: Color,
     pub select: Option<Color>,
-    pub select_popup: Option<Color>,
-    pub error_popup: Option<Color>,
+    pub popup_bg: Option<Color>,
+    pub error_popup_bg: Option<Color>,
     pub border_type: BorderType,
 }
 
@@ -52,8 +52,8 @@ impl Default for Theme {
             text: Color::Reset,
             bg: Color::Reset,
             select: None,
-            select_popup: None,
-            error_popup: None,
+            popup_bg: None,
+            error_popup_bg: None,
             border_type: BorderType::Plain,
         }
     }
@@ -89,16 +89,16 @@ impl Theme {
                 text: Color::White,
                 bg: Color::Black,
                 select: Some(Color::Yellow),
-                select_popup: Some(Color::Blue),
-                error_popup: Some(Color::Red),
+                popup_bg: Some(Color::Blue),
+                error_popup_bg: Some(Color::Red),
                 border_type: BorderType::Plain,
             },
             ThemeName::DarkModern => Theme {
                 text: Color::White,
                 bg: Color::Black,
                 select: Some(Color::Yellow),
-                select_popup: Some(Color::Blue),
-                error_popup: Some(Color::Red),
+                popup_bg: Some(Color::Blue),
+                error_popup_bg: Some(Color::Red),
                 border_type: BorderType::Rounded,
             },
         }
@@ -109,20 +109,21 @@ impl Theme {
             .map(|select| Into::<Style>::into(self).bg(select))
     }
 
-    pub fn select_popup(&self) -> Style {
-        if let Some(select_popup) = self.select_popup {
-            Into::<Style>::into(self)
-                .bg(select_popup)
-                .remove_modifier(Modifier::REVERSED)
+    pub fn popup_bg(&self) -> Theme {
+        if let Some(popup_bg) = self.popup_bg {
+            Theme {
+                bg: popup_bg,
+                ..self.clone()
+            }
         } else {
-            Style::default().remove_modifier(Modifier::REVERSED)
+            Theme::default()
         }
     }
 
-    pub fn error_popup(&self) -> Theme {
-        if let Some(error_popup) = self.error_popup {
+    pub fn error_popup_bg(&self) -> Theme {
+        if let Some(error_popup_bg) = self.error_popup_bg {
             Theme {
-                bg: error_popup,
+                bg: error_popup_bg,
                 ..self.clone()
             }
         } else {

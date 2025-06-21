@@ -27,6 +27,7 @@ impl Component for Title {
     where
         Self: Sized,
     {
+        buf.set_style(area, &shared_state.theme);
         let area = area.margin_h(1);
 
         let welcome_string = format!(

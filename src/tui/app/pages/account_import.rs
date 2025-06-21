@@ -75,7 +75,7 @@ impl Component for AccountImportPage {
         Ok(result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, _: &SharedState) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
     where
         Self: Sized,
     {
@@ -86,7 +86,7 @@ impl Component for AccountImportPage {
             empty_text: None,
             currency: None,
         }
-        .render(area, buf, &self.text_cursor);
+        .render(area, buf, &self.text_cursor, &shared_state.theme);
 
         if let Some(display) = &self.display {
             display.render(area.offset(Offset { x: 0, y: 4 }), buf);

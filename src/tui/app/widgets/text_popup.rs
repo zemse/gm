@@ -11,16 +11,14 @@ use crate::tui::{
 pub struct TextPopup {
     title: &'static str,
     text_scroll: TextScroll,
-    theme: Theme,
 }
 
 impl TextPopup {
-    pub fn new(title: &'static str, theme: Theme) -> Self {
+    pub fn new(title: &'static str) -> Self {
         let text = String::new();
         Self {
             title,
             text_scroll: TextScroll::new(text),
-            theme,
         }
     }
 
@@ -63,22 +61,24 @@ impl TextPopup {
 
         Ok(result)
     }
-}
-
-impl Widget for &TextPopup {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
+    pub fn render(
+        &self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        theme: &Theme,
+    ) where
         Self: Sized,
     {
         if self.text_scroll.text.is_empty() {
             return;
         }
-        Popup.render(area, buf);
+        Popup.render(area, buf, theme);
 
         let popup_inner_area = Popup::inner_area(area);
 
         let block = Block::bordered()
-            .style(&self.theme)
+            .style(theme)
+            .border_type(theme.into())
             .title(self.title)
             .title_bottom("press ESC to dismiss");
 

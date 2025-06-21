@@ -371,7 +371,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: currency.as_ref(),
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf, &self.text_cursor);
+                    widget.render(area, buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
                 FormWidget::DisplayBox {
@@ -395,7 +395,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf, &self.text_cursor);
+                    widget.render(area, buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
                 FormWidget::BooleanInput { label, value } => {
@@ -411,7 +411,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf, &self.text_cursor);
+                    widget.render(area, buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
                 FormWidget::SelectInput {
@@ -428,7 +428,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf, &self.text_cursor);
+                    widget.render(area, buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
                 FormWidget::Button { label } => {
@@ -436,7 +436,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         focus: self.form_focus && self.cursor == i,
                         label,
                     }
-                    .render(area, buf);
+                    .render(area, buf, theme);
                     area.y += 4;
                 }
                 FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {

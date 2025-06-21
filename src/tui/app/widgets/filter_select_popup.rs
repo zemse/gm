@@ -116,10 +116,13 @@ impl<Item: Display> FilterSelectPopup<Item> {
         Self: Sized,
     {
         if self.is_open() {
-            Popup.render(area, buf);
+            Popup.render(area, buf, theme);
 
             let inner_area = Popup::inner_area(area);
-            let block = Block::bordered().style(theme).title(self.title);
+            let block = Block::bordered()
+                .border_type(theme.into())
+                .style(theme)
+                .title(self.title);
             let block_inner_area = block.inner(inner_area);
             block.render(inner_area, buf);
 
@@ -136,7 +139,7 @@ impl<Item: Display> FilterSelectPopup<Item> {
                         cursor: &self.cursor,
                         search_string: &self.search_string,
                         focus: true,
-                        focus_style: Some(theme.select_popup()),
+                        focus_style: None,
                     }
                     .render(block_inner_area, buf);
                 }

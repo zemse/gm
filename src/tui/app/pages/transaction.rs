@@ -323,7 +323,7 @@ impl Component for TransactionPage {
                 label: "Send Transaction",
                 focus: true,
             }
-            .render(area, buf),
+            .render(area, buf, &_shared_state.theme),
 
             TxStatus::Signing => {
                 "Signing and sending transaction...".render(area, buf);
