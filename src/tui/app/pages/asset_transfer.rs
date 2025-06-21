@@ -224,7 +224,7 @@ impl Component for AssetTransferPage {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
-        _shared_state: &SharedState,
+        shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
@@ -232,9 +232,9 @@ impl Component for AssetTransferPage {
         self.form.render(area, buf);
 
         self.address_book_popup
-            .render(area, buf, &_shared_state.theme);
+            .render(area, buf, &shared_state.theme);
 
-        self.asset_popup.render(area, buf, &_shared_state.theme);
+        self.asset_popup.render(area, buf, &shared_state.theme);
 
         area
     }

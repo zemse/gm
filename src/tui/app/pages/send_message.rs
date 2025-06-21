@@ -174,7 +174,7 @@ impl Component for SendMessagePage {
         &self,
         area: Rect,
         buf: &mut ratatui::prelude::Buffer,
-        _shared_state: &SharedState,
+        shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
@@ -182,9 +182,9 @@ impl Component for SendMessagePage {
         self.form.render(area, buf);
 
         self.address_book_popup
-            .render(area, buf, &_shared_state.theme);
+            .render(area, buf, &shared_state.theme);
 
-        self.networks_popup.render(area, buf, &_shared_state.theme);
+        self.networks_popup.render(area, buf, &shared_state.theme);
 
         area
     }

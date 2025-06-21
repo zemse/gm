@@ -115,7 +115,7 @@ impl Component for AccountPage {
         Ok(result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, _shared_state: &SharedState) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
     where
         Self: Sized,
     {
@@ -123,7 +123,7 @@ impl Component for AccountPage {
             list: &self.list,
             cursor: &self.cursor,
             focus: self.focus,
-            focus_style: _shared_state.theme.select(),
+            focus_style: shared_state.theme.select(),
         }
         .render(area, buf);
         area

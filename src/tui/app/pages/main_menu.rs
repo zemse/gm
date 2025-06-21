@@ -160,7 +160,7 @@ impl Component for MainMenuPage {
         &self,
         area: Rect,
         buf: &mut ratatui::prelude::Buffer,
-        _shared_state: &SharedState,
+        shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
@@ -169,7 +169,7 @@ impl Component for MainMenuPage {
             list: &self.list,
             cursor: &self.cursor,
             focus: true,
-            focus_style: _shared_state.theme.select(),
+            focus_style: shared_state.theme.select(),
         }
         .render(area, buf);
 
