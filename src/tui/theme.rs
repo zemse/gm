@@ -116,7 +116,7 @@ impl Theme {
                 ..self.clone()
             }
         } else {
-            Theme::default()
+            self.clone()
         }
     }
 
@@ -127,7 +127,7 @@ impl Theme {
                 ..self.clone()
             }
         } else {
-            Theme::default()
+            self.clone()
         }
     }
 }
