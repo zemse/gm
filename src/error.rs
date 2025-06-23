@@ -42,6 +42,7 @@ pub enum Error {
     Abort(&'static str),
     UrlParseError(Box<url::ParseError>),
     Data3Error(Box<data3::error::Error>),
+    Generic(String),
 }
 
 impl Error {

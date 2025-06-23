@@ -6,18 +6,21 @@ use std::{
     time::{Duration, Instant},
 };
 
+use super::fs_keystore;
 use alloy::{
     hex,
     primitives::{address, Address, U256},
     signers::{
         k256::{ecdsa::SigningKey, FieldBytes},
-        local::{MnemonicBuilder, PrivateKeySigner},
+        local::{LocalSigner, MnemonicBuilder, PrivateKeySigner},
         utils::secret_key_to_address,
     },
 };
 use coins_bip39::{English, Mnemonic};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
+
+use crate::Error;
 
 pub trait AccountUtils {
     fn store_mnemonic_wallet(phrase: &str, address: Address) -> crate::Result<()>;
@@ -43,19 +46,55 @@ impl AccountManager {
         Ok(address)
     }
 
-    pub fn import_private_key(private_key: &str) -> crate::Result<Address> {
-        let private_key = hex::decode(private_key)?;
-        let address = PrivateKeySigner::from_slice(&private_key)?.address();
-        Self::store_private_key(FieldBytes::from_slice(private_key.as_slice()), address)?;
+    pub fn import_private_key(
+        private_key: &str,
+        password: Option<String>,
+    ) -> crate::Result<Address> {
+        let raw = hex::decode(private_key)?;
+        let address = PrivateKeySigner::from_slice(&raw)?.address();
+
+        #[cfg(target_os = "macos")]
+        {
+            Self::store_private_key(FieldBytes::from_slice(&raw), address)?;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let pwd = password.expect("Password must be supplied for keystore operations");
+
+            let stored_addr = fs_keystore::FsKeystore::store_private_key(
+                &raw,
+                &pwd,
+                Some(&format!("{:x}", address)),
+            )?;
+            if stored_addr != address {
+                return Err(crate::Error::Generic("Keystore-address mismatch".into()));
+            }
+        }
+
         Ok(address)
     }
 
-    pub fn load_wallet(address: &Address) -> crate::Result<PrivateKeySigner> {
-        match Self::get_secret(address)? {
+    pub fn load_wallet(
+        address: &Address,
+        password: Option<String>,
+    ) -> crate::Result<PrivateKeySigner> {
+        #[cfg(target_os = "linux")]
+        let secret = {
+            let pwd = password.unwrap_or_else(|| {
+                inquire::Password::new("Keystore password:")
+                    .without_confirmation()
+                    .prompt()
+                    .expect("Failed to read password")
+            });
+            fs_keystore::FsKeystore::load_secret(address, &pwd)?
+        };
+
+        #[cfg(target_os = "macos")]
+        let secret = Self::get_secret(address)?;
+
+        match secret {
             Secret::Mnemonic(phrase) => get_signer_from_mnemonic(&phrase),
-            Secret::PrivateKey(private_key) => {
-                Ok(PrivateKeySigner::from_slice(private_key.as_ref())?)
-            }
+            Secret::PrivateKey(pk) => Ok(PrivateKeySigner::from_slice(pk.as_ref())?),
         }
     }
 }
@@ -63,34 +102,63 @@ impl AccountManager {
 impl AccountUtils for AccountManager {
     fn store_mnemonic_wallet(phrase: &str, address: Address) -> crate::Result<()> {
         #[cfg(target_os = "macos")]
-        return macos::Macos::store_mnemonic_wallet(phrase, address);
-
+        {
+            return macos::Macos::store_mnemonic_wallet(phrase, address);
+        }
         #[cfg(target_os = "linux")]
-        return linux_insecure::LinuxInsecure::store_mnemonic_wallet(phrase, address);
+        {
+            // For mnemonics, you may want to use a custom encryption or just wrap in keystore.
+            // Here, we treat mnemonic as secret and store using fs_keystore.
+            // Convert phrase to bytes for storage.
+            fs_keystore::FsKeystore::store_mnemonic_wallet(phrase, address)
+        }
     }
 
     fn store_private_key(private_key: &FieldBytes, address: Address) -> crate::Result<()> {
         #[cfg(target_os = "macos")]
-        return macos::Macos::store_private_key(private_key, address);
-
+        {
+            return macos::Macos::store_private_key(private_key, address);
+        }
         #[cfg(target_os = "linux")]
-        return linux_insecure::LinuxInsecure::store_private_key(private_key, address);
+        {
+            // Prompt for password for storing the keystore
+            let pwd = inquire::Password::new("Keystore password:").prompt()?;
+
+            let stored = fs_keystore::FsKeystore::store_private_key(
+                private_key.as_ref(),
+                &pwd,
+                Some(&format!("{:x}", address)),
+            )?;
+            if stored != address {
+                return Err(crate::Error::Generic("Address mismatch".into()));
+            }
+            Ok(())
+        }
     }
 
     fn get_account_list() -> crate::Result<Vec<Address>> {
         #[cfg(target_os = "macos")]
-        return macos::Macos::get_account_list();
-
+        {
+            return macos::Macos::get_account_list();
+        }
         #[cfg(target_os = "linux")]
-        return linux_insecure::LinuxInsecure::get_account_list();
+        {
+            Ok(fs_keystore::FsKeystore::list_addresses()?)
+        }
     }
 
     fn get_secret(address: &Address) -> crate::Result<Secret> {
         #[cfg(target_os = "macos")]
-        return macos::Macos::get_secret(address);
-
+        {
+            return macos::Macos::get_secret(address);
+        }
         #[cfg(target_os = "linux")]
-        return linux_insecure::LinuxInsecure::get_secret(address);
+        {
+            let pwd = inquire::Password::new("Keystore password:")
+                .without_confirmation()
+                .prompt()?;
+            fs_keystore::FsKeystore::load_secret(address, &pwd)
+        }
     }
 }
 
@@ -354,66 +422,6 @@ mod macos {
 
             println!("{list:#?}");
             panic!();
-        }
-    }
-}
-
-pub mod linux_insecure {
-    use crate::disk::{DiskInterface, FileFormat};
-
-    use super::*;
-
-    pub struct LinuxInsecure;
-
-    impl AccountUtils for LinuxInsecure {
-        fn store_mnemonic_wallet(phrase: &str, address: Address) -> crate::Result<()> {
-            InsecurePrivateKeyStore::load()?.add(address, Secret::Mnemonic(phrase.to_string()))
-        }
-
-        fn store_private_key(private_key: &FieldBytes, address: Address) -> crate::Result<()> {
-            InsecurePrivateKeyStore::load()?.add(address, Secret::PrivateKey(*private_key))
-        }
-
-        fn get_account_list() -> crate::Result<Vec<Address>> {
-            Ok(InsecurePrivateKeyStore::load()?.list())
-        }
-
-        fn get_secret(address: &Address) -> crate::Result<Secret> {
-            InsecurePrivateKeyStore::load()?
-                .find_by_address(address)
-                .ok_or(crate::Error::SecretNotFound(*address))
-        }
-    }
-
-    // TODO remove this once we have implemented a secure store for linux
-    #[derive(Serialize, Deserialize, Debug, Default)]
-    pub struct InsecurePrivateKeyStore {
-        pub keys: Vec<(Address, Secret)>,
-    }
-
-    impl DiskInterface for InsecurePrivateKeyStore {
-        const FILE_NAME: &'static str = "insecure_private_key_store";
-        const FORMAT: FileFormat = FileFormat::TOML;
-    }
-
-    impl InsecurePrivateKeyStore {
-        pub fn add(&mut self, address: Address, key: Secret) -> crate::Result<()> {
-            self.keys.push((address, key));
-            self.save()
-        }
-
-        pub fn find_by_address(&self, address: &Address) -> Option<Secret> {
-            self.keys.iter().find_map(|(stored_address, key)| {
-                if stored_address == address {
-                    Some(key.clone())
-                } else {
-                    None
-                }
-            })
-        }
-
-        pub fn list(self) -> Vec<Address> {
-            self.keys.into_iter().map(|(address, _)| address).collect()
         }
     }
 }
