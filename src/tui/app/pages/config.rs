@@ -1,4 +1,7 @@
-use std::sync::{atomic::AtomicBool, mpsc, Arc};
+use std::{
+    str::FromStr,
+    sync::{atomic::AtomicBool, mpsc, Arc},
+};
 
 use ratatui::{buffer::Buffer, layout::Rect};
 use strum::EnumIter;
@@ -115,7 +118,7 @@ impl Component for ConfigPage {
             config.testnet_mode = form.get_boolean(FormItem::TestnetMode);
             config.developer_mode = form.get_boolean(FormItem::DeveloperMode);
             let theme_name = form.get_text(FormItem::Theme).clone();
-            config.theme_name = theme::ThemeName::from_str(&theme_name).to_string();
+            config.theme_name = theme::ThemeName::from_str(&theme_name)?.to_string();
 
             config.save()?;
 

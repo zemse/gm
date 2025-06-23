@@ -20,17 +20,24 @@ impl std::fmt::Display for ThemeName {
     }
 }
 
-impl ThemeName {
-    pub fn from_str(theme_name: &str) -> Self {
+impl std::str::FromStr for ThemeName {
+    type Err = crate::Error;
+
+    fn from_str(theme_name: &str) -> crate::Result<Self> {
         match theme_name {
-            "Monochrome" => Self::Monochrome,
-            "MonochromeModern" => Self::MonochromeModern,
-            "Dark" => Self::Dark,
-            "DarkModern" => Self::DarkModern,
-            _ => Default::default(),
+            "Monochrome" => Ok(Self::Monochrome),
+            "MonochromeModern" => Ok(Self::MonochromeModern),
+            "Dark" => Ok(Self::Dark),
+            "DarkModern" => Ok(Self::DarkModern),
+            _ => Err(crate::Error::InternalError(format!(
+                "Unknown theme name: {}",
+                theme_name
+            ))),
         }
     }
+}
 
+impl ThemeName {
     pub fn list() -> Vec<String> {
         Self::iter().map(|theme| theme.to_string()).collect()
     }

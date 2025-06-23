@@ -183,7 +183,6 @@ pub struct Config {
     pub theme_name: String,
 }
 
-// TODO use enum for theme names
 fn default_theme_name() -> String {
     "Monochrome".to_string()
 }

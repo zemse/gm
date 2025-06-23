@@ -1,5 +1,6 @@
 use std::{
     io,
+    str::FromStr,
     sync::{atomic::AtomicBool, mpsc, Arc},
 };
 
@@ -74,7 +75,7 @@ pub struct App {
 impl App {
     pub fn new() -> crate::Result<Self> {
         let config = Config::load()?;
-        let theme_name = ThemeName::from_str(&config.theme_name);
+        let theme_name = ThemeName::from_str(&config.theme_name)?;
         let theme = Theme::new(theme_name);
         Ok(Self {
             context: vec![Page::MainMenu(MainMenuPage::new(config.developer_mode)?)],
@@ -193,7 +194,7 @@ impl App {
         self.shared_state.alchemy_api_key_available = config.alchemy_api_key.is_some();
         self.shared_state.current_account = config.current_account;
         self.shared_state.developer_mode = config.developer_mode;
-        let theme_name = ThemeName::from_str(&config.theme_name);
+        let theme_name = ThemeName::from_str(&config.theme_name)?;
         let theme = Theme::new(theme_name);
         self.shared_state.theme = theme;
         for page in &mut self.context {
