@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEventKind};
 
 use crate::tui::Event;
 
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Cursor {
     pub current: usize,
 }

@@ -1,12 +1,12 @@
 use crossterm::event::KeyCode;
-use ratatui::widgets::{Block, Widget};
+use ratatui::widgets::Block;
 
+use super::{popup::Popup, text_scroll::TextScroll};
+use crate::tui::theme::Theme;
 use crate::tui::{
     traits::{BorderedWidget, HandleResult},
     Event,
 };
-
-use super::{popup::Popup, text_scroll::TextScroll};
 
 pub struct TextPopup {
     title: &'static str,
@@ -61,21 +61,24 @@ impl TextPopup {
 
         Ok(result)
     }
-}
-
-impl Widget for &TextPopup {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
+    pub fn render(
+        &self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        theme: &Theme,
+    ) where
         Self: Sized,
     {
         if self.text_scroll.text.is_empty() {
             return;
         }
-        Popup.render(area, buf);
+        Popup.render(area, buf, theme);
 
         let popup_inner_area = Popup::inner_area(area);
 
         let block = Block::bordered()
+            .style(theme)
+            .border_type(theme.into())
             .title(self.title)
             .title_bottom("press ESC to dismiss");
 

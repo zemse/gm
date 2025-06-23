@@ -213,7 +213,7 @@ impl Component for AccountCreatePage {
         Ok(result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, _: &SharedState) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
     where
         Self: Sized,
     {
@@ -310,7 +310,7 @@ impl Component for AccountCreatePage {
                     .render(area.offset(Offset { x: 0, y: 16 }), buf);
                 }
                 Gauge::default()
-                    .gauge_style(Style::new().white().on_black())
+                    .gauge_style(&shared_state.theme)
                     .percent(
                         (elapsed_time.as_secs() * 100)
                             .checked_div(est_time as u64)

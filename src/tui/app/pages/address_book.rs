@@ -221,7 +221,7 @@ impl Component for AddressBookPage {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
-        _shared_state: &SharedState,
+        shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
@@ -231,7 +231,7 @@ impl Component for AddressBookPage {
             cursor: &self.cursor,
             search_string: &self.search_string,
             focus: self.focus,
-            focus_style: None,
+            focus_style: shared_state.theme.select(),
         }
         .render(area, buf);
         area

@@ -179,6 +179,12 @@ pub struct Config {
     #[serde(default)]
     pub developer_mode: bool,
     pub alchemy_api_key: Option<String>,
+    #[serde(default = "default_theme_name")]
+    pub theme_name: String,
+}
+
+fn default_theme_name() -> String {
+    "Monochrome".to_string()
 }
 
 impl DiskInterface for Config {

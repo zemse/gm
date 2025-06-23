@@ -5,6 +5,7 @@ use ratatui::{
     widgets::{Block, Widget},
 };
 
+use crate::tui::theme::Theme;
 use crate::{
     tui::{
         traits::{HandleResult, WidgetHeight},
@@ -129,6 +130,7 @@ impl InputBox<'_> {
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         text_cursor: &usize,
+        theme: &Theme,
     ) where
         Self: Sized,
     {
@@ -140,7 +142,9 @@ impl InputBox<'_> {
             height: (2 + lines.len()) as u16,
         };
 
-        let block = Block::bordered().title(self.label);
+        let block = Block::bordered()
+            .border_type(theme.into())
+            .title(self.label);
         let inner_area = block.inner(area_used);
         block.render(area_used, buf);
 

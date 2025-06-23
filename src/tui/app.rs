@@ -1,5 +1,6 @@
 use std::{
     io,
+    str::FromStr,
     sync::{atomic::AtomicBool, mpsc, Arc},
 };
 
@@ -21,15 +22,15 @@ use ratatui::{
 };
 use widgets::{footer::Footer, form::Form, popup::Popup, text_popup::TextPopup, title::Title};
 
+use super::{
+    events::{self, Event},
+    traits::{Component, HandleResult},
+};
+use crate::tui::theme::{Theme, ThemeName};
 use crate::{
     disk::{Config, DiskInterface},
     error::FmtError,
     utils::assets::Asset,
-};
-
-use super::{
-    events::{self, Event},
-    traits::{Component, HandleResult},
 };
 
 pub mod pages;
@@ -52,6 +53,7 @@ pub struct SharedState {
     pub current_account: Option<Address>,
     pub alchemy_api_key_available: bool,
     pub eth_price: Option<String>,
+    pub theme: Theme,
 }
 
 pub struct App {
@@ -73,7 +75,8 @@ pub struct App {
 impl App {
     pub fn new() -> crate::Result<Self> {
         let config = Config::load()?;
-
+        let theme_name = ThemeName::from_str(&config.theme_name)?;
+        let theme = Theme::new(theme_name);
         Ok(Self {
             context: vec![Page::MainMenu(MainMenuPage::new(config.developer_mode)?)],
             preview_page: None,
@@ -81,7 +84,6 @@ impl App {
             exit: false,
             // fatal_error: None,
             fatal_error_popup: TextPopup::new("Fatal Error"),
-
             shared_state: SharedState {
                 assets: None,
                 recent_addresses: None,
@@ -91,6 +93,7 @@ impl App {
                 online: None,
                 eth_price: None,
                 testnet_mode: config.testnet_mode,
+                theme,
             },
 
             input_thread: None,
@@ -191,7 +194,9 @@ impl App {
         self.shared_state.alchemy_api_key_available = config.alchemy_api_key.is_some();
         self.shared_state.current_account = config.current_account;
         self.shared_state.developer_mode = config.developer_mode;
-
+        let theme_name = ThemeName::from_str(&config.theme_name)?;
+        let theme = Theme::new(theme_name);
+        self.shared_state.theme = theme;
         for page in &mut self.context {
             page.reload(&self.shared_state)?;
         }
@@ -448,9 +453,10 @@ impl Widget for &App {
                 exit: &self.exit,
                 is_main_menu: &page.is_main_menu(),
             }
-            .render(footer_area, buf);
+            .render(footer_area, buf, &self.shared_state.theme);
         }
 
-        self.fatal_error_popup.render(area, buf);
+        self.fatal_error_popup
+            .render(area, buf, &self.shared_state.theme.error_popup_bg());
     }
 }

@@ -1,16 +1,23 @@
-use std::sync::{atomic::AtomicBool, mpsc, Arc};
+use std::{
+    str::FromStr,
+    sync::{atomic::AtomicBool, mpsc, Arc},
+};
 
-use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
+use ratatui::{buffer::Buffer, layout::Rect};
 use strum::EnumIter;
 
 use crate::{
     disk::{Config, DiskInterface},
     tui::{
         app::{
-            widgets::form::{Form, FormItemIndex, FormWidget},
+            widgets::{
+                filter_select_popup::FilterSelectPopup,
+                form::{Form, FormItemIndex, FormWidget},
+            },
             SharedState,
         },
         events::Event,
+        theme::{self, ThemeName},
         traits::{Component, HandleResult},
     },
 };
@@ -21,6 +28,7 @@ pub enum FormItem {
     AlchemyApiKey,
     TestnetMode,
     DeveloperMode,
+    Theme,
     SaveButton,
     DisplayText,
 }
@@ -48,6 +56,12 @@ impl TryFrom<FormItem> for FormWidget {
                 label: "Developer Mode",
                 value: false,
             },
+            FormItem::Theme => FormWidget::SelectInput {
+                label: "Theme",
+                text: String::new(),
+                empty_text: Some("Select a theme"),
+                popup: FilterSelectPopup::new("Select a theme", Some("No themes available")),
+            },
             FormItem::SaveButton => FormWidget::Button { label: "Save" },
             FormItem::DisplayText => FormWidget::DisplayText(String::new()),
         };
@@ -67,6 +81,10 @@ impl ConfigPage {
                 config.alchemy_api_key.clone().unwrap_or_default();
             *form.get_boolean_mut(FormItem::TestnetMode) = config.testnet_mode;
             *form.get_boolean_mut(FormItem::DeveloperMode) = config.developer_mode;
+            *form.get_text_mut(FormItem::Theme) = config.theme_name.clone();
+            let popup = form.get_popup_mut(FormItem::Theme);
+            popup.set_items(Some(ThemeName::list()));
+            popup.set_cursor(&config.theme_name);
             Ok(())
         })?;
 
@@ -99,6 +117,9 @@ impl Component for ConfigPage {
             config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
             config.testnet_mode = form.get_boolean(FormItem::TestnetMode);
             config.developer_mode = form.get_boolean(FormItem::DeveloperMode);
+            let theme_name = form.get_text(FormItem::Theme).clone();
+            config.theme_name = theme::ThemeName::from_str(&theme_name)?.to_string();
+
             config.save()?;
 
             let display_text = form.get_text_mut(FormItem::DisplayText);
@@ -110,11 +131,11 @@ impl Component for ConfigPage {
         Ok(handle_result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, _: &SharedState) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, ss: &SharedState) -> Rect
     where
         Self: Sized,
     {
-        self.form.render(area, buf);
+        self.form.render(area, buf, &ss.theme);
         area
     }
 }

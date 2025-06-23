@@ -1,18 +1,16 @@
 use std::fmt::Display;
 
 use crossterm::event::{KeyCode, KeyEventKind};
-use ratatui::{
-    style::{Modifier, Style},
-    widgets::{Block, Widget},
-};
+use ratatui::widgets::{Block, Widget};
 
+use super::{filter_select::FilterSelect, popup::Popup};
+use crate::tui::theme::Theme;
 use crate::{
     tui::{traits::HandleResult, Event},
     utils::cursor::Cursor,
 };
 
-use super::{filter_select::FilterSelect, popup::Popup};
-
+#[derive(Clone, Debug)]
 pub struct FilterSelectPopup<Item: Display> {
     title: &'static str,
     empty_text: Option<&'static str>,
@@ -33,16 +31,34 @@ impl<Item: Display> FilterSelectPopup<Item> {
             search_string: String::new(),
         }
     }
+
+    pub fn set_items(&mut self, items: Option<Vec<Item>>) {
+        self.items = items;
+    }
+
+    pub fn set_cursor(&mut self, item: &Item) {
+        if let Some(items) = &self.items {
+            if let Some(index) = items.iter().position(|i| i.to_string() == item.to_string()) {
+                self.cursor.current = index;
+            }
+        }
+    }
+
+    pub fn current_selection(&self) -> Option<&Item> {
+        self.items
+            .as_ref()
+            .and_then(|items| items.get(self.cursor.current))
+    }
+
     pub fn is_open(&self) -> bool {
         self.open
     }
 
     // Opens the popup with the fresh items.
-    pub fn open(&mut self, items: Option<Vec<Item>>) {
+    pub fn open(&mut self) {
         self.open = true;
         self.cursor.reset();
         self.search_string.clear();
-        self.items = items;
     }
 
     pub fn close(&mut self) {
@@ -91,18 +107,22 @@ impl<Item: Display> FilterSelectPopup<Item> {
 
         Ok(result)
     }
-}
-
-impl<Item: Display> Widget for &FilterSelectPopup<Item> {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
+    pub fn render(
+        &self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        theme: &Theme,
+    ) where
         Self: Sized,
     {
         if self.is_open() {
-            Popup.render(area, buf);
+            Popup.render(area, buf, theme);
 
             let inner_area = Popup::inner_area(area);
-            let block = Block::bordered().title(self.title);
+            let block = Block::bordered()
+                .border_type(theme.into())
+                .style(theme)
+                .title(self.title);
             let block_inner_area = block.inner(inner_area);
             block.render(inner_area, buf);
 
@@ -119,7 +139,7 @@ impl<Item: Display> Widget for &FilterSelectPopup<Item> {
                         cursor: &self.cursor,
                         search_string: &self.search_string,
                         focus: true,
-                        focus_style: Some(Style::default().remove_modifier(Modifier::REVERSED)),
+                        focus_style: None,
                     }
                     .render(block_inner_area, buf);
                 }

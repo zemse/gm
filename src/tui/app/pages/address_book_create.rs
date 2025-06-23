@@ -9,7 +9,6 @@ use crate::{
         traits::{Component, HandleResult},
     },
 };
-use ratatui::widgets::Widget;
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 use strum::EnumIter;
 
@@ -116,12 +115,12 @@ impl Component for AddressBookCreatePage {
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
-        _: &SharedState,
+        ss: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
     {
-        self.form.render(area, buf);
+        self.form.render(area, buf, &ss.theme);
 
         area
     }
