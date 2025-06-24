@@ -1,5 +1,9 @@
 use std::{
-    sync::{atomic::AtomicBool, mpsc, Arc},
+    sync::{
+        atomic::AtomicBool,
+        mpsc::{self, Sender},
+        Arc,
+    },
     time::Duration,
 };
 
@@ -14,7 +18,7 @@ use tokio::task::JoinHandle;
 use walletconnect_sdk::{
     pairing::{Pairing, Topic},
     types::{Metadata, SessionProposeParams},
-    wc_message::WcMessage,
+    wc_message::{WcData, WcMessage},
     Connection,
 };
 
@@ -85,20 +89,20 @@ impl TryFrom<FormItem> for FormWidget {
 
 pub struct WalletConnectPage {
     form: Form<FormItem>,
-    thread: Option<JoinHandle<()>>,
-    messages: Vec<WcMessage>,
+    session_requests: Vec<WcMessage>,
     status: WalletConnectStatus,
     confirm_popup: ConfirmPopup,
     wait_popup: ConfirmPopup,
     watch_thread: Option<JoinHandle<()>>,
+    send_thread: Option<JoinHandle<()>>,
+    tr_2: Option<Sender<Event>>,
 }
 
 impl WalletConnectPage {
     pub fn new() -> crate::Result<Self> {
         Ok(Self {
             form: Form::init(|_| Ok(()))?,
-            thread: None,
-            messages: vec![],
+            session_requests: vec![],
             status: WalletConnectStatus::Idle,
             confirm_popup: ConfirmPopup::new("WalletConnect", String::new(), "Approve", "Reject"),
             wait_popup: ConfirmPopup::new(
@@ -109,16 +113,26 @@ impl WalletConnectPage {
                 "End",
             ),
             watch_thread: None,
+            send_thread: None,
+            tr_2: None,
         })
     }
 }
 
 impl Component for WalletConnectPage {
     async fn exit_threads(&mut self) {
-        let watch_thread = self.watch_thread.take();
-
+        let wc_thread = self.watch_thread.take();
         async move {
-            if let Some(thread) = watch_thread {
+            if let Some(thread) = wc_thread {
+                thread.abort();
+                let _ = thread.await;
+            }
+        }
+        .await;
+
+        let send_thread = self.send_thread.take();
+        async move {
+            if let Some(thread) = send_thread {
                 thread.abort();
                 let _ = thread.await;
             }
@@ -135,7 +149,29 @@ impl Component for WalletConnectPage {
         shared_state: &SharedState,
     ) -> crate::Result<crate::tui::traits::HandleResult> {
         match event {
-            Event::WalletConnectMessage(_addr, msg) => self.messages.push(*msg.clone()),
+            Event::WalletConnectMessage(_addr, msg) => {
+                match &msg.data {
+                    WcData::SessionPing => {
+                        if let Some(tr_2) = self.tr_2.as_ref() {
+                            let _ = tr_2.send(Event::WalletConnectMessage(
+                                shared_state
+                                    .current_account
+                                    .ok_or(crate::Error::InternalErrorStr("addr not set"))?,
+                                Box::new(msg.create_response(WcData::SessionPingResponseSuccess)),
+                            ));
+                        }
+                    }
+                    WcData::SessionRequest(_) => {
+                        self.session_requests.push(*msg.clone());
+                    }
+                    _ => {
+                        return Err(crate::Error::InternalError(format!(
+                            "unhandled {:?} in TUI",
+                            msg.method()
+                        )))
+                    }
+                };
+            }
             Event::WalletConnectStatus(status) => {
                 self.status = status.clone();
                 if let Some((_, proposal)) = status.proposal() {
@@ -156,7 +192,7 @@ impl Component for WalletConnectPage {
 
         if self.status == WalletConnectStatus::Idle {
             self.form.handle_event(event, |item, form| {
-                if item == FormItem::ConnectButton && self.thread.is_none() {
+                if item == FormItem::ConnectButton {
                     let uri_input = form.get_text(FormItem::UriInput).clone();
                     let current_account = shared_state.current_account.unwrap(); // TODO ensure we can see this page only if account exists
                     let tr = tr.clone();
@@ -208,7 +244,7 @@ impl Component for WalletConnectPage {
             event,
             area,
             || {
-                let mut pairing = self
+                let pairing = self
                     .status
                     .proposal()
                     .ok_or(crate::Error::InternalErrorStr(
@@ -223,7 +259,10 @@ impl Component for WalletConnectPage {
 
                 let addr = shared_state.current_account.unwrap();
                 let tr = tr.clone();
+
+                let pairing_clone = pairing.clone();
                 self.watch_thread = Some(tokio::spawn(async move {
+                    let mut pairing = pairing_clone;
                     let Ok(msgs) = pairing.approve_with_session_settle(addr).await else {
                         let _ = tr.send(Event::WalletConnectStatus(
                             WalletConnectStatus::SessionSettleFailed,
@@ -249,6 +288,30 @@ impl Component for WalletConnectPage {
                         tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }));
+
+                let (tr_2, rc_2) = mpsc::channel::<Event>();
+                self.tr_2 = Some(tr_2);
+
+                self.send_thread = Some(tokio::spawn(async move {
+                    loop {
+                        match rc_2.recv().unwrap() {
+                            Event::WalletConnectMessage(_, msg) => {
+                                pairing
+                                    .send_message(
+                                        Topic::Derived,
+                                        &msg.into_raw().unwrap(), // TODO handle
+                                        Some(0),
+                                        msg.irn_tag(),
+                                        msg.ttl(),
+                                    )
+                                    .await
+                                    .unwrap();
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                }));
+
                 Ok(())
             },
             || {
@@ -330,11 +393,11 @@ impl Component for WalletConnectPage {
                 "Settling session cancelled".render(area, buf);
             }
             WalletConnectStatus::SessionSettleDone => {
-                if self.messages.is_empty() {
-                    "Connected! Waiting for actions".render(area, buf);
+                if self.session_requests.is_empty() {
+                    "Connected! Waiting for session requests".render(area, buf);
                 } else {
                     let mut s = String::new();
-                    for msg in &self.messages {
+                    for msg in &self.session_requests {
                         s.push_str(&format!("{msg:?}\n"));
                     }
                     Paragraph::new(Text::raw(&s))
