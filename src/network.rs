@@ -82,6 +82,13 @@ impl DiskInterface for NetworkStore {
 }
 
 impl NetworkStore {
+    pub fn get(network_name: &str) -> crate::Result<Network> {
+        let network_store = NetworkStore::load()?;
+        network_store
+            .get_by_name(network_name)
+            .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))
+    }
+
     pub fn load_networks(testnet_mode: bool) -> crate::Result<Vec<Network>> {
         Ok(NetworkStore::load()?
             .networks

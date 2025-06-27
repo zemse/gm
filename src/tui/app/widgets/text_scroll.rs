@@ -11,6 +11,7 @@ use crate::tui::{
 
 use super::scroll_bar::CustomScrollBar;
 
+#[derive(Default)]
 pub struct TextScroll {
     pub text: String,
     pub scroll_offset: usize,

@@ -16,7 +16,6 @@ use setup::SetupPage;
 use sign_message::SignMessagePage;
 use text::TextPage;
 use trade::TradePage;
-use transaction::TransactionPage;
 use walletconnect::WalletConnectPage;
 
 use crate::tui::{
@@ -42,7 +41,6 @@ pub mod setup;
 pub mod sign_message;
 pub mod text;
 pub mod trade;
-pub mod transaction;
 pub mod walletconnect;
 
 #[allow(clippy::large_enum_variant)]
@@ -64,8 +62,7 @@ pub enum Page {
     Config(ConfigPage),
     SendMessage(SendMessagePage),
     SignMessage(SignMessagePage),
-    Transaction(TransactionPage),
-
+    // Transaction(TransactionPage),
     WalletConnect(WalletConnectPage),
 
     Trade(TradePage),
@@ -118,8 +115,7 @@ impl Component for Page {
             Page::Config(page) => page.set_focus(focus),
             Page::SendMessage(page) => page.set_focus(focus),
             Page::SignMessage(page) => page.set_focus(focus),
-            Page::Transaction(page) => page.set_focus(focus),
-
+            // Page::Transaction(page) => page.set_focus(focus),
             Page::WalletConnect(page) => page.set_focus(focus),
 
             Page::Trade(page) => page.set_focus(focus),
@@ -148,7 +144,6 @@ impl Component for Page {
             Page::Config(page) => page.exit_threads().await,
             Page::SendMessage(page) => page.exit_threads().await,
             Page::SignMessage(page) => page.exit_threads().await,
-            Page::Transaction(page) => page.exit_threads().await,
 
             Page::WalletConnect(page) => page.exit_threads().await,
 
@@ -178,7 +173,6 @@ impl Component for Page {
             Page::Config(page) => page.reload(ss),
             Page::SendMessage(page) => page.reload(ss),
             Page::SignMessage(page) => page.reload(ss),
-            Page::Transaction(page) => page.reload(ss),
 
             Page::WalletConnect(page) => page.reload(ss),
 
@@ -215,7 +209,6 @@ impl Component for Page {
             Page::Config(page) => page.handle_event(event, area, tr, sd, ss),
             Page::SendMessage(page) => page.handle_event(event, area, tr, sd, ss),
             Page::SignMessage(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::Transaction(page) => page.handle_event(event, area, tr, sd, ss),
 
             Page::WalletConnect(page) => page.handle_event(event, area, tr, sd, ss),
 
@@ -253,7 +246,6 @@ impl Component for Page {
             Page::Config(page) => page.render_component(area, buf, shared_state),
             Page::SendMessage(page) => page.render_component(area, buf, shared_state),
             Page::SignMessage(page) => page.render_component(area, buf, shared_state),
-            Page::Transaction(page) => page.render_component(area, buf, shared_state),
 
             Page::WalletConnect(page) => page.render_component(area, buf, shared_state),
 

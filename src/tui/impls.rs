@@ -3,9 +3,9 @@ use ratatui::{
     widgets::{Block, Widget},
 };
 
-use crate::utils::text::split_string;
+use crate::{tui::traits::CustomRender, utils::text::split_string};
 
-use super::traits::{BorderedWidget, CustomRender, RectUtil};
+use super::traits::{BorderedWidget, RectUtil};
 
 impl<T: Widget> BorderedWidget for T {
     fn render_with_block(

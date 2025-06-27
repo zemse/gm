@@ -345,8 +345,7 @@ impl App {
             }
 
             // Transaction API
-            Event::TxSubmitError(error) => self.fatal_error_popup.set_text(error),
-            Event::TxStatusError(error) => self.fatal_error_popup.set_text(error),
+            Event::TxError(error) => self.fatal_error_popup.set_text(error),
 
             Event::WalletConnectError(_, error) => {
                 self.fatal_error_popup.set_text(error);

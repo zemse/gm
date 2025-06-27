@@ -1,17 +1,14 @@
 use std::time::Duration;
 
-use alloy::{
-    primitives::{Address, FixedBytes},
-    signers::k256::ecdsa::SigningKey,
-};
+use alloy::{primitives::Address, signers::k256::ecdsa::SigningKey};
 use walletconnect_sdk::wc_message::WcMessage;
 
-use crate::utils::assets::Asset;
+use crate::{tui::app::widgets::tx_popup::TxStatus, utils::assets::Asset};
 
 use reqwest::Error as ReqwestError;
 
 use super::app::{
-    pages::{transaction::TxStatus, walletconnect::WalletConnectStatus},
+    pages::walletconnect::WalletConnectStatus,
     widgets::candle_chart::{Candle, Interval},
 };
 
@@ -43,11 +40,8 @@ pub enum Event {
     CandlesUpdate(Vec<Candle>, Interval),
     CandlesUpdateError(ReqwestError),
 
-    TxSubmitResult(FixedBytes<32>),
-    TxSubmitError(String),
-
-    TxStatus(TxStatus),
-    TxStatusError(String),
+    TxUpdate(TxStatus),
+    TxError(String),
 
     WalletConnectStatus(WalletConnectStatus),
     WalletConnectMessage(Address, Box<WcMessage>),

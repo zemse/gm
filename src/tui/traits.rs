@@ -22,6 +22,7 @@ pub trait WidgetHeight {
 }
 
 pub trait CustomRender<Args = ()> {
+    #[allow(dead_code)]
     fn render(
         &self,
         area: ratatui::prelude::Rect,

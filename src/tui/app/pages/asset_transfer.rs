@@ -1,8 +1,8 @@
-use crate::tui::app::pages::transaction::TransactionPage;
-use crate::tui::app::pages::Page;
+use crate::network::NetworkStore;
 use crate::tui::app::widgets::address_book_popup::AddressBookPopup;
 use crate::tui::app::widgets::assets_popup::AssetsPopup;
 use crate::tui::app::widgets::form::FormItemIndex;
+use crate::tui::app::widgets::tx_popup::TxPopup;
 use crate::tui::app::SharedState;
 use crate::tui::{
     app::widgets::form::{Form, FormWidget},
@@ -12,7 +12,8 @@ use crate::tui::{
 use crate::utils::assets::{Asset, TokenAddress};
 use crate::Result;
 use alloy::primitives::utils::parse_units;
-use alloy::primitives::{Bytes, TxKind, U256};
+use alloy::primitives::{Bytes, U256};
+use alloy::rpc::types::TransactionRequest;
 use alloy::sol;
 use alloy::sol_types::SolCall;
 use std::sync::mpsc;
@@ -69,6 +70,7 @@ pub struct AssetTransferPage {
     pub asset: Option<Asset>, // TODO see if we can avoid this here
     pub address_book_popup: AddressBookPopup,
     pub asset_popup: AssetsPopup,
+    pub tx_popup: TxPopup,
 }
 
 impl AssetTransferPage {
@@ -78,6 +80,7 @@ impl AssetTransferPage {
             asset: None,
             address_book_popup: AddressBookPopup::default(),
             asset_popup: AssetsPopup::default(),
+            tx_popup: TxPopup::default(),
         })
     }
 }
@@ -109,10 +112,10 @@ impl Component for AssetTransferPage {
     fn handle_event(
         &mut self,
         event: &Event,
-        _area: ratatui::prelude::Rect,
-        _tr: &mpsc::Sender<Event>,
-        _sd: &Arc<AtomicBool>,
-        shared_state: &SharedState,
+        area: ratatui::prelude::Rect,
+        tr: &mpsc::Sender<Event>,
+        sd: &Arc<AtomicBool>,
+        ss: &SharedState,
     ) -> Result<HandleResult> {
         let mut result = HandleResult::default();
 
@@ -132,6 +135,20 @@ impl Component for AssetTransferPage {
                     Some(asset.r#type.symbol.clone());
                 self.form.advance_cursor();
             })?);
+        } else if self.tx_popup.is_open() {
+            let is_confirmed = self.tx_popup.is_confirmed();
+            let r = self.tx_popup.handle_event(
+                (event, area, tr, sd, ss),
+                |_| {},
+                |_| {},
+                || {},
+                || {
+                    if is_confirmed {
+                        result.page_pops = 1;
+                    }
+                },
+            )?;
+            result.merge(r);
         } else {
             // Handle form events
             if self.form.is_focused(FormItem::To)
@@ -142,61 +159,60 @@ impl Component for AssetTransferPage {
                 self.address_book_popup
                     .set_items(Some(AddressBookMenuItem::get_menu(
                         false,
-                        shared_state.recent_addresses.clone(),
+                        ss.recent_addresses.clone(),
                     )?));
                 result.esc_ignores = 1;
             } else if self.form.is_focused(FormItem::AssetType) && event.is_space_or_enter_pressed()
             {
                 self.asset_popup.open();
-                self.asset_popup.set_items(shared_state.assets.clone());
+                self.asset_popup.set_items(ss.assets.clone());
                 result.esc_ignores = 1;
             } else {
                 self.form.handle_event(event, |label, form| {
-                if label == FormItem::TransferButton {
-                    let to = form.get_text(FormItem::To);
-                    let asset = self
-                        .asset
-                        .as_ref()
-                        .ok_or(crate::Error::InternalErrorStr("No asset selected"))?;
-                    let amount =
-                        parse_units(form.get_text(FormItem::Amount), asset.r#type.decimals)?;
+                    if label == FormItem::TransferButton {
+                        let to = form.get_text(FormItem::To);
+                        let asset = self
+                            .asset
+                            .as_ref()
+                            .ok_or(crate::Error::InternalErrorStr("No asset selected"))?;
+                        let amount =
+                            parse_units(form.get_text(FormItem::Amount), asset.r#type.decimals)?;
 
-                    sol! {
-                        interface IERC20 {
-                            function balanceOf(address owner) external view returns (uint256);
-                            function transfer(address to, uint256 amount) external returns (bool);
+                        let (to, calldata, value) = match asset.r#type.token_address {
+                            TokenAddress::Native => {
+                                (to.parse()?, Bytes::new(), amount.get_absolute())
+                            }
+                            TokenAddress::Contract(address) => {
+                                // This causes `cargo fmt` to not work
+                                sol! {
+                                    interface IERC20 {
+                                        function balanceOf(address owner) external view returns (uint256);
+                                        function transfer(address to, uint256 amount) external returns (bool);
+                                    }
+                                }
+                                let transfer_call = IERC20::transferCall {
+                                    to: to.parse()?,
+                                    amount: amount.get_absolute(),
+                                };
+                                let calldata = Bytes::from(transfer_call.abi_encode());
+                                (address, calldata, U256::ZERO)
+                            }
+                        };
+
+                        if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
+                            self.tx_popup.set_tx_req(
+                                NetworkStore::get(&asset.r#type.network)?,
+                                TransactionRequest::default()
+                                    .to(to)
+                                    .value(value)
+                                    .input(calldata.into()),
+                            );
                         }
+
+                        self.tx_popup.open();
                     }
-
-                    let (to, calldata, value) = match asset.r#type.token_address {
-                        TokenAddress::Native => (
-                            TxKind::Call(to.parse()?),
-                            Bytes::new(),
-                            amount.get_absolute(),
-                        ),
-                        TokenAddress::Contract(address) => {
-                            let transfer_call = IERC20::transferCall {
-                                to: to.parse()?,
-                                amount: amount.get_absolute(),
-                            };
-
-                            let calldata = Bytes::from(transfer_call.abi_encode());
-
-                            (TxKind::Call(address), calldata, U256::ZERO)
-                        }
-                    };
-
-                    result
-                        .page_inserts
-                        .push(Page::Transaction(TransactionPage::new(
-                            &asset.r#type.network,
-                            to,
-                            calldata,
-                            value,
-                        )?))
-                }
-                Ok(())
-            })?;
+                    Ok(())
+                })?;
             }
         }
 
@@ -236,6 +252,8 @@ impl Component for AssetTransferPage {
             .render(area, buf, &shared_state.theme);
 
         self.asset_popup.render(area, buf, &shared_state.theme);
+
+        self.tx_popup.render(area, buf, &shared_state.theme);
 
         area
     }

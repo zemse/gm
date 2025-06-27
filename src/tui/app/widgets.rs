@@ -16,3 +16,4 @@ pub mod sidebar;
 pub mod text_popup;
 pub mod text_scroll;
 pub mod title;
+pub mod tx_popup;
