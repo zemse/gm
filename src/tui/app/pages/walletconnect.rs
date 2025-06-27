@@ -1,6 +1,6 @@
 use std::{
     sync::{
-        atomic::AtomicBool,
+        atomic::{AtomicBool, Ordering},
         mpsc::{self, Sender},
         Arc,
     },
@@ -57,6 +57,11 @@ impl WalletConnectStatus {
     }
 }
 
+enum WcEvent {
+    Message(Box<WcMessage>),
+    NoOp,
+}
+
 #[derive(EnumIter, PartialEq)]
 enum FormItem {
     Heading,
@@ -95,7 +100,7 @@ pub struct WalletConnectPage {
     wait_popup: ConfirmPopup,
     watch_thread: Option<JoinHandle<()>>,
     send_thread: Option<JoinHandle<()>>,
-    tr_2: Option<Sender<Event>>,
+    tr_2: Option<Sender<WcEvent>>,
 }
 
 impl WalletConnectPage {
@@ -133,6 +138,9 @@ impl Component for WalletConnectPage {
         let send_thread = self.send_thread.take();
         async move {
             if let Some(thread) = send_thread {
+                if let Some(tr_2) = self.tr_2.as_ref() {
+                    let _ = tr_2.send(WcEvent::NoOp);
+                }
                 thread.abort();
                 let _ = thread.await;
             }
@@ -145,7 +153,7 @@ impl Component for WalletConnectPage {
         event: &Event,
         area: Rect,
         tr: &mpsc::Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        sd: &Arc<AtomicBool>,
         shared_state: &SharedState,
     ) -> crate::Result<crate::tui::traits::HandleResult> {
         match event {
@@ -153,12 +161,9 @@ impl Component for WalletConnectPage {
                 match &msg.data {
                     WcData::SessionPing => {
                         if let Some(tr_2) = self.tr_2.as_ref() {
-                            let _ = tr_2.send(Event::WalletConnectMessage(
-                                shared_state
-                                    .current_account
-                                    .ok_or(crate::Error::InternalErrorStr("addr not set"))?,
-                                Box::new(msg.create_response(WcData::SessionPingResponseSuccess)),
-                            ));
+                            let _ = tr_2.send(WcEvent::Message(Box::new(
+                                msg.create_response(WcData::SessionPingResponseSuccess),
+                            )));
                         }
                     }
                     WcData::SessionRequest(_) => {
@@ -259,7 +264,7 @@ impl Component for WalletConnectPage {
 
                 let addr = shared_state.current_account.unwrap();
                 let tr = tr.clone();
-
+                let shutdown_signal = sd.clone();
                 let pairing_clone = pairing.clone();
                 self.watch_thread = Some(tokio::spawn(async move {
                     let mut pairing = pairing_clone;
@@ -279,6 +284,10 @@ impl Component for WalletConnectPage {
                     }
 
                     loop {
+                        if shutdown_signal.load(Ordering::Relaxed) {
+                            break;
+                        }
+
                         let messages = pairing.watch_messages(Topic::Derived, None).await.unwrap();
 
                         for msg in messages {
@@ -289,25 +298,26 @@ impl Component for WalletConnectPage {
                     }
                 }));
 
-                let (tr_2, rc_2) = mpsc::channel::<Event>();
+                let (tr_2, rc_2) = mpsc::channel::<WcEvent>();
                 self.tr_2 = Some(tr_2);
-
+                let shutdown_signal = sd.clone();
                 self.send_thread = Some(tokio::spawn(async move {
                     loop {
-                        match rc_2.recv().unwrap() {
-                            Event::WalletConnectMessage(_, msg) => {
-                                pairing
-                                    .send_message(
-                                        Topic::Derived,
-                                        &msg.into_raw().unwrap(), // TODO handle
-                                        Some(0),
-                                        msg.irn_tag(),
-                                        msg.ttl(),
-                                    )
-                                    .await
-                                    .unwrap();
-                            }
-                            _ => unreachable!(),
+                        if shutdown_signal.load(Ordering::Relaxed) {
+                            break;
+                        }
+
+                        if let Ok(WcEvent::Message(msg)) = rc_2.recv() {
+                            pairing
+                                .send_message(
+                                    Topic::Derived,
+                                    &msg.into_raw().unwrap(), // TODO handle
+                                    Some(0),
+                                    msg.irn_tag(),
+                                    msg.ttl(),
+                                )
+                                .await
+                                .unwrap();
                         }
                     }
                 }));
