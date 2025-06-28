@@ -12,6 +12,8 @@ use crate::{
 pub struct Network {
     pub name: String,
     pub name_alchemy: Option<String>,
+    #[serde(default)]
+    pub name_aliases: Vec<String>,
     pub chain_id: u32,
     pub symbol: Option<String>,
     pub price_ticker: Option<String>,
@@ -82,11 +84,20 @@ impl DiskInterface for NetworkStore {
 }
 
 impl NetworkStore {
-    pub fn get(network_name: &str) -> crate::Result<Network> {
+    pub fn from_name(network_name: &str) -> crate::Result<Network> {
         let network_store = NetworkStore::load()?;
         network_store
             .get_by_name(network_name)
             .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))
+    }
+
+    pub fn from_chain_id(chain_id: u32) -> crate::Result<Network> {
+        let network_store = NetworkStore::load()?;
+        network_store
+            .get_by_chain_id(chain_id)
+            .ok_or(crate::Error::NetworkNotFound(format!(
+                "Chain ID {chain_id}",
+            )))
     }
 
     pub fn load_networks(testnet_mode: bool) -> crate::Result<Vec<Network>> {
@@ -114,9 +125,20 @@ impl NetworkStore {
             let existing = networks.remove(&entry.chain_id);
             let entry = if let Some(existing) = existing {
                 // merge entries
+                let mut name_aliases = vec![];
+                for n in entry
+                    .name_aliases
+                    .iter()
+                    .chain(existing.name_aliases.iter())
+                {
+                    if !name_aliases.contains(n) {
+                        name_aliases.push(n.clone());
+                    }
+                }
                 Network {
                     name: entry.name,
                     name_alchemy: entry.name_alchemy.or(existing.name_alchemy),
+                    name_aliases,
                     chain_id: entry.chain_id,
                     symbol: entry.symbol.or(existing.symbol),
                     price_ticker: entry.price_ticker.or(existing.price_ticker),
@@ -170,7 +192,15 @@ impl NetworkStore {
                         .as_ref()
                         .map(|name| name == network_name)
                         .unwrap_or(false)
+                    || n.name_aliases.contains(&network_name.to_string())
             })
+            .cloned()
+    }
+
+    pub fn get_by_chain_id(&self, chain_id: u32) -> Option<Network> {
+        self.networks
+            .iter()
+            .find(|n| n.chain_id == chain_id)
             .cloned()
     }
 
@@ -243,6 +273,7 @@ fn default_networks() -> Vec<Network> {
         Network {
             name: "Mainnet".to_string(),
             name_alchemy: Some("eth-mainnet".to_string()),
+            name_aliases: vec![],
             chain_id: 1,
             symbol: Some("ETH".to_string()),
             price_ticker: Some("ETH".to_string()),
@@ -289,6 +320,7 @@ fn default_networks() -> Vec<Network> {
         Network {
             name: "Arbitrum".to_string(),
             name_alchemy: Some("arb-mainnet".to_string()),
+            name_aliases: vec![],
             chain_id: 42161,
             symbol: Some("ArbETH".to_string()),
             price_ticker: Some("ETH".to_string()),
@@ -343,6 +375,7 @@ fn default_networks() -> Vec<Network> {
         Network {
             name: "Base".to_string(),
             name_alchemy: Some("base-mainnet".to_string()),
+            name_aliases: vec![],
             chain_id: 8453,
             symbol: Some("BaseETH".to_string()),
             price_ticker: Some("ETH".to_string()),
@@ -371,8 +404,23 @@ fn default_networks() -> Vec<Network> {
             ],
         },
         Network {
+            name: "Polygon".to_string(),
+            name_alchemy: Some("polygon-mainnet".to_string()),
+            name_aliases: vec!["matic-mainnet".to_string()],
+            chain_id: 137,
+            symbol: Some("PolygonETH".to_string()),
+            price_ticker: Some("ETH".to_string()),
+            rpc_url: None,
+            rpc_alchemy: Some(("https://polygon-mainnet.g.alchemy.com/v2/{}").to_string()),
+            rpc_infura: None,
+            explorer_url: None,
+            is_testnet: false,
+            tokens: vec![],
+        },
+        Network {
             name: "Sepolia".to_string(),
             name_alchemy: Some("eth-sepolia".to_string()),
+            name_aliases: vec![],
             chain_id: 11155111,
             symbol: Some("sepoliaETH".to_string()),
             price_ticker: None,

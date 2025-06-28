@@ -32,7 +32,7 @@ pub trait CustomRender<Args = ()> {
 }
 
 pub trait RectUtil {
-    fn consume_height(self, height: u16) -> ratatui::prelude::Rect;
+    fn consume_height(self, height: u16) -> crate::Result<ratatui::prelude::Rect>;
 
     fn change_height(self, height: u16) -> ratatui::prelude::Rect;
 

@@ -105,40 +105,45 @@ pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
 
     let mut networks = NetworkStore::load()?;
 
-    let mut balances: Vec<Asset> = Alchemy::get_tokens_by_wallet(
+    let mut balances = Vec::new();
+
+    for entry in Alchemy::get_tokens_by_wallet(
         wallet_address,
         networks.get_alchemy_network_names(config.testnet_mode),
     )
     .await?
-    .into_iter()
-    .map(|entry| Asset {
-        wallet_address,
-        r#type: AssetType {
-            token_address: match entry.token_address {
-                Some(token_address) => TokenAddress::Contract(token_address),
-                None => TokenAddress::Native,
+    {
+        let asset = Asset {
+            wallet_address,
+            r#type: AssetType {
+                token_address: match entry.token_address {
+                    Some(token_address) => TokenAddress::Contract(token_address),
+                    None => TokenAddress::Native,
+                },
+                network: networks
+                    .get_by_name(&entry.network)
+                    .ok_or(crate::Error::NetworkNotFound(entry.network))?
+                    .name
+                    .clone(),
+                symbol: entry.token_metadata.symbol.unwrap_or("UNKNOWN".to_string()),
+                name: entry.token_metadata.name.unwrap_or("UNKNOWN".to_string()),
+                decimals: entry.token_metadata.decimals.unwrap_or_default(),
+                price: entry
+                    .token_prices
+                    .first()
+                    .map(|p| {
+                        assert_eq!(p.currency, "usd");
+                        Price::InUSD(p.value.parse().unwrap())
+                    })
+                    .unwrap_or(Price::Unknown),
             },
-            network: networks
-                .get_by_name(&entry.network)
-                .expect("must exist")
-                .name
-                .clone(),
-            symbol: entry.token_metadata.symbol.unwrap_or("UNKNOWN".to_string()),
-            name: entry.token_metadata.name.unwrap_or("UNKNOWN".to_string()),
-            decimals: entry.token_metadata.decimals.unwrap_or_default(),
-            price: entry
-                .token_prices
-                .first()
-                .map(|p| {
-                    assert_eq!(p.currency, "usd");
-                    Price::InUSD(p.value.parse().unwrap())
-                })
-                .unwrap_or(Price::Unknown),
-        },
-        value: entry.token_balance,
-    })
-    .filter(|entry: &Asset| entry.usd_value().map(|v| v > 0.0).unwrap_or_default())
-    .collect();
+            value: entry.token_balance,
+        };
+
+        if asset.usd_value().map(|v| v > 0.0).unwrap_or_default() {
+            balances.push(asset);
+        }
+    }
 
     for balance in &balances {
         if let TokenAddress::Contract(token_address) = balance.r#type.token_address {

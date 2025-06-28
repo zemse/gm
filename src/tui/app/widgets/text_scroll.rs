@@ -113,7 +113,10 @@ impl Widget for &TextScroll {
         if total > area.height as usize {
             for line in &lines {
                 line.render(text_area, buf);
-                text_area = text_area.consume_height(1);
+                let Ok(text_area_new) = text_area.consume_height(1) else {
+                    return;
+                };
+                text_area = text_area_new;
             }
 
             CustomScrollBar {
@@ -124,7 +127,10 @@ impl Widget for &TextScroll {
         } else {
             for line in &lines {
                 line.render(text_area, buf);
-                text_area = text_area.consume_height(1);
+                let Ok(text_area_new) = text_area.consume_height(1) else {
+                    return;
+                };
+                text_area = text_area_new;
             }
         }
     }

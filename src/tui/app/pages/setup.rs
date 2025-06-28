@@ -129,19 +129,23 @@ impl Component for SetupPage {
         Ok(handle_result)
     }
 
-    fn render_component(&self, mut area: Rect, buf: &mut Buffer, ss: &SharedState) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, ss: &SharedState) -> Rect
     where
         Self: Sized,
     {
         Line::from("Setup").bold().render(area, buf);
-        area = area.consume_height(2);
+        let Ok(area) = area.consume_height(2) else {
+            return area;
+        };
 
         if self.form.visible_count() == 0 {
             Line::from("You have completed the setup please press ESC to return back.")
                 .render(area, buf);
         } else {
             "Complete the following steps to get started:".render(area, buf);
-            area = area.consume_height(2);
+            let Ok(area) = area.consume_height(2) else {
+                return area;
+            };
 
             self.form.render(area, buf, &ss.theme);
         }

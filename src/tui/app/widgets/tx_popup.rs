@@ -31,7 +31,7 @@ use crate::{
             SharedState,
         },
         theme::Theme,
-        traits::HandleResult,
+        traits::{CustomRender, HandleResult},
         Event,
     },
     utils::account::AccountManager,
@@ -122,10 +122,10 @@ impl TxPopup {
         mut on_esc: F4,
     ) -> crate::Result<HandleResult>
     where
-        F1: FnMut(FixedBytes<32>),
-        F2: FnMut(FixedBytes<32>),
-        F3: FnMut(),
-        F4: FnMut(),
+        F1: FnMut(FixedBytes<32>) -> crate::Result<()>,
+        F2: FnMut(FixedBytes<32>) -> crate::Result<()>,
+        F3: FnMut() -> crate::Result<()>,
+        F4: FnMut() -> crate::Result<()>,
     {
         let mut result = HandleResult::default();
 
@@ -155,12 +155,12 @@ impl TxPopup {
                                     self.status = TxStatus::Signing;
                                 } else {
                                     self.close();
-                                    on_cancel();
+                                    on_cancel()?;
                                 }
                             }
                             KeyCode::Esc => {
                                 self.close();
-                                on_esc();
+                                on_esc()?;
                             }
                             _ => {}
                         },
@@ -173,7 +173,7 @@ impl TxPopup {
                             match key_event.code {
                                 KeyCode::Esc => {
                                     self.close();
-                                    on_esc();
+                                    on_esc()?;
                                 }
                                 _ => {}
                             }
@@ -186,13 +186,13 @@ impl TxPopup {
 
                 match status {
                     TxStatus::Pending(tx_hash) => {
-                        on_tx_submit(*tx_hash);
+                        on_tx_submit(*tx_hash)?;
 
                         self.watch_tx_thread =
                             Some(watch_tx_thread(&self.network, tr, sd, *tx_hash)?);
                     }
                     TxStatus::Confirmed(tx_hash) | TxStatus::Failed(tx_hash) => {
-                        on_tx_confirm(*tx_hash);
+                        on_tx_confirm(*tx_hash)?;
                     }
                     _ => {}
                 }
@@ -248,7 +248,11 @@ impl TxPopup {
                     format!("Transaction pending... Hash: {tx_hash}").render(button_area, buf);
                 }
                 TxStatus::Confirmed(tx_hash) => {
-                    format!("Transaction confirmed! Hash: {tx_hash}").render(button_area, buf);
+                    [
+                        format!("Transaction confirmed! Hash: {tx_hash}"),
+                        "Press ESC to close".to_string(),
+                    ]
+                    .render(button_area, buf, false);
                 }
                 TxStatus::Failed(tx_hash) => {
                     format!("Transaction failed! Hash: {tx_hash}").render(button_area, buf);

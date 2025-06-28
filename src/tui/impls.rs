@@ -62,23 +62,37 @@ impl<const N: usize> CustomRender<bool> for [String; N] {
         for line in self {
             let segs = split_string(line, area.width as usize);
             for seg in segs {
-                seg.render(area, buf);
-                area = area.consume_height(1);
+                if let Ok(new_area) = area.consume_height(1) {
+                    seg.render(area, buf);
+                    area = new_area;
+                } else {
+                    break;
+                }
             }
 
-            area = area.consume_height(if leave_space { 2 } else { 1 });
+            if let Ok(new_area) = area.consume_height(if leave_space { 1 } else { 0 }) {
+                area = new_area;
+            } else {
+                break;
+            }
         }
         full_area.change_height(full_area.height - area.height)
     }
 }
 
 impl RectUtil for Rect {
-    fn consume_height(self, height: u16) -> Rect {
-        Rect {
-            x: self.x,
-            y: self.y + height,
-            width: self.width,
-            height: self.height - height,
+    fn consume_height(self, height: u16) -> crate::Result<Rect> {
+        if self.height > height {
+            Ok(Rect {
+                x: self.x,
+                y: self.y + height,
+                width: self.width,
+                height: self.height - height,
+            })
+        } else {
+            Err(crate::Error::InternalErrorStr(
+                "Cannot consume more height than available",
+            ))
         }
     }
 

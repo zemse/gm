@@ -139,13 +139,14 @@ impl Component for AssetTransferPage {
             let is_confirmed = self.tx_popup.is_confirmed();
             let r = self.tx_popup.handle_event(
                 (event, area, tr, sd, ss),
-                |_| {},
-                |_| {},
-                || {},
+                |_| Ok(()),
+                |_| Ok(()),
+                || Ok(()),
                 || {
                     if is_confirmed {
                         result.page_pops = 1;
                     }
+                    Ok(())
                 },
             )?;
             result.merge(r);
@@ -201,7 +202,7 @@ impl Component for AssetTransferPage {
 
                         if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
                             self.tx_popup.set_tx_req(
-                                NetworkStore::get(&asset.r#type.network)?,
+                                NetworkStore::from_name(&asset.r#type.network)?,
                                 TransactionRequest::default()
                                     .to(to)
                                     .value(value)

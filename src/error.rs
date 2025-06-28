@@ -15,6 +15,7 @@ pub enum Error {
     SecretNotFound(Address),
     InternalError(String),
     InternalErrorStr(&'static str),
+    ParseIntError(Box<std::num::ParseIntError>),
     ParseFloatError(Box<std::num::ParseFloatError>),
     IoError(Box<std::io::Error>),
     FromHexError(Box<alloy::hex::FromHexError>),
@@ -85,6 +86,12 @@ impl Display for Error {
 impl From<&str> for Error {
     fn from(e: &str) -> Self {
         Error::InternalError(e.to_string())
+    }
+}
+
+impl From<std::num::ParseIntError> for Error {
+    fn from(e: std::num::ParseIntError) -> Self {
+        Error::ParseIntError(Box::new(e))
     }
 }
 

@@ -128,10 +128,10 @@ impl Component for SendMessagePage {
         } else if self.tx_popup.is_open() {
             let r = self.tx_popup.handle_event(
                 (event, area, tr, sd, ss),
-                |_| {},
-                |_| {},
-                || {},
-                || {},
+                |_| Ok(()),
+                |_| Ok(()),
+                || Ok(()),
+                || Ok(()),
             )?;
             result.merge(r);
         } else {
@@ -161,7 +161,7 @@ impl Component for SendMessagePage {
                         }
 
                         self.tx_popup.set_tx_req(
-                            NetworkStore::get(network_name)?,
+                            NetworkStore::from_name(network_name)?,
                             TransactionRequest::default().to(to.parse()?).input(
                                 TransactionInput::from(Bytes::from(
                                     message.to_owned().into_bytes(),
