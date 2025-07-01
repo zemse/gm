@@ -342,7 +342,7 @@ pub fn send_tx_thread(
             let signature = wallet.sign_transaction_sync(&mut tx)?;
             let tx_signed = SignableTransaction::into_signed(tx, signature);
 
-            // // Encode transaction
+            // Encode transaction
             let mut out = BytesMut::new();
             let tx_typed = TxEnvelope::Eip1559(tx_signed);
             tx_typed.encode(&mut out);

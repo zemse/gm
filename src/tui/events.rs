@@ -1,6 +1,9 @@
 use std::time::Duration;
 
-use alloy::{primitives::Address, signers::k256::ecdsa::SigningKey};
+use alloy::{
+    primitives::Address,
+    signers::{k256::ecdsa::SigningKey, Signature},
+};
 use walletconnect_sdk::wc_message::WcMessage;
 
 use crate::{tui::app::widgets::tx_popup::TxStatus, utils::assets::Asset};
@@ -42,6 +45,9 @@ pub enum Event {
 
     TxUpdate(TxStatus),
     TxError(String),
+
+    SignResult(Signature),
+    SignError(String),
 
     WalletConnectStatus(WalletConnectStatus),
     WalletConnectMessage(Address, Box<WcMessage>),

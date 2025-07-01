@@ -32,6 +32,7 @@ use crate::{
                 confirm_popup::ConfirmPopup,
                 form::{Form, FormItemIndex, FormWidget},
                 select::Select,
+                sign_popup::SignPopup,
                 tx_popup::TxPopup,
             },
             SharedState,
@@ -41,6 +42,54 @@ use crate::{
     },
     utils::cursor::Cursor,
 };
+
+fn format_proposal(params: &SessionProposeParams) -> String {
+    let metadata = &params.proposer.metadata;
+    let mut output = format!(
+        "dApp Name: {name}\n{desc}\n{url}\n\nRequested Permissions\n",
+        name = metadata.name,
+        desc = metadata.description,
+        url = metadata.url
+    );
+
+    for (ns_key, ns) in params
+        .required_namespaces
+        .iter()
+        .chain(params.optional_namespaces.iter())
+    {
+        output.push_str(&format!("\n1. {ns_key}\n"));
+
+        if let Some(accounts) = &ns.accounts {
+            output.push_str("   - Accounts:\n");
+            for a in accounts {
+                output.push_str(&format!("     • {a}\n"));
+            }
+        }
+
+        if !ns.chains.is_empty() {
+            output.push_str("   - Chains:\n");
+            for c in &ns.chains {
+                output.push_str(&format!("     • {c}\n"));
+            }
+        }
+
+        if !ns.methods.is_empty() {
+            output.push_str("   - Methods:\n");
+            for m in &ns.methods {
+                output.push_str(&format!("     • {m}\n"));
+            }
+        }
+
+        if !ns.events.is_empty() {
+            output.push_str("   - Events:\n");
+            for e in &ns.events {
+                output.push_str(&format!("     • {e}\n"));
+            }
+        }
+    }
+
+    output
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum WalletConnectStatus {
@@ -108,6 +157,7 @@ pub struct WalletConnectPage {
     confirm_popup: ConfirmPopup,
     exit_popup: ConfirmPopup,
     tx_popup: TxPopup,
+    sign_popup: SignPopup,
     watch_thread: Option<JoinHandle<()>>,
     send_thread: Option<JoinHandle<()>>,
     tr_2: Option<Sender<WcEvent>>,
@@ -116,23 +166,26 @@ pub struct WalletConnectPage {
 impl WalletConnectPage {
     pub fn new() -> crate::Result<Self> {
         Ok(Self {
-            form: Form::init(|_| Ok(()))?,
-            session_requests: vec![],
-            cursor: Cursor::default(),
-            status: WalletConnectStatus::Idle,
-            confirm_popup: ConfirmPopup::new("WalletConnect", String::new(), "Approve", "Reject"),
-            exit_popup: ConfirmPopup::new(
-                "Warning",
-                "The WalletConnect session will be ended if you go back. You can also press ESC to go back. If you want to continue session you can choose to wait."
-                    .to_string(),
-                "Wait",
-                "End",
-            ),
-            tx_popup: TxPopup::default(),
-            watch_thread: None,
-            send_thread: None,
-            tr_2: None,
-        })
+                form: Form::init(|_| Ok(()))?,
+                session_requests: vec![],
+                cursor: Cursor::default(),
+                status: WalletConnectStatus::Idle,
+                confirm_popup: ConfirmPopup::new("WalletConnect", String::new(), "Approve", "Reject"),
+                exit_popup: ConfirmPopup::new(
+                    "Warning",
+                    "The WalletConnect session will be ended if you go back. You can also press ESC to go back. If you want to continue session you can choose to wait."
+                        .to_string(),
+                    "Wait",
+                    "End",
+                ),
+                tx_popup: TxPopup::default(),
+                sign_popup: SignPopup::default(
+
+                ),
+                watch_thread: None,
+                send_thread: None,
+                tr_2: None,
+            })
     }
 
     fn open_request_at_cursor(&mut self) -> crate::Result<()> {
@@ -176,7 +229,10 @@ impl WalletConnectPage {
                 );
                 self.tx_popup.open();
             }
-            SessionRequestData::PersonalSign { message, account } => todo!(),
+            SessionRequestData::PersonalSign { message, .. } => {
+                self.sign_popup.set_text(message);
+                self.sign_popup.open();
+            }
         }
 
         Ok(())
@@ -217,8 +273,10 @@ impl Component for WalletConnectPage {
     ) -> crate::Result<crate::tui::traits::HandleResult> {
         let mut handle_result = HandleResult::default();
 
-        let any_popup_open_before =
-            self.confirm_popup.is_open() || self.exit_popup.is_open() || self.tx_popup.is_open();
+        let any_popup_open_before = self.confirm_popup.is_open()
+            || self.exit_popup.is_open()
+            || self.tx_popup.is_open()
+            || self.sign_popup.is_open();
 
         // First handle the WalletConnect specific events regardless of what's there on the UI
         match event {
@@ -233,7 +291,7 @@ impl Component for WalletConnectPage {
                     }
                     WcData::SessionRequest(_) => {
                         self.session_requests.push(*msg.clone());
-                        if !self.tx_popup.is_open() {
+                        if !self.tx_popup.is_open() && !self.sign_popup.is_open() {
                             self.cursor.current = self.session_requests.len() - 1;
                             self.open_request_at_cursor()?;
                         }
@@ -381,6 +439,29 @@ impl Component for WalletConnectPage {
                 || Ok(()),
             )?;
             handle_result.merge(r);
+        } else if self.sign_popup.is_open() {
+            let r = self.sign_popup.handle_event(
+                (event, area, tr, ss),
+                |signature| {
+                    let req = self
+                        .session_requests
+                        .get(self.cursor.current)
+                        .ok_or("session request not found")?;
+                    let _ = self
+                        .tr_2
+                        .as_ref()
+                        .ok_or("no tr_2")?
+                        .send(WcEvent::Message(Box::new(req.create_response(
+                            WcData::SessionRequestResponse(Value::String(hex::encode_prefixed(
+                                signature.as_bytes(),
+                            ))),
+                        ))));
+                    Ok(())
+                },
+                || Ok(()),
+                || Ok(()),
+            )?;
+            handle_result.merge(r);
         } else if self.exit_popup.is_open() {
             let r = self.exit_popup.handle_event(
                 event,
@@ -461,6 +542,7 @@ impl Component for WalletConnectPage {
                 && !self.confirm_popup.is_open()
                 && !self.exit_popup.is_open()
                 && !self.tx_popup.is_open()
+                && !self.sign_popup.is_open()
                 && !any_popup_open_before
             {
                 self.exit_popup.open();
@@ -532,56 +614,9 @@ impl Component for WalletConnectPage {
 
         self.confirm_popup.render(area, buf, &shared_state.theme);
         self.tx_popup.render(area, buf, &shared_state.theme);
+        self.sign_popup.render(area, buf, &shared_state.theme);
         self.exit_popup.render(area, buf, &shared_state.theme);
 
         area
     }
-}
-
-fn format_proposal(params: &SessionProposeParams) -> String {
-    let metadata = &params.proposer.metadata;
-    let mut output = format!(
-        "dApp Name: {name}\n{desc}\n{url}\n\nRequested Permissions\n",
-        name = metadata.name,
-        desc = metadata.description,
-        url = metadata.url
-    );
-
-    for (ns_key, ns) in params
-        .required_namespaces
-        .iter()
-        .chain(params.optional_namespaces.iter())
-    {
-        output.push_str(&format!("\n1. {ns_key}\n"));
-
-        if let Some(accounts) = &ns.accounts {
-            output.push_str("   - Accounts:\n");
-            for a in accounts {
-                output.push_str(&format!("     • {a}\n"));
-            }
-        }
-
-        if !ns.chains.is_empty() {
-            output.push_str("   - Chains:\n");
-            for c in &ns.chains {
-                output.push_str(&format!("     • {c}\n"));
-            }
-        }
-
-        if !ns.methods.is_empty() {
-            output.push_str("   - Methods:\n");
-            for m in &ns.methods {
-                output.push_str(&format!("     • {m}\n"));
-            }
-        }
-
-        if !ns.events.is_empty() {
-            output.push_str("   - Events:\n");
-            for e in &ns.events {
-                output.push_str(&format!("     • {e}\n"));
-            }
-        }
-    }
-
-    output
 }
