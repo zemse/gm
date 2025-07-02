@@ -54,6 +54,4 @@ chrono = "0.4.41"
 url = "2.5.4"
 serde_path_to_error = "0.1.17"
 data3 = "0.1.0"
-# TODO replace with published crate
-walletconnect-sdk = { git = "https://github.com/zemse/walletconnect-sdk-rs" }
-# walletconnect-sdk = { path = "../walletconnect-sdk" }
+walletconnect-sdk = "0.1.0"
