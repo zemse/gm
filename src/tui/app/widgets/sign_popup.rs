@@ -211,18 +211,18 @@ impl SignPopup {
                 }
 
                 SignStatus::Signing => {
-                    "Signing message...".render(button_area.margin_up(1), buf);
+                    "Signing message...".render(button_area.margin_top(1), buf);
                 }
                 SignStatus::Done => {
                     ["Signature is done.", "Press ESC to close"].render(
-                        button_area.margin_up(1),
+                        button_area.margin_top(1),
                         buf,
                         (),
                     );
                 }
                 SignStatus::Failed => {
                     ["Signing failed.", "Press ESC to close"].render(
-                        button_area.margin_up(1),
+                        button_area.margin_top(1),
                         buf,
                         (),
                     );

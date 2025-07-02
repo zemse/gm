@@ -246,22 +246,22 @@ impl TxPopup {
                 }
 
                 TxStatus::Signing => {
-                    "Signing and sending transaction...".render(button_area.margin_up(1), buf);
+                    "Signing and sending transaction...".render(button_area.margin_top(1), buf);
                 }
                 TxStatus::Pending(tx_hash) => {
                     format!("Transaction pending... Hash: {tx_hash}")
-                        .render(button_area.margin_up(1), buf);
+                        .render(button_area.margin_top(1), buf);
                 }
                 TxStatus::Confirmed(tx_hash) => {
                     [
                         format!("Transaction confirmed! Hash: {tx_hash}"),
                         "Press ESC to close".to_string(),
                     ]
-                    .render(button_area.margin_up(1), buf, false);
+                    .render(button_area.margin_top(1), buf, false);
                 }
                 TxStatus::Failed(tx_hash) => {
                     format!("Transaction failed! Hash: {tx_hash}")
-                        .render(button_area.margin_up(1), buf);
+                        .render(button_area.margin_top(1), buf);
                 }
             }
         }

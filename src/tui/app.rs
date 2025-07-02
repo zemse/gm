@@ -392,18 +392,34 @@ impl Widget for &App {
             // Render Body
             if page.is_main_menu() && page.main_menu_focused_item().is_some() {
                 let main_menu_item = page.main_menu_focused_item().unwrap();
-                let [left_area, right_area] =
-                    Layout::horizontal([Constraint::Length(15), Constraint::Min(2)])
-                        .areas(body_area);
+                let [left_area, gap_area, right_area] = Layout::horizontal([
+                    Constraint::Length(13),
+                    Constraint::Length(1),
+                    Constraint::Min(2),
+                ])
+                .areas(body_area.block_inner());
 
-                page.render_component_with_block(
-                    left_area,
-                    buf,
-                    Block::bordered(),
-                    &self.shared_state,
-                );
+                // Render border of the canvas
+                Block::bordered()
+                    .border_type(self.shared_state.theme.border_type)
+                    .render(body_area, buf);
 
-                let page = match main_menu_item {
+                // Render the Middle stick
+                let height_inner = gap_area.height;
+                let mut gap_area = gap_area.expand_vertical(1);
+                "┬".render(gap_area, buf);
+                for _ in 0..height_inner {
+                    gap_area = gap_area.consume_height(1).expect("should not fail");
+                    "│".render(gap_area, buf);
+                }
+                gap_area = gap_area.consume_height(1).expect("should not fail");
+                "┴".render(gap_area, buf);
+
+                // Render Main Menu on the Left side
+                page.render_component(left_area, buf, &self.shared_state);
+
+                // Render the preview of selection on the Right side
+                let dummy_page = match main_menu_item {
                     MainMenuItem::Portfolio => {
                         let mut preview_page = main_menu_item
                             .get_page()
@@ -443,17 +459,12 @@ impl Widget for &App {
                     MainMenuItem::DevKeyInput => Page::DevKeyCapture(DevKeyCapturePage::default()),
                 };
 
-                page.render_component_with_block(
-                    right_area,
-                    buf,
-                    Block::bordered(),
-                    &self.shared_state,
-                );
+                dummy_page.render_component(right_area, buf, &self.shared_state);
             } else {
                 page.render_component_with_block(
                     body_area,
                     buf,
-                    Block::bordered(),
+                    Block::bordered().border_type(self.shared_state.theme.border_type),
                     &self.shared_state,
                 );
             }

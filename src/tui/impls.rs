@@ -116,7 +116,7 @@ impl RectUtil for Rect {
         }
     }
 
-    fn margin_up(self, m: u16) -> Rect {
+    fn margin_top(self, m: u16) -> Rect {
         Rect {
             x: self.x,
             y: self.y + m,
@@ -131,6 +131,15 @@ impl RectUtil for Rect {
             y: self.y,
             width: self.width,
             height: self.height - m,
+        }
+    }
+
+    fn expand_vertical(self, m: u16) -> Rect {
+        Rect {
+            x: self.x,
+            y: self.y - m,
+            width: self.width,
+            height: self.height + 2 * m,
         }
     }
 
