@@ -418,7 +418,7 @@ impl Widget for &App {
                         })
                         .unwrap(),
                     }),
-                    MainMenuItem::Setup => Page::Text(TextPage::new(
+                    MainMenuItem::CompleteSetup => Page::Text(TextPage::new(
                         "Setup some of the essential stuff to get the most out of gm".to_string(),
                     )),
                     MainMenuItem::Accounts => {

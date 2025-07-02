@@ -8,11 +8,11 @@ use address_book_create::AddressBookCreatePage;
 use address_book_display::AddressBookDisplayPage;
 use asset_transfer::AssetTransferPage;
 use assets::AssetsPage;
+use complete_setup::CompleteSetupPage;
 use config::ConfigPage;
 use dev_key_capture::DevKeyCapturePage;
 use main_menu::{MainMenuItem, MainMenuPage};
 use send_message::SendMessagePage;
-use setup::SetupPage;
 use sign_message::SignMessagePage;
 use text::TextPage;
 use trade::TradePage;
@@ -33,11 +33,11 @@ pub mod address_book_create;
 pub mod address_book_display;
 pub mod asset_transfer;
 pub mod assets;
+pub mod complete_setup;
 pub mod config;
 pub mod dev_key_capture;
 pub mod main_menu;
 pub mod send_message;
-pub mod setup;
 pub mod sign_message;
 pub mod text;
 pub mod trade;
@@ -46,7 +46,7 @@ pub mod walletconnect;
 #[allow(clippy::large_enum_variant)]
 pub enum Page {
     MainMenu(MainMenuPage),
-    Setup(SetupPage),
+    CompleteSetup(CompleteSetupPage),
 
     Account(AccountPage),
     AccountCreate(AccountCreatePage),
@@ -99,7 +99,7 @@ impl Component for Page {
     fn set_focus(&mut self, focus: bool) {
         match self {
             Page::MainMenu(page) => page.set_focus(focus),
-            Page::Setup(page) => page.set_focus(focus),
+            Page::CompleteSetup(page) => page.set_focus(focus),
 
             Page::AddressBook(page) => page.set_focus(focus),
             Page::AddressBookCreate(page) => page.set_focus(focus),
@@ -128,7 +128,7 @@ impl Component for Page {
     async fn exit_threads(&mut self) {
         match self {
             Page::MainMenu(page) => page.exit_threads().await,
-            Page::Setup(page) => page.exit_threads().await,
+            Page::CompleteSetup(page) => page.exit_threads().await,
 
             Page::AddressBook(page) => page.exit_threads().await,
             Page::AddressBookCreate(page) => page.exit_threads().await,
@@ -157,7 +157,7 @@ impl Component for Page {
     fn reload(&mut self, ss: &SharedState) -> crate::Result<()> {
         match self {
             Page::MainMenu(page) => page.reload(ss),
-            Page::Setup(page) => page.reload(ss),
+            Page::CompleteSetup(page) => page.reload(ss),
 
             Page::AddressBook(page) => page.reload(ss),
             Page::AddressBookCreate(page) => page.reload(ss),
@@ -193,7 +193,7 @@ impl Component for Page {
     ) -> crate::Result<HandleResult> {
         match self {
             Page::MainMenu(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::Setup(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::CompleteSetup(page) => page.handle_event(event, area, tr, sd, ss),
 
             Page::AddressBook(page) => page.handle_event(event, area, tr, sd, ss),
             Page::AddressBookCreate(page) => page.handle_event(event, area, tr, sd, ss),
@@ -230,7 +230,7 @@ impl Component for Page {
     {
         match self {
             Page::MainMenu(page) => page.render_component(area, buf, shared_state),
-            Page::Setup(page) => page.render_component(area, buf, shared_state),
+            Page::CompleteSetup(page) => page.render_component(area, buf, shared_state),
 
             Page::AddressBook(page) => page.render_component(area, buf, shared_state),
             Page::AddressBookCreate(page) => page.render_component(area, buf, shared_state),

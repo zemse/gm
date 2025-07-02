@@ -57,11 +57,11 @@ impl TryFrom<FormItem> for FormWidget {
     }
 }
 
-pub struct SetupPage {
+pub struct CompleteSetupPage {
     pub form: Form<FormItem>,
 }
 
-impl SetupPage {
+impl CompleteSetupPage {
     pub fn new() -> crate::Result<Self> {
         Ok(Self {
             form: Form::init(|form| {
@@ -83,7 +83,7 @@ impl SetupPage {
         })
     }
 }
-impl Component for SetupPage {
+impl Component for CompleteSetupPage {
     fn set_focus(&mut self, focus: bool) {
         self.form.set_form_focus(focus);
     }
@@ -133,7 +133,7 @@ impl Component for SetupPage {
     where
         Self: Sized,
     {
-        Line::from("Setup").bold().render(area, buf);
+        Line::from("Complete Setup").bold().render(area, buf);
         let Ok(area) = area.consume_height(2) else {
             return area;
         };

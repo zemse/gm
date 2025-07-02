@@ -15,14 +15,15 @@ use crate::{
 };
 
 use super::{
-    account::AccountPage, address_book::AddressBookPage, assets::AssetsPage, config::ConfigPage,
-    dev_key_capture::DevKeyCapturePage, send_message::SendMessagePage, setup::SetupPage,
-    sign_message::SignMessagePage, walletconnect::WalletConnectPage, Page,
+    account::AccountPage, address_book::AddressBookPage, assets::AssetsPage,
+    complete_setup::CompleteSetupPage, config::ConfigPage, dev_key_capture::DevKeyCapturePage,
+    send_message::SendMessagePage, sign_message::SignMessagePage, walletconnect::WalletConnectPage,
+    Page,
 };
 
 #[derive(Display, EnumIter)]
 pub enum MainMenuItem {
-    Setup,
+    CompleteSetup,
     Portfolio,
     Accounts,
     AddressBook,
@@ -36,7 +37,7 @@ pub enum MainMenuItem {
 impl MainMenuItem {
     pub fn get_page(&self) -> crate::Result<Page> {
         Ok(match self {
-            MainMenuItem::Setup => Page::Setup(SetupPage::new()?),
+            MainMenuItem::CompleteSetup => Page::CompleteSetup(CompleteSetupPage::new()?),
             MainMenuItem::Portfolio => Page::Assets(AssetsPage::default()),
             MainMenuItem::Accounts => Page::Account(AccountPage::new()?),
             MainMenuItem::AddressBook => Page::AddressBook(AddressBookPage::new()?),
@@ -50,7 +51,7 @@ impl MainMenuItem {
 
     pub fn depends_on_current_account(&self) -> bool {
         match self {
-            MainMenuItem::Setup
+            MainMenuItem::CompleteSetup
             | MainMenuItem::AddressBook
             | MainMenuItem::Accounts
             | MainMenuItem::WalletConnect
@@ -63,7 +64,7 @@ impl MainMenuItem {
 
     pub fn only_on_developer_mode(&self) -> bool {
         match self {
-            MainMenuItem::Setup
+            MainMenuItem::CompleteSetup
             | MainMenuItem::Portfolio
             | MainMenuItem::Accounts
             | MainMenuItem::AddressBook
@@ -78,7 +79,7 @@ impl MainMenuItem {
     pub fn get_menu(developer_mode: bool) -> crate::Result<Vec<MainMenuItem>> {
         let mut all_options: Vec<MainMenuItem> = MainMenuItem::iter().collect();
 
-        let temp_setup_page = SetupPage::new()?;
+        let temp_setup_page = CompleteSetupPage::new()?;
         if temp_setup_page.form.visible_count() == 0 {
             all_options.remove(0);
         }
