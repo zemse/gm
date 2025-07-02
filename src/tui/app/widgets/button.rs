@@ -1,18 +1,13 @@
 use crate::tui::theme::Theme;
 use crate::tui::traits::BorderedWidget;
-use ratatui::{
-    layout::Rect,
-    style::{Modifier, Style},
-    text::Line,
-    widgets::Block,
-};
+use ratatui::{layout::Rect, style::Style, text::Line, widgets::Block};
 
-pub struct Button<const REVERSED: bool = false> {
+pub struct Button {
     pub focus: bool,
     pub label: &'static str,
 }
 
-impl<const REVERSED: bool> Button<REVERSED> {
+impl Button {
     pub fn render(
         &self,
         area: ratatui::prelude::Rect,
@@ -34,11 +29,7 @@ impl<const REVERSED: bool> Button<REVERSED> {
             Block::bordered()
                 .border_type(theme.into())
                 .style(if self.focus {
-                    if REVERSED {
-                        Style::default().remove_modifier(Modifier::REVERSED)
-                    } else {
-                        Style::default().add_modifier(Modifier::REVERSED)
-                    }
+                    theme.button_focused()
                 } else {
                     Style::default()
                 }),

@@ -16,7 +16,7 @@ pub struct FilterSelect<'a, T: Display> {
     pub cursor: &'a Cursor,
     pub search_string: &'a String,
     pub focus: bool,
-    pub focus_style: Option<Style>,
+    pub focus_style: Style,
 }
 
 impl<T: Display> Widget for FilterSelect<'_, T> {

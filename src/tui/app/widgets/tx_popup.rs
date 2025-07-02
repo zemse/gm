@@ -211,7 +211,9 @@ impl TxPopup {
         Self: Sized,
     {
         if self.is_open() {
-            Popup.render(area, buf, theme);
+            let theme = theme.popup();
+
+            Popup.render(area, buf, &theme);
 
             let inner_area = Popup::inner_area(area);
             let block = Block::bordered().title("Transaction");
@@ -230,17 +232,17 @@ impl TxPopup {
 
             match self.status {
                 TxStatus::NotSent => {
-                    Button::<false> {
+                    Button {
                         focus: !self.button_cursor,
                         label: "Cancel",
                     }
-                    .render(left_area, buf, theme);
+                    .render(left_area, buf, &theme);
 
-                    Button::<false> {
+                    Button {
                         focus: self.button_cursor,
                         label: "Confirm",
                     }
-                    .render(right_area, buf, theme);
+                    .render(right_area, buf, &theme);
                 }
 
                 TxStatus::Signing => {

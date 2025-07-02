@@ -664,10 +664,13 @@ impl Component for WalletConnectPage {
             }
         }
 
-        self.confirm_popup.render(area, buf, &shared_state.theme);
-        self.tx_popup.render(area, buf, &shared_state.theme);
-        self.sign_popup.render(area, buf, &shared_state.theme);
-        self.exit_popup.render(area, buf, &shared_state.theme);
+        self.confirm_popup
+            .render(area, buf, &shared_state.theme.popup());
+        self.tx_popup.render(area, buf, &shared_state.theme.popup());
+        self.sign_popup
+            .render(area, buf, &shared_state.theme.popup());
+        self.exit_popup
+            .render(area, buf, &shared_state.theme.popup());
 
         area
     }

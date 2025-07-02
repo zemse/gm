@@ -21,7 +21,7 @@ use crate::{
             SharedState,
         },
         theme::Theme,
-        traits::{CustomRender, HandleResult},
+        traits::{CustomRender, HandleResult, RectUtil},
         Event,
     },
     utils::account::AccountManager,
@@ -176,7 +176,9 @@ impl SignPopup {
         Self: Sized,
     {
         if self.is_open() {
-            Popup.render(area, buf, theme);
+            let theme = theme.popup();
+
+            Popup.render(area, buf, &theme);
 
             let inner_area = Popup::inner_area(area);
             let block = Block::bordered().title("Sign Message");
@@ -195,27 +197,35 @@ impl SignPopup {
 
             match self.status {
                 SignStatus::Idle => {
-                    Button::<false> {
+                    Button {
                         focus: !self.button_cursor,
                         label: "Cancel",
                     }
-                    .render(left_area, buf, theme);
+                    .render(left_area, buf, &theme);
 
-                    Button::<false> {
+                    Button {
                         focus: self.button_cursor,
                         label: "Confirm",
                     }
-                    .render(right_area, buf, theme);
+                    .render(right_area, buf, &theme);
                 }
 
                 SignStatus::Signing => {
-                    "Signing message...".render(button_area, buf);
+                    "Signing message...".render(button_area.margin_up(1), buf);
                 }
                 SignStatus::Done => {
-                    ["Signature is done.", "Press ESC to close"].render(button_area, buf, ());
+                    ["Signature is done.", "Press ESC to close"].render(
+                        button_area.margin_up(1),
+                        buf,
+                        (),
+                    );
                 }
                 SignStatus::Failed => {
-                    ["Signing failed.", "Press ESC to close"].render(button_area, buf, ());
+                    ["Signing failed.", "Press ESC to close"].render(
+                        button_area.margin_up(1),
+                        buf,
+                        (),
+                    );
                 }
             }
         }

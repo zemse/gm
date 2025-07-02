@@ -32,14 +32,14 @@ impl Popup {
     ) where
         Self: Sized,
     {
+        let theme = theme.popup();
         let popup_area = Popup::area(area);
-        // let popup_inner_area = Popup::inner_area(area);
 
         Clear.render(popup_area, buf);
 
         Block::default()
-            .style(theme)
-            .border_type(theme.into())
+            .border_type((&theme).into())
+            .style(&theme)
             .render(popup_area, buf);
     }
 }

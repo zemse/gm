@@ -85,10 +85,7 @@ impl FormWidget {
     }
 }
 
-pub struct Form<
-    E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>,
-    const REVERSED: bool = false,
-> {
+pub struct Form<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>> {
     pub cursor: usize,
     pub text_cursor: usize,
     pub form_focus: bool,
@@ -98,11 +95,7 @@ pub struct Form<
     pub _phantom: PhantomData<E>,
 }
 
-impl<
-        E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>,
-        const REVERSED: bool,
-    > Form<E, REVERSED>
-{
+impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>> Form<E> {
     // TODO remove the cursor parameter, and guess it as the first item that is
     // not heading or static text or similar
     pub fn init<F>(set_values_closure: F) -> crate::Result<Self>
@@ -439,7 +432,7 @@ impl<
                     area.y += height_used;
                 }
                 FormWidget::Button { label } => {
-                    Button::<REVERSED> {
+                    Button {
                         focus: self.form_focus && self.cursor == i,
                         label,
                     }

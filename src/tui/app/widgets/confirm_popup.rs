@@ -111,7 +111,9 @@ impl ConfirmPopup {
         Self: Sized,
     {
         if self.is_open() {
-            Popup.render(area, buf, theme);
+            let theme = theme.popup();
+
+            Popup.render(area, buf, &theme);
 
             let inner_area = Popup::inner_area(area);
             let block = Block::bordered().title(self.title);
@@ -128,17 +130,17 @@ impl ConfirmPopup {
                 Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
                     .areas(button_area);
 
-            Button::<true> {
+            Button {
                 focus: !self.button_cursor,
                 label: self.cancel_button_label,
             }
-            .render(left_area, buf, theme);
+            .render(left_area, buf, &theme);
 
-            Button::<true> {
+            Button {
                 focus: self.button_cursor,
                 label: self.confirm_button_label,
             }
-            .render(right_area, buf, theme);
+            .render(right_area, buf, &theme);
         }
     }
 }

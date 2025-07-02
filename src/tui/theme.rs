@@ -1,4 +1,5 @@
 use ratatui::prelude::Color;
+use ratatui::style::Modifier;
 use ratatui::style::Style;
 use ratatui::widgets::BorderType;
 use std::fmt::Formatter;
@@ -45,36 +46,38 @@ impl ThemeName {
 
 #[derive(Clone)]
 pub struct Theme {
-    pub text: Color,
-    pub bg: Color,
-    pub select: Option<Color>,
+    pub text: Option<Color>,
+    pub bg: Option<Color>,
+    pub reversed: bool,
+    pub select_focus: Option<Color>,
+    pub popup_reversed: bool,
     pub popup_bg: Option<Color>,
     pub error_popup_bg: Option<Color>,
     pub border_type: BorderType,
 }
 
-impl Default for Theme {
-    fn default() -> Self {
-        Self {
-            text: Color::Reset,
-            bg: Color::Reset,
-            select: None,
-            popup_bg: None,
-            error_popup_bg: None,
-            border_type: BorderType::Plain,
-        }
-    }
-}
-
 impl From<&Theme> for Style {
-    fn from(val: &Theme) -> Self {
-        Style::default().bg(val.bg).fg(val.text)
+    fn from(theme: &Theme) -> Self {
+        let mut style = Style::default();
+        if let Some(text_color) = theme.text {
+            style = style.fg(text_color);
+        }
+        if let Some(bg_color) = theme.bg {
+            style = style.bg(bg_color);
+        }
+        if theme.reversed {
+            style = style.add_modifier(Modifier::REVERSED);
+        } else {
+            style = style.remove_modifier(Modifier::REVERSED);
+        }
+        style
     }
 }
 
 impl From<&mut Theme> for Style {
-    fn from(val: &mut Theme) -> Self {
-        Style::default().bg(val.bg).fg(val.text)
+    fn from(theme: &mut Theme) -> Self {
+        let theme = &*theme;
+        theme.into()
     }
 }
 
@@ -87,23 +90,42 @@ impl From<&Theme> for BorderType {
 impl Theme {
     pub fn new(theme_name: ThemeName) -> Theme {
         match theme_name {
-            ThemeName::Monochrome => Default::default(),
+            ThemeName::Monochrome => Theme {
+                text: None,
+                bg: None,
+                select_focus: None,
+                reversed: false,
+                popup_reversed: true,
+                popup_bg: None,
+                error_popup_bg: None,
+                border_type: BorderType::Plain,
+            },
             ThemeName::MonochromeModern => Theme {
+                text: None,
+                bg: None,
+                select_focus: None,
+                reversed: false,
+                popup_reversed: true,
+                popup_bg: None,
+                error_popup_bg: None,
                 border_type: BorderType::Rounded,
-                ..Default::default()
             },
             ThemeName::Dark => Theme {
-                text: Color::White,
-                bg: Color::Black,
-                select: Some(Color::Yellow),
+                text: Some(Color::White),
+                bg: Some(Color::Black),
+                select_focus: None,
+                reversed: false,
+                popup_reversed: false,
                 popup_bg: Some(Color::Blue),
                 error_popup_bg: Some(Color::Red),
                 border_type: BorderType::Plain,
             },
             ThemeName::DarkModern => Theme {
-                text: Color::White,
-                bg: Color::Black,
-                select: Some(Color::Yellow),
+                text: Some(Color::White),
+                bg: Some(Color::Black),
+                select_focus: None,
+                reversed: false,
+                popup_reversed: false,
                 popup_bg: Some(Color::Blue),
                 error_popup_bg: Some(Color::Red),
                 border_type: BorderType::Rounded,
@@ -111,30 +133,51 @@ impl Theme {
         }
     }
 
-    pub fn select(&self) -> Option<Style> {
-        self.select
-            .map(|select| Into::<Style>::into(self).bg(select))
-    }
-
-    pub fn popup_bg(&self) -> Theme {
-        if let Some(popup_bg) = self.popup_bg {
-            Theme {
-                bg: popup_bg,
-                ..self.clone()
-            }
+    pub fn button_focused(&self) -> Style {
+        if self.reversed {
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .remove_modifier(Modifier::REVERSED)
         } else {
-            self.clone()
+            Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED)
         }
     }
 
-    pub fn error_popup_bg(&self) -> Theme {
-        if let Some(error_popup_bg) = self.error_popup_bg {
-            Theme {
-                bg: error_popup_bg,
-                ..self.clone()
-            }
+    pub fn select(&self) -> Style {
+        if let Some(select_focus) = self.select_focus {
+            Style::default()
+                .bg(select_focus)
+                .add_modifier(Modifier::BOLD)
         } else {
-            self.clone()
+            Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED)
+        }
+    }
+
+    pub fn select_popup(&self) -> Style {
+        if let Some(select_focus) = self.select_focus {
+            Style::default()
+                .bg(select_focus)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .remove_modifier(Modifier::REVERSED)
+        }
+    }
+
+    pub fn popup(&self) -> Theme {
+        Theme {
+            bg: self.popup_bg,
+            reversed: self.popup_reversed,
+            ..self.clone()
+        }
+    }
+
+    pub fn error_popup(&self) -> Theme {
+        let s = self.popup();
+        Theme {
+            bg: s.error_popup_bg,
+            ..s.clone()
         }
     }
 }

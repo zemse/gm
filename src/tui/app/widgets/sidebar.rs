@@ -108,7 +108,7 @@ impl Component for Sidebar {
             list: &list,
             cursor: &self.cursor,
             focus: false,
-            focus_style: None,
+            focus_style: shared_state.theme.select(),
         }
         .render(area, buf);
 

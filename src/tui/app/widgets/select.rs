@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use ratatui::{
     layout::{Constraint, Layout},
-    style::{Modifier, Style},
+    style::Style,
     text::Line,
     widgets::{List, ListItem, Widget},
 };
@@ -15,7 +15,7 @@ pub struct Select<'a, T: Display> {
     pub focus: bool,
     pub list: &'a Vec<T>,
     pub cursor: &'a Cursor,
-    pub focus_style: Option<Style>,
+    pub focus_style: Style,
 }
 
 impl<T: Display> Widget for Select<'_, T> {
@@ -31,7 +31,6 @@ impl<T: Display> Widget for Select<'_, T> {
             let content = Line::from(format!("{member}"));
             let style = if idx == i && self.focus {
                 self.focus_style
-                    .unwrap_or(Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED))
             } else {
                 Style::default()
             };

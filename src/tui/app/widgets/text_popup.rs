@@ -74,13 +74,15 @@ impl TextPopup {
         if self.text_scroll.text.is_empty() {
             return;
         }
-        Popup.render(area, buf, theme);
+        let theme = theme.popup();
+
+        Popup.render(area, buf, &theme);
 
         let popup_inner_area = Popup::inner_area(area);
 
         let block = Block::bordered()
-            .style(theme)
-            .border_type(theme.into())
+            .style(&theme)
+            .border_type((&theme).into())
             .title(self.title)
             .title_bottom("press ESC to dismiss");
 

@@ -466,6 +466,6 @@ impl Widget for &App {
         }
 
         self.fatal_error_popup
-            .render(area, buf, &self.shared_state.theme.error_popup_bg());
+            .render(area, buf, &self.shared_state.theme.error_popup());
     }
 }

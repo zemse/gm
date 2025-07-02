@@ -73,7 +73,7 @@ impl Component for AssetsPage {
                     list,
                     cursor: &self.cursor,
                     focus: self.focus,
-                    focus_style: None,
+                    focus_style: shared_state.theme.select(),
                 }
                 .render(area, buf);
             }
