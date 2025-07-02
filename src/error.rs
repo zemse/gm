@@ -33,6 +33,7 @@ pub enum Error {
     SerdeJsonWithString(Box<serde_json::Error>, Box<String>),
     MpscRecvError(Box<std::sync::mpsc::RecvError>),
     MpscSendError(Box<std::sync::mpsc::SendError<crate::tui::Event>>),
+    MpscSendError2(Box<std::sync::mpsc::SendError<crate::tui::app::pages::walletconnect::WcEvent>>),
     MnemonicError(Box<coins_bip39::MnemonicError>),
     AlloyLocalSignerError(Box<alloy::signers::local::LocalSignerError>),
     FromUtf8Error(Box<std::string::FromUtf8Error>),
@@ -171,6 +172,12 @@ impl From<std::sync::mpsc::RecvError> for Error {
 impl From<std::sync::mpsc::SendError<crate::tui::Event>> for Error {
     fn from(e: std::sync::mpsc::SendError<crate::tui::Event>) -> Self {
         Error::MpscSendError(Box::new(e))
+    }
+}
+
+impl From<std::sync::mpsc::SendError<crate::tui::app::pages::walletconnect::WcEvent>> for Error {
+    fn from(e: std::sync::mpsc::SendError<crate::tui::app::pages::walletconnect::WcEvent>) -> Self {
+        Error::MpscSendError2(Box::new(e))
     }
 }
 

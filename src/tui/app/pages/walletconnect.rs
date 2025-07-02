@@ -19,7 +19,7 @@ use strum::EnumIter;
 use tokio::task::JoinHandle;
 use walletconnect_sdk::{
     pairing::{Pairing, Topic},
-    types::{Metadata, SessionProposeParams, SessionRequestData},
+    types::{IrnTag, Metadata, SessionProposeParams, SessionRequestData},
     wc_message::{WcData, WcMessage},
     Connection,
 };
@@ -114,7 +114,7 @@ impl WalletConnectStatus {
     }
 }
 
-enum WcEvent {
+pub enum WcEvent {
     Message(Box<WcMessage>),
     NoOp,
 }
@@ -285,7 +285,7 @@ impl Component for WalletConnectPage {
                     WcData::SessionPing => {
                         if let Some(tr_2) = self.tr_2.as_ref() {
                             let _ = tr_2.send(WcEvent::Message(Box::new(
-                                msg.create_response(WcData::SessionPingResponseSuccess),
+                                msg.create_response(WcData::SessionPingResponseSuccess, None),
                             )));
                         }
                     }
@@ -322,7 +322,18 @@ impl Component for WalletConnectPage {
             _ => {}
         }
 
+        let get_req_tr_2 = || -> crate::Result<_> {
+            let req = self
+                .session_requests
+                .get(self.cursor.current)
+                .ok_or("session request not found")?;
+            let tr_2 = self.tr_2.as_ref().ok_or("no tr_2")?;
+            Ok((req, tr_2))
+        };
+
         let mut go_back = false;
+        let mut remove_current_request = false;
+        let mut remove_current_request_2 = false;
 
         // Handle based on what's active on the UI
         if self.confirm_popup.is_open() {
@@ -343,66 +354,81 @@ impl Component for WalletConnectPage {
                         WalletConnectStatus::SessionSettleInProgress,
                     ));
 
-                    let addr = ss.current_account.unwrap();
-                    let tr = tr.clone();
-                    let shutdown_signal = sd.clone();
-                    let pairing_clone = pairing.clone();
-                    self.watch_thread = Some(tokio::spawn(async move {
-                        let mut pairing = pairing_clone;
-                        let Ok(msgs) = pairing.approve_with_session_settle(addr).await else {
+                    {
+                        let addr = ss.current_account.unwrap();
+                        let tr = tr.clone();
+                        let shutdown_signal = sd.clone();
+                        let pairing_clone = pairing.clone();
+                        self.watch_thread = Some(tokio::spawn(async move {
+                            let mut pairing = pairing_clone;
+                            let Ok(msgs) = pairing.approve_with_session_settle(addr).await else {
+                                let _ = tr.send(Event::WalletConnectStatus(
+                                    WalletConnectStatus::SessionSettleFailed,
+                                ));
+                                return;
+                            };
+
                             let _ = tr.send(Event::WalletConnectStatus(
-                                WalletConnectStatus::SessionSettleFailed,
+                                WalletConnectStatus::SessionSettleDone,
                             ));
-                            return;
-                        };
 
-                        let _ = tr.send(Event::WalletConnectStatus(
-                            WalletConnectStatus::SessionSettleDone,
-                        ));
-
-                        for msg in msgs {
-                            let _ = tr.send(Event::WalletConnectMessage(addr, Box::new(msg)));
-                        }
-
-                        loop {
-                            if shutdown_signal.load(Ordering::Relaxed) {
-                                break;
-                            }
-
-                            let messages =
-                                pairing.watch_messages(Topic::Derived, None).await.unwrap();
-
-                            for msg in messages {
+                            for msg in msgs {
                                 let _ = tr.send(Event::WalletConnectMessage(addr, Box::new(msg)));
                             }
 
-                            tokio::time::sleep(Duration::from_secs(1)).await;
-                        }
-                    }));
+                            loop {
+                                if shutdown_signal.load(Ordering::Relaxed) {
+                                    break;
+                                }
 
-                    let (tr_2, rc_2) = mpsc::channel::<WcEvent>();
-                    self.tr_2 = Some(tr_2);
-                    let shutdown_signal = sd.clone();
-                    self.send_thread = Some(tokio::spawn(async move {
-                        loop {
-                            if shutdown_signal.load(Ordering::Relaxed) {
-                                break;
-                            }
+                                let messages =
+                                    pairing.watch_messages(Topic::Derived, None).await.unwrap();
 
-                            if let Ok(WcEvent::Message(msg)) = rc_2.recv() {
-                                pairing
-                                    .send_message(
-                                        Topic::Derived,
-                                        &msg.into_raw().unwrap(), // TODO handle unwrap
-                                        Some(0),
-                                        msg.irn_tag(),
-                                        msg.ttl(),
-                                    )
-                                    .await
-                                    .unwrap();
+                                for msg in messages {
+                                    let _ =
+                                        tr.send(Event::WalletConnectMessage(addr, Box::new(msg)));
+                                }
+
+                                tokio::time::sleep(Duration::from_secs(1)).await;
                             }
-                        }
-                    }));
+                        }));
+                    }
+
+                    {
+                        let (tr_2, rc_2) = mpsc::channel::<WcEvent>();
+                        self.tr_2 = Some(tr_2);
+                        let addr = ss.current_account.unwrap();
+                        let tr = tr.clone();
+                        let shutdown_signal = sd.clone();
+                        self.send_thread = Some(tokio::spawn(async move {
+                            loop {
+                                if shutdown_signal.load(Ordering::Relaxed) {
+                                    break;
+                                }
+
+                                if let Ok(WcEvent::Message(msg)) = rc_2.recv() {
+                                    match pairing
+                                        .send_message(
+                                            Topic::Derived,
+                                            &msg.into_raw().unwrap(), // TODO handle unwrap
+                                            Some(0),
+                                            msg.irn_tag(),
+                                            msg.ttl(),
+                                        )
+                                        .await
+                                    {
+                                        Ok(_) => {}
+                                        Err(error) => tr
+                                            .send(Event::WalletConnectError(
+                                                addr,
+                                                format!("{error:?}"),
+                                            ))
+                                            .unwrap(),
+                                    }
+                                }
+                            }
+                        }));
+                    }
 
                     Ok(())
                 },
@@ -418,24 +444,29 @@ impl Component for WalletConnectPage {
             let r = self.tx_popup.handle_event(
                 (event, area, tr, sd, ss),
                 |tx_hash| {
-                    let req = self
-                        .session_requests
-                        .get(self.cursor.current)
-                        .ok_or("session request not found")?;
-                    let _ = self
-                        .tr_2
-                        .as_ref()
-                        .ok_or("no tr_2")?
-                        .send(WcEvent::Message(Box::new(req.create_response(
-                            WcData::SessionRequestResponse(Value::String(hex::encode_prefixed(
-                                tx_hash,
-                            ))),
-                        ))));
-
+                    let (req, tr_2) = get_req_tr_2()?;
+                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                        WcData::SessionRequestResponse(Value::String(hex::encode_prefixed(
+                            tx_hash,
+                        ))),
+                        None,
+                    ))))?;
+                    remove_current_request = true;
                     Ok(())
                 },
                 |_| Ok(()),
-                || Ok(()),
+                || {
+                    let (req, tr_2) = get_req_tr_2()?;
+                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                        WcData::Error {
+                            message: "User denied tx signing".to_string(),
+                            code: 5000,
+                        },
+                        Some(IrnTag::SessionRequestResponse),
+                    ))))?;
+                    remove_current_request_2 = true;
+                    Ok(())
+                },
                 || Ok(()),
             )?;
             handle_result.merge(r);
@@ -443,22 +474,28 @@ impl Component for WalletConnectPage {
             let r = self.sign_popup.handle_event(
                 (event, area, tr, ss),
                 |signature| {
-                    let req = self
-                        .session_requests
-                        .get(self.cursor.current)
-                        .ok_or("session request not found")?;
-                    let _ = self
-                        .tr_2
-                        .as_ref()
-                        .ok_or("no tr_2")?
-                        .send(WcEvent::Message(Box::new(req.create_response(
-                            WcData::SessionRequestResponse(Value::String(hex::encode_prefixed(
-                                signature.as_bytes(),
-                            ))),
-                        ))));
+                    let (req, tr_2) = get_req_tr_2()?;
+                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                        WcData::SessionRequestResponse(Value::String(hex::encode_prefixed(
+                            signature.as_bytes(),
+                        ))),
+                        None,
+                    ))))?;
+                    remove_current_request = true;
                     Ok(())
                 },
-                || Ok(()),
+                || {
+                    let (req, tr_2) = get_req_tr_2()?;
+                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                        WcData::Error {
+                            message: "User denied msg signing".to_string(),
+                            code: 5000,
+                        },
+                        Some(IrnTag::SessionRequestResponse),
+                    ))))?;
+                    remove_current_request_2 = true;
+                    Ok(())
+                },
                 || Ok(()),
             )?;
             handle_result.merge(r);
@@ -533,6 +570,10 @@ impl Component for WalletConnectPage {
                     _ => {}
                 }
             }
+        }
+
+        if remove_current_request || remove_current_request_2 {
+            self.session_requests.remove(self.cursor.current);
         }
 
         // Special handling for ESC key, Ask user if they really want to exit

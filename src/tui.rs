@@ -1,7 +1,7 @@
 mod events;
 #[macro_use]
 mod traits;
-mod app;
+pub mod app;
 mod impls;
 mod theme;
 
