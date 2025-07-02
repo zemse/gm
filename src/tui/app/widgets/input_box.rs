@@ -14,6 +14,49 @@ use crate::{
     utils::text::split_string,
 };
 
+fn option_delete(text_input: &mut String, text_cursor: &mut usize) {
+    loop {
+        if *text_cursor == 0 {
+            break;
+        }
+        text_input.remove(*text_cursor - 1);
+        *text_cursor -= 1;
+        if *text_cursor == 0 {
+            break;
+        }
+        let next_char = text_input.chars().nth(*text_cursor - 1).unwrap_or(' ');
+        if next_char == ' ' {
+            break;
+        }
+    }
+}
+
+fn option_left(text_input: &str, text_cursor: &mut usize) {
+    loop {
+        if *text_cursor == 0 {
+            break;
+        }
+        *text_cursor -= 1;
+        let cur_char = text_input.chars().nth(*text_cursor).unwrap_or(' ');
+        if cur_char == ' ' {
+            break;
+        }
+    }
+}
+
+fn option_right(text_input: &str, text_cursor: &mut usize) {
+    loop {
+        if *text_cursor == text_input.len() {
+            break;
+        }
+        *text_cursor += 1;
+        let cur_char = text_input.chars().nth(*text_cursor).unwrap_or(' ');
+        if cur_char == ' ' {
+            break;
+        }
+    }
+}
+
 pub struct InputBox<'a> {
     pub focus: bool,
     pub label: &'static str,
@@ -33,12 +76,16 @@ impl InputBox<'_> {
         if let Event::Input(key_event) = event {
             match key_event.code {
                 KeyCode::Left => {
-                    if *text_cursor > 0 {
+                    if key_event.modifiers == KeyModifiers::ALT {
+                        option_left(text_input, text_cursor);
+                    } else if *text_cursor > 0 {
                         *text_cursor -= 1
                     }
                 }
                 KeyCode::Right => {
-                    if *text_cursor < text_input.len() {
+                    if key_event.modifiers == KeyModifiers::ALT {
+                        option_right(text_input, text_cursor);
+                    } else if *text_cursor < text_input.len() {
                         *text_cursor += 1
                     }
                 }
@@ -63,46 +110,15 @@ impl InputBox<'_> {
                     }
                     // Handle option + delete on macOS
                     else if char == 'w' && key_event.modifiers == KeyModifiers::CONTROL {
-                        loop {
-                            if *text_cursor == 0 {
-                                break;
-                            }
-                            text_input.remove(*text_cursor - 1);
-                            *text_cursor -= 1;
-                            if *text_cursor == 0 {
-                                break;
-                            }
-                            let next_char = text_input.chars().nth(*text_cursor - 1).unwrap_or(' ');
-                            if next_char == ' ' {
-                                break;
-                            }
-                        }
+                        option_delete(text_input, text_cursor);
                     }
                     // option + Left
                     else if char == 'b' && key_event.modifiers == KeyModifiers::ALT {
-                        loop {
-                            if *text_cursor == 0 {
-                                break;
-                            }
-                            *text_cursor -= 1;
-                            let cur_char = text_input.chars().nth(*text_cursor).unwrap_or(' ');
-                            if cur_char == ' ' {
-                                break;
-                            }
-                        }
+                        option_left(text_input, text_cursor);
                     }
                     // option + Right
                     else if char == 'f' && key_event.modifiers == KeyModifiers::ALT {
-                        loop {
-                            if *text_cursor == text_input.len() {
-                                break;
-                            }
-                            *text_cursor += 1;
-                            let cur_char = text_input.chars().nth(*text_cursor).unwrap_or(' ');
-                            if cur_char == ' ' {
-                                break;
-                            }
-                        }
+                        option_right(text_input, text_cursor);
                     }
                     // Simple char press
                     else {
@@ -111,7 +127,9 @@ impl InputBox<'_> {
                     }
                 }
                 KeyCode::Backspace => {
-                    if *text_cursor > 0 {
+                    if key_event.modifiers == KeyModifiers::ALT {
+                        option_delete(text_input, text_cursor);
+                    } else if *text_cursor > 0 {
                         *text_cursor -= 1;
                         text_input.remove(*text_cursor);
                     }
