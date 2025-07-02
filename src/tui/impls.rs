@@ -70,10 +70,12 @@ impl<const N: usize> CustomRender<bool> for [String; N] {
                 }
             }
 
-            if let Ok(new_area) = area.consume_height(if leave_space { 1 } else { 0 }) {
-                area = new_area;
-            } else {
-                break;
+            if leave_space {
+                if let Ok(new_area) = area.consume_height(1) {
+                    area = new_area;
+                } else {
+                    break;
+                }
             }
         }
         full_area.change_height(full_area.height - area.height)
@@ -82,7 +84,7 @@ impl<const N: usize> CustomRender<bool> for [String; N] {
 
 impl RectUtil for Rect {
     fn consume_height(self, height: u16) -> crate::Result<Rect> {
-        if self.height > height {
+        if self.height >= height {
             Ok(Rect {
                 x: self.x,
                 y: self.y + height,
@@ -111,6 +113,15 @@ impl RectUtil for Rect {
             y: self.y,
             width: self.width - 2 * x,
             height: self.height,
+        }
+    }
+
+    fn margin_up(self, m: u16) -> Rect {
+        Rect {
+            x: self.x,
+            y: self.y + m,
+            width: self.width,
+            height: self.height - m,
         }
     }
 

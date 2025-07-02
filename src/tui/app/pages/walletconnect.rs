@@ -381,12 +381,22 @@ impl Component for WalletConnectPage {
                                     break;
                                 }
 
-                                let messages =
-                                    pairing.watch_messages(Topic::Derived, None).await.unwrap();
-
-                                for msg in messages {
-                                    let _ =
-                                        tr.send(Event::WalletConnectMessage(addr, Box::new(msg)));
+                                match pairing.watch_messages(Topic::Derived, None).await {
+                                    Ok(messages) => {
+                                        for msg in messages {
+                                            let _ = tr.send(Event::WalletConnectMessage(
+                                                addr,
+                                                Box::new(msg),
+                                            ));
+                                        }
+                                    }
+                                    Err(error) => {
+                                        let _ = tr.send(Event::WalletConnectError(
+                                            addr,
+                                            format!("Error during watch messages {error:?}"),
+                                        ));
+                                        break;
+                                    }
                                 }
 
                                 tokio::time::sleep(Duration::from_secs(1)).await;
@@ -561,6 +571,7 @@ impl Component for WalletConnectPage {
             })?;
         } else if self.status == WalletConnectStatus::SessionSettleDone {
             self.cursor.handle(event, self.session_requests.len());
+
             if let Event::Input(key_event) = event {
                 #[allow(clippy::single_match)]
                 match key_event.code {

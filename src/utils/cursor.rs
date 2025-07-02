@@ -29,10 +29,14 @@ impl Cursor {
     }
 
     fn move_up(&mut self, max: usize) {
-        self.current = (self.current + max - 1) % max;
+        if max != 0 {
+            self.current = (self.current + max - 1) % max;
+        }
     }
 
     fn move_down(&mut self, max: usize) {
-        self.current = (self.current + 1) % max;
+        if max != 0 {
+            self.current = (self.current + 1) % max;
+        }
     }
 }

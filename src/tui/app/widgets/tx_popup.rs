@@ -9,9 +9,9 @@ use std::{
 use alloy::{
     consensus::{SignableTransaction, TxEnvelope, TxType},
     network::TxSignerSync,
-    primitives::{Address, FixedBytes},
+    primitives::{Address, Bytes, FixedBytes},
     providers::Provider,
-    rlp::{BytesMut, Encodable},
+    rlp::{self, BytesMut, Encodable},
     rpc::types::TransactionRequest,
 };
 use crossterm::event::{KeyCode, KeyEventKind};
@@ -31,7 +31,7 @@ use crate::{
             SharedState,
         },
         theme::Theme,
-        traits::{CustomRender, HandleResult},
+        traits::{CustomRender, HandleResult, RectUtil},
         Event,
     },
     utils::account::AccountManager,
@@ -129,7 +129,9 @@ impl TxPopup {
     {
         let mut result = HandleResult::default();
 
-        let r = self.text.handle_event(event, area)?;
+        let r = self
+            .text
+            .handle_event(event, Popup::inner_area(area).block_inner().margin_down(3))?;
         result.merge(r);
 
         match event {
@@ -242,20 +244,22 @@ impl TxPopup {
                 }
 
                 TxStatus::Signing => {
-                    "Signing and sending transaction...".render(button_area, buf);
+                    "Signing and sending transaction...".render(button_area.margin_up(1), buf);
                 }
                 TxStatus::Pending(tx_hash) => {
-                    format!("Transaction pending... Hash: {tx_hash}").render(button_area, buf);
+                    format!("Transaction pending... Hash: {tx_hash}")
+                        .render(button_area.margin_up(1), buf);
                 }
                 TxStatus::Confirmed(tx_hash) => {
                     [
                         format!("Transaction confirmed! Hash: {tx_hash}"),
                         "Press ESC to close".to_string(),
                     ]
-                    .render(button_area, buf, false);
+                    .render(button_area.margin_up(1), buf, false);
                 }
                 TxStatus::Failed(tx_hash) => {
-                    format!("Transaction failed! Hash: {tx_hash}").render(button_area, buf);
+                    format!("Transaction failed! Hash: {tx_hash}")
+                        .render(button_area.margin_up(1), buf);
                 }
             }
         }
@@ -264,7 +268,7 @@ impl TxPopup {
 
 fn fmt_tx_request(network: &Network, tx_req: &TransactionRequest) -> String {
     format!(
-        "Network: {}\nTo: {:?}\nValue: {}\nData: {:?}",
+        "Network: {}\nTo: {:?}\nValue: {}\nData: {:?}\n",
         network,
         tx_req.to.unwrap_or_default(),
         tx_req.value.unwrap_or_default(),
@@ -346,14 +350,14 @@ pub fn send_tx_thread(
             let mut out = BytesMut::new();
             let tx_typed = TxEnvelope::Eip1559(tx_signed);
             tx_typed.encode(&mut out);
-            let out = &out[2..];
+            let out = rlp::decode_exact::<Bytes>(out)?;
 
             if shutdown_signal.load(Ordering::Relaxed) {
                 return Err(crate::Error::Abort("shutdown signal received"));
             }
 
             // Submit transaction
-            let result = provider.send_raw_transaction(out).await?;
+            let result = provider.send_raw_transaction(&out).await?;
             Ok(*result.tx_hash())
         }
     }))

@@ -3,6 +3,7 @@ use ratatui::widgets::Block;
 
 use super::{popup::Popup, text_scroll::TextScroll};
 use crate::tui::theme::Theme;
+use crate::tui::traits::RectUtil;
 use crate::tui::{
     traits::{BorderedWidget, HandleResult},
     Event,
@@ -46,8 +47,8 @@ impl TextPopup {
             result.esc_ignores = 1;
         }
 
-        let popup_inner_area = Popup::inner_area(area);
-        result.merge(self.text_scroll.handle_event(event, popup_inner_area)?);
+        let text_area = Popup::inner_area(area).block_inner();
+        result.merge(self.text_scroll.handle_event(event, text_area)?);
 
         #[allow(clippy::single_match)]
         match event {

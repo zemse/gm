@@ -41,6 +41,7 @@ pub enum Error {
     UnitsError(Box<alloy::primitives::utils::UnitsError>),
     AlloySignerError(Box<alloy::signers::Error>),
     AlloyPendingTransactionError(Box<alloy::providers::PendingTransactionError>),
+    AlloyRlpError(Box<alloy::rlp::Error>),
     Abort(&'static str),
     UrlParseError(Box<url::ParseError>),
     Data3Error(Box<data3::error::Error>),
@@ -220,6 +221,12 @@ impl From<alloy::signers::Error> for Error {
 impl From<alloy::providers::PendingTransactionError> for Error {
     fn from(e: alloy::providers::PendingTransactionError) -> Self {
         Error::AlloyPendingTransactionError(Box::new(e))
+    }
+}
+
+impl From<alloy::rlp::Error> for Error {
+    fn from(e: alloy::rlp::Error) -> Self {
+        Error::AlloyRlpError(Box::new(e))
     }
 }
 
