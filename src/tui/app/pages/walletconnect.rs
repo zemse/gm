@@ -601,7 +601,7 @@ impl Component for WalletConnectPage {
             }
         }
 
-        if !go_back {
+        if !go_back && self.status != WalletConnectStatus::Idle {
             handle_result.esc_ignores = 1;
         }
 
