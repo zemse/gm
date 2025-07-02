@@ -16,6 +16,7 @@ pub struct Network {
     pub name_aliases: Vec<String>,
     pub chain_id: u32,
     pub symbol: Option<String>,
+    pub native_decimals: Option<u8>,
     pub price_ticker: Option<String>,
     pub rpc_url: Option<String>, // TODO this can rather be an array
     pub rpc_alchemy: Option<String>,
@@ -141,6 +142,7 @@ impl NetworkStore {
                     name_aliases,
                     chain_id: entry.chain_id,
                     symbol: entry.symbol.or(existing.symbol),
+                    native_decimals: entry.native_decimals.or(existing.native_decimals),
                     price_ticker: entry.price_ticker.or(existing.price_ticker),
                     rpc_url: entry.rpc_url.or(existing.rpc_url),
                     rpc_alchemy: entry.rpc_alchemy.or(existing.rpc_alchemy),
@@ -255,6 +257,15 @@ impl NetworkStore {
             });
         }
     }
+
+    pub fn has_token(&self, token_address: &Address) -> bool {
+        self.networks.iter().any(|network| {
+            network
+                .tokens
+                .iter()
+                .any(|token| token.contract_address == *token_address)
+        })
+    }
 }
 
 impl TryFrom<String> for Network {
@@ -276,6 +287,7 @@ fn default_networks() -> Vec<Network> {
             name_aliases: vec![],
             chain_id: 1,
             symbol: Some("ETH".to_string()),
+            native_decimals: Some(18),
             price_ticker: Some("ETH".to_string()),
             rpc_url: None,
             rpc_alchemy: Some(("https://eth-mainnet.g.alchemy.com/v2/{}").to_string()),
@@ -323,6 +335,7 @@ fn default_networks() -> Vec<Network> {
             name_aliases: vec![],
             chain_id: 42161,
             symbol: Some("ArbETH".to_string()),
+            native_decimals: Some(18),
             price_ticker: Some("ETH".to_string()),
             rpc_url: None,
             rpc_alchemy: Some(("https://arb-mainnet.g.alchemy.com/v2/{}").to_string()),
@@ -378,6 +391,7 @@ fn default_networks() -> Vec<Network> {
             name_aliases: vec![],
             chain_id: 8453,
             symbol: Some("BaseETH".to_string()),
+            native_decimals: Some(18),
             price_ticker: Some("ETH".to_string()),
             rpc_url: None,
             rpc_alchemy: Some(("https://base-mainnet.g.alchemy.com/v2/{}").to_string()),
@@ -409,6 +423,7 @@ fn default_networks() -> Vec<Network> {
             name_aliases: vec!["matic-mainnet".to_string()],
             chain_id: 137,
             symbol: Some("PolygonETH".to_string()),
+            native_decimals: Some(18),
             price_ticker: Some("ETH".to_string()),
             rpc_url: None,
             rpc_alchemy: Some(("https://polygon-mainnet.g.alchemy.com/v2/{}").to_string()),
@@ -423,6 +438,7 @@ fn default_networks() -> Vec<Network> {
             name_aliases: vec![],
             chain_id: 11155111,
             symbol: Some("sepoliaETH".to_string()),
+            native_decimals: Some(18),
             price_ticker: None,
             rpc_url: None,
             rpc_alchemy: Some(("https://eth-sepolia.g.alchemy.com/v2/{}").to_string()),

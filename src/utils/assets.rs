@@ -1,9 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use alloy::{
-    primitives::{utils::format_units, Address, U256},
-    providers::Provider,
-};
+use alloy::primitives::{utils::format_units, Address, U256};
 
 use crate::{
     alchemy::Alchemy,
@@ -33,6 +30,16 @@ impl Price {
 pub enum TokenAddress {
     Native,
     Contract(Address),
+}
+
+impl TokenAddress {
+    pub fn is_native(&self) -> bool {
+        matches!(self, TokenAddress::Native)
+    }
+
+    pub fn is_contract(&self) -> bool {
+        matches!(self, TokenAddress::Contract(_))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -97,6 +104,14 @@ impl Display for Asset {
     }
 }
 
+#[allow(dead_code)]
+fn has_token(networks: &NetworkStore, token_address: &TokenAddress) -> bool {
+    match token_address {
+        TokenAddress::Native => false,
+        TokenAddress::Contract(address) => networks.has_token(address),
+    }
+}
+
 pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
     let config = Config::load()?;
     let wallet_address = config
@@ -113,6 +128,9 @@ pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
     )
     .await?
     {
+        let network = networks
+            .get_by_name(&entry.network)
+            .ok_or(crate::Error::NetworkNotFound(entry.network))?;
         let asset = Asset {
             wallet_address,
             r#type: AssetType {
@@ -120,19 +138,35 @@ pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
                     Some(token_address) => TokenAddress::Contract(token_address),
                     None => TokenAddress::Native,
                 },
-                network: networks
-                    .get_by_name(&entry.network)
-                    .ok_or(crate::Error::NetworkNotFound(entry.network))?
+                network: network.name.clone(),
+                symbol: entry
+                    .token_metadata
+                    .symbol
+                    .unwrap_or(if entry.token_address.is_none() {
+                        network.symbol.unwrap_or(format!("{}ETH", network.name))
+                    } else {
+                        "UNKNOWN".to_string()
+                    }),
+                name: entry
+                    .token_metadata
                     .name
-                    .clone(),
-                symbol: entry.token_metadata.symbol.unwrap_or("UNKNOWN".to_string()),
-                name: entry.token_metadata.name.unwrap_or("UNKNOWN".to_string()),
-                decimals: entry.token_metadata.decimals.unwrap_or_default(),
+                    .unwrap_or(if entry.token_address.is_none() {
+                        network.name
+                    } else {
+                        "UNKNOWN".to_string()
+                    }),
+                decimals: entry.token_metadata.decimals.unwrap_or(
+                    if entry.token_address.is_none() {
+                        network.native_decimals.unwrap_or(0)
+                    } else {
+                        0
+                    },
+                ),
                 price: entry
                     .token_prices
                     .first()
                     .map(|p| {
-                        assert_eq!(p.currency, "usd");
+                        assert_eq!(p.currency, "usd"); // TODO could blow up
                         Price::InUSD(p.value.parse().unwrap())
                     })
                     .unwrap_or(Price::Unknown),
@@ -140,7 +174,9 @@ pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
             value: entry.token_balance,
         };
 
-        if asset.usd_value().map(|v| v > 0.0).unwrap_or_default() {
+        if asset.usd_value().map(|v| v > 0.0).unwrap_or_default()
+        // || has_token(&networks, &asset.r#type.token_address)
+        {
             balances.push(asset);
         }
     }
@@ -158,36 +194,37 @@ pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
     }
     networks.save()?;
 
-    for network in networks.get_iter(config.testnet_mode) {
-        let provider = network.get_provider()?;
+    // Native balances are also fetched through Alchemy above
+    // for network in networks.get_iter(config.testnet_mode) {
+    //     let provider = network.get_provider()?;
 
-        let balance = provider.get_balance(wallet_address).await?;
-        if !balance.is_zero() {
-            let price = if let Some(price_ticker) = &network.price_ticker {
-                if price_ticker == "ETH" {
-                    Price::InETH(1f64)
-                } else {
-                    let (price, _) = Alchemy::get_price(price_ticker).await.expect("api failed");
-                    Price::InUSD(price)
-                }
-            } else {
-                Price::Unknown
-            };
+    //     let balance = provider.get_balance(wallet_address).await?;
+    //     if !balance.is_zero() {
+    //         let price = if let Some(price_ticker) = &network.price_ticker {
+    //             if price_ticker == "ETH" {
+    //                 Price::InETH(1f64)
+    //             } else {
+    //                 let (price, _) = Alchemy::get_price(price_ticker).await.expect("api failed");
+    //                 Price::InUSD(price)
+    //             }
+    //         } else {
+    //             Price::Unknown
+    //         };
 
-            balances.push(Asset {
-                wallet_address,
-                r#type: AssetType {
-                    token_address: TokenAddress::Native,
-                    network: network.name.clone(),
-                    symbol: network.symbol.clone().unwrap_or("ETH".to_string()),
-                    name: network.name.clone(),
-                    decimals: 18,
-                    price,
-                },
-                value: balance,
-            });
-        }
-    }
+    //         balances.push(Asset {
+    //             wallet_address,
+    //             r#type: AssetType {
+    //                 token_address: TokenAddress::Native,
+    //                 network: network.name.clone(),
+    //                 symbol: network.symbol.clone().unwrap_or("ETH".to_string()),
+    //                 name: network.name.clone(),
+    //                 decimals: 18,
+    //                 price,
+    //             },
+    //             value: balance,
+    //         });
+    //     }
+    // }
 
     balances.sort_by(|a, b| {
         a.usd_value()
