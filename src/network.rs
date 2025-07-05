@@ -70,7 +70,7 @@ impl Network {
 
     pub fn get_provider(&self) -> crate::Result<Provider> {
         let rpc_url = self.get_rpc()?.parse()?;
-        Ok(ProviderBuilder::new().on_http(rpc_url))
+        Ok(ProviderBuilder::new().connect_http(rpc_url))
     }
 }
 

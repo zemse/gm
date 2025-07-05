@@ -23,7 +23,7 @@ qrcode = "0.12"
 indicatif = "0.17"
 
 # Ethereum
-alloy = { version = "0.11", features = ["full", "rlp", "signer-mnemonic"] }
+alloy = { version = "1", features = ["full", "rlp", "signer-mnemonic"] }
 coins-bip39 = "0.12.0"
 rand = "0.8"
 
@@ -53,5 +53,5 @@ humantime = "2.2.0"
 chrono = "0.4.41"
 url = "2.5.4"
 serde_path_to_error = "0.1.17"
-data3 = "0.1.0"
-walletconnect-sdk = "0.1.0"
+data3 = "0.2.0"
+walletconnect-sdk = "0.2.0"

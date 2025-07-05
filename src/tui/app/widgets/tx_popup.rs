@@ -316,7 +316,7 @@ pub fn send_tx_thread(
             tx.chain_id = Some(chain_id);
 
             // Estimate gas fees
-            let fee_estimation = provider.estimate_eip1559_fees(None).await?;
+            let fee_estimation = provider.estimate_eip1559_fees().await?;
             tx.max_priority_fee_per_gas = Some(fee_estimation.max_priority_fee_per_gas);
             tx.max_fee_per_gas = Some(gm(fee_estimation.max_fee_per_gas));
             fn gm(gas_price: u128) -> u128 {
@@ -329,7 +329,7 @@ pub fn send_tx_thread(
             }
 
             tx.from = Some(sender_account);
-            tx.gas = Some(provider.estimate_gas(&tx).await?);
+            tx.gas = Some(provider.estimate_gas(tx.clone()).await?);
             tx.gas = tx.gas.map(|gas| gas * 110 / 100); // TODO allow to configure gas limit)
 
             tx.transaction_type = Some(2); // EIP-1559 transaction type
