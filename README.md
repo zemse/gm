@@ -6,6 +6,7 @@ Terminal-based Ethereum accounts manager
 
 - Apple keychain: securely store your keys
 - Address book: keep familiar accounts handy
+- Light client: don't trust rpc data blindly
 - Walletconnect: connect to dapps
 
 ## Installation

@@ -90,7 +90,7 @@ impl Component for Sidebar {
             && shared_state.current_account.is_some()
             && shared_state.alchemy_api_key_available
         {
-            let portfolio = if let Some(assets) = &shared_state.assets {
+            let portfolio = if let Some(assets) = &shared_state.assets_read().ok().flatten() {
                 let portfolio = assets
                     .iter()
                     .fold(0.0, |acc, asset| acc + asset.usd_value().unwrap_or(0.0));

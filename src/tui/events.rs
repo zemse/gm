@@ -6,7 +6,10 @@ use alloy::{
 };
 use walletconnect_sdk::wc_message::WcMessage;
 
-use crate::{tui::app::widgets::tx_popup::TxStatus, utils::assets::Asset};
+use crate::{
+    tui::app::widgets::tx_popup::TxStatus,
+    utils::assets::{Asset, LightClientVerification, TokenAddress},
+};
 
 use reqwest::Error as ReqwestError;
 
@@ -17,6 +20,7 @@ use super::app::{
 
 pub mod assets;
 pub mod eth_price;
+pub mod helios;
 pub mod input;
 pub mod recent_addresses;
 
@@ -34,7 +38,7 @@ pub enum Event {
     HashRateError(String),
     VanityResult(SigningKey, usize, Duration),
 
-    AssetsUpdate(Vec<Asset>),
+    AssetsUpdate(Address, Vec<Asset>),
     AssetsUpdateError(String, bool), // bool - whether to silence the error
 
     RecentAddressesUpdate(Vec<Address>),
@@ -52,6 +56,14 @@ pub enum Event {
     WalletConnectStatus(WalletConnectStatus),
     WalletConnectMessage(Address, Box<WcMessage>),
     WalletConnectError(Address, String),
+
+    HeliosUpdate {
+        account: Address,
+        network: String,
+        token_address: TokenAddress,
+        status: LightClientVerification,
+    },
+    HeliosError(String),
 }
 
 impl Event {

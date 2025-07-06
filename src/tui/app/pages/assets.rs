@@ -33,10 +33,10 @@ impl Component for AssetsPage {
         _shutdown_signal: &Arc<AtomicBool>,
         shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
-        self.cursor.handle(
-            event,
-            shared_state.assets.as_ref().map(|a| a.len()).unwrap_or(1),
-        );
+        let assets = shared_state.assets_read()?;
+
+        self.cursor
+            .handle(event, assets.as_ref().map(|a| a.len()).unwrap_or(1));
 
         let mut handle_result = HandleResult::default();
 
@@ -46,7 +46,7 @@ impl Component for AssetsPage {
                 KeyCode::Enter =>
                 {
                     #[allow(clippy::field_reassign_with_default)]
-                    if let Some(assets) = shared_state.assets.as_ref() {
+                    if let Some(assets) = assets.as_ref() {
                         handle_result.page_inserts.push(Page::AssetTransfer(
                             AssetTransferPage::new(&assets[self.cursor.current])?,
                         ));
@@ -65,7 +65,7 @@ impl Component for AssetsPage {
     where
         Self: Sized,
     {
-        if let Some(list) = shared_state.assets.as_ref() {
+        if let Some(list) = shared_state.assets_read().ok().flatten().as_ref() {
             if list.is_empty() {
                 "no assets on the address".render(area, buf);
             } else {

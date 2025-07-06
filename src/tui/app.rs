@@ -1,7 +1,7 @@
 use std::{
     io,
     str::FromStr,
-    sync::{atomic::AtomicBool, mpsc, Arc},
+    sync::{atomic::AtomicBool, mpsc, Arc, RwLock, RwLockWriteGuard},
 };
 
 use alloy::primitives::Address;
@@ -26,11 +26,15 @@ use super::{
     events::{self, Event},
     traits::{Component, HandleResult, RectUtil},
 };
-use crate::tui::theme::{Theme, ThemeName};
 use crate::{
     disk::{Config, DiskInterface},
     error::FmtError,
+    tui::events::helios::helios_thread,
     utils::assets::Asset,
+};
+use crate::{
+    tui::theme::{Theme, ThemeName},
+    utils::assets::AssetManager,
 };
 
 pub mod pages;
@@ -46,7 +50,7 @@ pub enum Focus {
 
 pub struct SharedState {
     pub online: Option<bool>,
-    pub assets: Option<Vec<Asset>>,
+    pub asset_manager: Arc<RwLock<AssetManager>>,
     pub recent_addresses: Option<Vec<Address>>,
     pub testnet_mode: bool,
     pub developer_mode: bool,
@@ -56,12 +60,33 @@ pub struct SharedState {
     pub theme: Theme,
 }
 
+impl SharedState {
+    pub fn assets_read(&self) -> crate::Result<Option<Vec<Asset>>> {
+        let Some(current_account) = self.current_account else {
+            return Ok(None);
+        };
+
+        Ok(self
+            .asset_manager
+            .read()
+            .map_err(|e| format!("poison error - please restart gm - {e}"))?
+            .get_assets(&current_account)
+            .cloned())
+    }
+
+    pub fn assets_mut(&mut self) -> crate::Result<RwLockWriteGuard<'_, AssetManager>> {
+        Ok(self
+            .asset_manager
+            .write()
+            .map_err(|e| format!("poison error - please restart gm - {e}"))?)
+    }
+}
+
 pub struct App {
     pub context: Vec<Page>,
     pub preview_page: Option<Page>,
 
     pub exit: bool,
-    // pub fatal_error: Option<String>,
     pub fatal_error_popup: TextPopup,
 
     pub shared_state: SharedState,
@@ -70,6 +95,7 @@ pub struct App {
     pub eth_price_thread: Option<tokio::task::JoinHandle<()>>,
     pub assets_thread: Option<tokio::task::JoinHandle<()>>,
     pub recent_addresses_thread: Option<tokio::task::JoinHandle<()>>,
+    pub helios_thread: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl App {
@@ -85,7 +111,7 @@ impl App {
             // fatal_error: None,
             fatal_error_popup: TextPopup::new("Fatal Error"),
             shared_state: SharedState {
-                assets: None,
+                asset_manager: Arc::new(RwLock::new(AssetManager::default())),
                 recent_addresses: None,
                 current_account: config.current_account,
                 developer_mode: config.developer_mode,
@@ -100,6 +126,7 @@ impl App {
             eth_price_thread: None,
             assets_thread: None,
             recent_addresses_thread: None,
+            helios_thread: None,
         })
     }
 }
@@ -132,6 +159,16 @@ impl App {
             let shutdown_signal = sd.clone();
             self.assets_thread = Some(tokio::spawn(async move {
                 events::assets::watch_assets(tr_assets, shutdown_signal).await
+            }));
+        }
+
+        if self.helios_thread.is_none() {
+            let tr = tr.clone();
+            let assets_manager = Arc::clone(&self.shared_state.asset_manager);
+            self.helios_thread = Some(tokio::spawn(async move {
+                if let Err(e) = helios_thread(&tr, assets_manager).await {
+                    let _ = tr.send(Event::HeliosError(e.fmt_err("HeliosError")));
+                }
             }));
         }
 
@@ -225,8 +262,10 @@ impl App {
             }
         }
         if result.refresh_assets {
-            self.shared_state.assets = None;
             // TODO restart the assets thread to avoid the delay
+            if let Some(account) = Config::current_account()? {
+                self.shared_state.assets_mut()?.clear_data_for(account);
+            }
         }
         self.context.extend(result.page_inserts);
         Ok(result.esc_ignores)
@@ -324,11 +363,28 @@ impl App {
             }
 
             // Assets API
-            Event::AssetsUpdate(assets) => self.shared_state.assets = Some(assets),
+            Event::AssetsUpdate(wallet_address, assets) => {
+                self.shared_state
+                    .assets_mut()?
+                    .update_assets(wallet_address, assets)?;
+            }
             Event::AssetsUpdateError(error, silence_error) => {
                 if !silence_error {
                     self.fatal_error_popup.set_text(error);
                 }
+            }
+
+            Event::HeliosUpdate {
+                account,
+                network,
+                token_address,
+                status,
+            } => {
+                self.shared_state
+                    .asset_manager
+                    .write()
+                    .map_err(|err| format!("poison error - please restart gm - {err}"))?
+                    .update_light_client_verification(account, network, token_address, status);
             }
 
             Event::RecentAddressesUpdate(addresses) => {

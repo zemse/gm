@@ -1,12 +1,78 @@
 use std::fmt::{Display, Formatter};
 
-use alloy::primitives::{utils::format_units, Address, U256};
+use alloy::primitives::{map::HashMap, utils::format_units, Address, U256};
 
 use crate::{
     alchemy::Alchemy,
     disk::{Config, DiskInterface},
     network::NetworkStore,
 };
+
+#[derive(Default)]
+pub struct AssetManager {
+    assets: HashMap<Address, Option<Vec<Asset>>>,
+    // prices: HashMap<String, Price>,
+}
+
+impl AssetManager {
+    pub fn clear_data_for(&mut self, account: Address) {
+        self.assets.remove(&account);
+    }
+
+    // Update asset
+    pub fn update_assets(
+        &mut self,
+        account: Address,
+        mut new_assets: Vec<Asset>,
+    ) -> crate::Result<()> {
+        let old_assets = self.assets.remove(&account).flatten().unwrap_or_default();
+
+        for old_asset in old_assets {
+            if let Some(new_asset) = new_assets.iter_mut().find(|new_asset| {
+                new_asset.r#type.token_address == old_asset.r#type.token_address
+                    && new_asset.r#type.network == old_asset.r#type.network
+            }) {
+                // If balance did not change, then carry fwd some properties
+                if new_asset.value == old_asset.value {
+                    new_asset.light_client_verification = old_asset.light_client_verification;
+                }
+            }
+        }
+
+        self.assets.insert(account, Some(new_assets));
+
+        Ok(())
+    }
+
+    // Update light client info
+    pub fn update_light_client_verification(
+        &mut self,
+        account: Address,
+        network: String,
+        token_address: TokenAddress,
+        status: LightClientVerification,
+    ) {
+        let mut assets = self.assets.remove(&account).flatten();
+
+        if let Some(assets) = assets.as_mut() {
+            for asset in assets {
+                if asset.r#type.network == network && asset.r#type.token_address == token_address {
+                    asset.light_client_verification = status.clone();
+                }
+            }
+        }
+
+        self.assets.insert(account, assets);
+    }
+
+    // Update price
+    // TODO impl
+
+    // Get fn for render which should also factor in the price
+    pub fn get_assets(&self, address: &Address) -> Option<&Vec<Asset>> {
+        self.assets.get(address).and_then(|r| r.as_ref())
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum Price {
@@ -59,11 +125,18 @@ impl Display for AssetType {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum LightClientVerification {
+    Pending,
+    Verified,
+    Rejected,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Asset {
-    #[allow(dead_code)]
     pub wallet_address: Address,
     pub r#type: AssetType,
     pub value: U256,
+    pub light_client_verification: LightClientVerification,
 }
 
 impl Asset {
@@ -88,19 +161,20 @@ impl Display for Asset {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let formatted_value = self.formatted_value();
         let usd_value = self.usd_value();
-        if let Some(usd_value) = usd_value {
-            write!(
-                f,
-                "{formatted_value} {} {} (${usd_value:.2})",
-                self.r#type.symbol, self.r#type.network
-            )
-        } else {
-            write!(
-                f,
-                "{formatted_value} {} {}",
-                self.r#type.symbol, self.r#type.network
-            )
-        }
+
+        let usd_value_fmt = usd_value.map(|v| format!(" (${v:.2})")).unwrap_or_default();
+        let light_client_status_fmt = match self.light_client_verification {
+            LightClientVerification::Pending => "",
+            LightClientVerification::Verified => " [Lightclient Verified]",
+            LightClientVerification::Rejected => " [Lightclient REJECTED]",
+        };
+
+        write!(
+            f,
+            "{formatted_value} {symbol} {network}{usd_value_fmt}{light_client_status_fmt}",
+            symbol = self.r#type.symbol,
+            network = self.r#type.network
+        )
     }
 }
 
@@ -112,7 +186,7 @@ fn has_token(networks: &NetworkStore, token_address: &TokenAddress) -> bool {
     }
 }
 
-pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
+pub async fn get_all_assets() -> crate::Result<(Address, Vec<Asset>)> {
     let config = Config::load()?;
     let wallet_address = config
         .current_account
@@ -172,6 +246,7 @@ pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
                     .unwrap_or(Price::Unknown),
             },
             value: entry.token_balance,
+            light_client_verification: LightClientVerification::Pending,
         };
 
         if asset.usd_value().map(|v| v > 0.0).unwrap_or_default()
@@ -232,5 +307,5 @@ pub async fn get_all_assets() -> crate::Result<Vec<Asset>> {
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    Ok(balances)
+    Ok((wallet_address, balances))
 }

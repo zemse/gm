@@ -1,6 +1,7 @@
 pub mod account;
 pub mod assets;
 pub mod cursor;
+pub mod erc20;
 pub mod text;
 
 pub trait Inquire<DefaultValue = ()>

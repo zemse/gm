@@ -42,10 +42,12 @@ pub enum Error {
     AlloySignerError(Box<alloy::signers::Error>),
     AlloyPendingTransactionError(Box<alloy::providers::PendingTransactionError>),
     AlloyRlpError(Box<alloy::rlp::Error>),
+    AlloySolTypesError(alloy::sol_types::Error),
     Abort(&'static str),
     UrlParseError(Box<url::ParseError>),
     Data3Error(Box<data3::error::Error>),
     WalletConnectError(walletconnect_sdk::Error),
+    EyreError(Box<eyre::Report>), // TODO Helios should expose this
 }
 
 impl Error {
@@ -85,9 +87,16 @@ impl Display for Error {
         }
     }
 }
+
 impl From<&str> for Error {
     fn from(e: &str) -> Self {
         Error::InternalError(e.to_string())
+    }
+}
+
+impl From<String> for Error {
+    fn from(e: String) -> Self {
+        Error::InternalError(e)
     }
 }
 
@@ -230,6 +239,12 @@ impl From<alloy::rlp::Error> for Error {
     }
 }
 
+impl From<alloy::sol_types::Error> for Error {
+    fn from(e: alloy::sol_types::Error) -> Self {
+        Error::AlloySolTypesError(e)
+    }
+}
+
 impl From<url::ParseError> for Error {
     fn from(e: url::ParseError) -> Self {
         Error::UrlParseError(Box::new(e))
@@ -245,6 +260,12 @@ impl From<data3::error::Error> for Error {
 impl From<walletconnect_sdk::Error> for Error {
     fn from(e: walletconnect_sdk::Error) -> Self {
         Error::WalletConnectError(e)
+    }
+}
+
+impl From<eyre::Report> for Error {
+    fn from(e: eyre::Report) -> Self {
+        Error::EyreError(Box::new(e))
     }
 }
 

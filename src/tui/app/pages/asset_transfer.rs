@@ -10,12 +10,11 @@ use crate::tui::{
     traits::{Component, HandleResult},
 };
 use crate::utils::assets::{Asset, TokenAddress};
+use crate::utils::erc20;
 use crate::Result;
 use alloy::primitives::utils::parse_units;
 use alloy::primitives::{Bytes, U256};
 use alloy::rpc::types::TransactionRequest;
-use alloy::sol;
-use alloy::sol_types::SolCall;
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use strum::EnumIter;
@@ -166,7 +165,7 @@ impl Component for AssetTransferPage {
             } else if self.form.is_focused(FormItem::AssetType) && event.is_space_or_enter_pressed()
             {
                 self.asset_popup.open();
-                self.asset_popup.set_items(ss.assets.clone());
+                self.asset_popup.set_items(ss.assets_read()?);
                 result.esc_ignores = 1;
             } else {
                 self.form.handle_event(event, |label, form| {
@@ -183,21 +182,11 @@ impl Component for AssetTransferPage {
                             TokenAddress::Native => {
                                 (to.parse()?, Bytes::new(), amount.get_absolute())
                             }
-                            TokenAddress::Contract(address) => {
-                                // This causes `cargo fmt` to not work
-                                sol! {
-                                    interface IERC20 {
-                                        function balanceOf(address owner) external view returns (uint256);
-                                        function transfer(address to, uint256 amount) external returns (bool);
-                                    }
-                                }
-                                let transfer_call = IERC20::transferCall {
-                                    to: to.parse()?,
-                                    amount: amount.get_absolute(),
-                                };
-                                let calldata = Bytes::from(transfer_call.abi_encode());
-                                (address, calldata, U256::ZERO)
-                            }
+                            TokenAddress::Contract(address) => (
+                                address,
+                                erc20::encode_transfer(to.parse()?, amount.get_absolute()),
+                                U256::ZERO,
+                            ),
                         };
 
                         if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {

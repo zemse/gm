@@ -17,7 +17,7 @@ pub enum ThemeName {
 
 impl std::fmt::Display for ThemeName {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -31,8 +31,7 @@ impl std::str::FromStr for ThemeName {
             "Dark" => Ok(Self::Dark),
             "DarkModern" => Ok(Self::DarkModern),
             _ => Err(crate::Error::InternalError(format!(
-                "Unknown theme name: {}",
-                theme_name
+                "Unknown theme name: {theme_name}"
             ))),
         }
     }

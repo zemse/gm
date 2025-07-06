@@ -26,7 +26,9 @@ pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Arc<Atomi
             // shutdown, then we will get error. Since our event is not
             // critical, we do not store it to disk.
             let _ = match get_all_assets().await {
-                Ok(assets) => transmitter.send(Event::AssetsUpdate(assets)),
+                Ok((wallet_address, assets)) => {
+                    transmitter.send(Event::AssetsUpdate(wallet_address, assets))
+                }
                 Err(error) => transmitter.send(Event::AssetsUpdateError(
                     error.fmt_err("AssetsUpdateError"),
                     matches!(
