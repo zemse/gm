@@ -1,6 +1,7 @@
 use std::{collections::HashMap, marker::PhantomData};
 
 use crossterm::event::{KeyCode, KeyEventKind};
+use ratatui::layout::{Constraint, Layout};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -10,14 +11,15 @@ use ratatui::{
 };
 use strum::IntoEnumIterator;
 
+use super::{button::Button, input_box::InputBox};
+use crate::tui::app::widgets::scroll_bar::CustomScrollBar;
 use crate::tui::{
     app::widgets::filter_select_popup::FilterSelectPopup,
     theme::Theme,
     traits::{RectUtil, WidgetHeight},
     Event,
 };
-
-use super::{button::Button, input_box::InputBox};
+use crate::utils::text::split_string;
 
 pub trait FormItemIndex {
     fn index(self) -> usize;
@@ -81,6 +83,29 @@ impl FormWidget {
             | FormWidget::StaticText(_)
             | FormWidget::DisplayText(_)
             | FormWidget::ErrorText(_) => 0,
+        }
+    }
+    pub fn height(&self, area: Rect) -> u16 {
+        match self {
+            FormWidget::InputBox { text, .. }
+            | FormWidget::DisplayBox { text, .. }
+            | FormWidget::SelectInput { text, .. } => {
+                let lines = split_string(text, (area.width - 2) as usize);
+                (2 + lines.len()) as u16
+            }
+
+            FormWidget::BooleanInput { value, .. } => {
+                let value = value.to_string();
+                let lines = split_string(&value, (area.width - 2) as usize);
+                (2 + lines.len()) as u16
+            }
+            FormWidget::Button { .. } => 4,
+            FormWidget::Heading(text) | FormWidget::StaticText(text) => {
+                (text.len() as u16).div_ceil(area.width) + 1
+            }
+            FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
+                (text.len() as u16).div_ceil(area.width) + 1
+            }
         }
     }
 }
@@ -334,6 +359,14 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         Self: Sized,
     {
         let full_area = area;
+        let form_height: u16 = self.items.iter().fold(0, |acc, i| acc + i.height(area));
+        let mut virtual_buf = Buffer::empty(Rect::new(0, 0, buf.area.width, form_height));
+        let mut scroll_cursor: u16 = 0;
+        let horizontal_layout = Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]);
+        let [form_area, scroll_area] = horizontal_layout.areas(area);
+        if full_area.height < form_height {
+            area = form_area;
+        }
 
         for (i, item) in self.items.iter().enumerate() {
             if self.hide.contains_key(&i) {
@@ -342,11 +375,11 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
 
             match item {
                 FormWidget::Heading(heading) => {
-                    heading.bold().render(area, buf);
+                    heading.bold().render(area, &mut virtual_buf);
                     area.y += 2;
                 }
                 FormWidget::StaticText(text) => {
-                    text.render(area, buf);
+                    text.render(area, &mut virtual_buf);
                     area.y += 2;
                 }
                 FormWidget::InputBox {
@@ -371,7 +404,10 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: currency.as_ref(),
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf, &self.text_cursor, theme);
+                    if self.form_focus && self.cursor == i {
+                        scroll_cursor = area.y;
+                    }
+                    widget.render(area, &mut virtual_buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
                 FormWidget::DisplayBox {
@@ -395,7 +431,10 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf, &self.text_cursor, theme);
+                    if self.form_focus && self.cursor == i {
+                        scroll_cursor = area.y;
+                    }
+                    widget.render(area, &mut virtual_buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
                 FormWidget::BooleanInput { label, value } => {
@@ -411,7 +450,10 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf, &self.text_cursor, theme);
+                    if self.form_focus && self.cursor == i {
+                        scroll_cursor = area.y;
+                    }
+                    widget.render(area, &mut virtual_buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
                 FormWidget::SelectInput {
@@ -428,7 +470,10 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    widget.render(area, buf, &self.text_cursor, theme);
+                    if self.form_focus && self.cursor == i {
+                        scroll_cursor = area.y;
+                    }
+                    widget.render(area, &mut virtual_buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
                 FormWidget::Button { label } => {
@@ -436,7 +481,10 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         focus: self.form_focus && self.cursor == i,
                         label,
                     }
-                    .render(area, buf, theme);
+                        .render(area, &mut virtual_buf, theme);
+                    if self.form_focus && self.cursor == i {
+                        scroll_cursor = area.y;
+                    }
                     area.y += 4;
                 }
                 FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
@@ -444,11 +492,20 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         area.y += 1;
                         Paragraph::new(Text::raw(text))
                             .wrap(Wrap { trim: false })
-                            .render(area.margin_h(1), buf);
+                            .render(area.margin_h(1), &mut virtual_buf);
                         area.y += (text.len() as u16).div_ceil(area.width) + 1;
                     }
                 }
             }
+        }
+
+        if full_area.height < form_height {
+            //form is overflowing draw a scrollbar
+            CustomScrollBar {
+                cursor: scroll_cursor as usize,
+                total: form_height as usize,
+            }
+                .render(scroll_area, buf);
         }
 
         // Render popups at the end so they appear on the top
@@ -456,9 +513,29 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
             #[allow(clippy::single_match)]
             match item {
                 FormWidget::SelectInput { popup, .. } => {
-                    popup.render(full_area, buf, theme);
+                    popup.render(full_area, &mut virtual_buf, theme);
                 }
                 _ => {}
+            }
+        }
+        let capacity = full_area.height;
+        let current_page = scroll_cursor / capacity;
+
+        let mut page = area;
+        page.x = full_area.x;
+        page.height = full_area.height;
+        page.y = full_area.y + current_page * page.height;
+
+        let visible_area = page.intersection(virtual_buf.area);
+
+        //Only show contents that are visible, copy contents from virtual buffer to the actual buffer
+        for (src_row, dst_row) in visible_area.rows().zip(full_area.rows()) {
+            for (src_col, dst_col) in src_row.columns().zip(dst_row.columns()) {
+                if let Some(dst) = buf.cell_mut((dst_col.x, dst_col.y)) {
+                    if let Some(src) = virtual_buf.cell((src_col.x, src_col.y)) {
+                        *dst = src.clone();
+                    }
+                };
             }
         }
     }
