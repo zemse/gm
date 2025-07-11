@@ -481,7 +481,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         focus: self.form_focus && self.cursor == i,
                         label,
                     }
-                        .render(area, &mut virtual_buf, theme);
+                    .render(area, &mut virtual_buf, theme);
                     if self.form_focus && self.cursor == i {
                         scroll_cursor = area.y;
                     }
@@ -505,7 +505,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                 cursor: scroll_cursor as usize,
                 total: form_height as usize,
             }
-                .render(scroll_area, buf);
+            .render(scroll_area, buf);
         }
 
         // Render popups at the end so they appear on the top
