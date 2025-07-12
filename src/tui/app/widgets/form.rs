@@ -9,6 +9,7 @@ use ratatui::{
     text::Text,
     widgets::{Paragraph, Widget, Wrap},
 };
+use ratatui::style::Style;
 use strum::IntoEnumIterator;
 
 use super::{button::Button, input_box::InputBox};
@@ -362,6 +363,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         let form_height: u16 = self.items.iter().fold(0, |acc, i| acc + i.height(area));
         let mut virtual_buf = Buffer::empty(Rect::new(0, 0, buf.area.width, form_height));
         let mut scroll_cursor: u16 = 0;
+        let mut scroll_cursor_item_height: u16 = 0;
         let horizontal_layout = Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]);
         let [form_area, scroll_area] = horizontal_layout.areas(area);
         if full_area.height < form_height {
@@ -371,6 +373,10 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         for (i, item) in self.items.iter().enumerate() {
             if self.hide.contains_key(&i) {
                 continue; // skip hidden items
+            }
+            if self.form_focus && self.cursor == i {
+                scroll_cursor = area.y;
+                scroll_cursor_item_height = item.height(area);
             }
 
             match item {
@@ -404,9 +410,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: currency.as_ref(),
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    if self.form_focus && self.cursor == i {
-                        scroll_cursor = area.y;
-                    }
+
                     widget.render(area, &mut virtual_buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
@@ -431,9 +435,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    if self.form_focus && self.cursor == i {
-                        scroll_cursor = area.y;
-                    }
+
                     widget.render(area, &mut virtual_buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
@@ -450,9 +452,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    if self.form_focus && self.cursor == i {
-                        scroll_cursor = area.y;
-                    }
+
                     widget.render(area, &mut virtual_buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
@@ -470,9 +470,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         currency: None,
                     };
                     let height_used = widget.height_used(area); // to see height based on width
-                    if self.form_focus && self.cursor == i {
-                        scroll_cursor = area.y;
-                    }
+
                     widget.render(area, &mut virtual_buf, &self.text_cursor, theme);
                     area.y += height_used;
                 }
@@ -482,9 +480,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         label,
                     }
                     .render(area, &mut virtual_buf, theme);
-                    if self.form_focus && self.cursor == i {
-                        scroll_cursor = area.y;
-                    }
+
                     area.y += 4;
                 }
                 FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
@@ -525,6 +521,11 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         page.x = full_area.x;
         page.height = full_area.height;
         page.y = full_area.y + current_page * page.height;
+        let item_overflow_top = (page.y).saturating_sub(scroll_cursor - scroll_cursor_item_height.div_ceil(2)) ;
+        let item_overflow_bottom = (scroll_cursor + scroll_cursor_item_height.div_ceil(2)).saturating_sub(page.y + page.height);
+        
+        page.y -= item_overflow_top;
+        page.y += item_overflow_bottom;
 
         let visible_area = page.intersection(virtual_buf.area);
 
