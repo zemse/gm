@@ -520,13 +520,11 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         page.x = full_area.x;
         page.height = full_area.height;
         page.y = full_area.y + current_page * page.height;
-        let item_overflow_top =
-            (page.y).saturating_sub(scroll_cursor - scroll_cursor_item_height.div_ceil(2));
-        let item_overflow_bottom = (scroll_cursor + scroll_cursor_item_height.div_ceil(2))
-            .saturating_sub(page.y + page.height);
-
-        page.y -= item_overflow_top;
-        page.y += item_overflow_bottom;
+        let item_overflow_top = (page.y).saturating_sub(scroll_cursor - 1);
+        let item_overflow_bottom =
+            (scroll_cursor + scroll_cursor_item_height + 1).saturating_sub(page.y + page.height);
+        page.y = page.y.saturating_sub(item_overflow_top);
+        page.y = page.y.saturating_add(item_overflow_bottom);
 
         let visible_area = page.intersection(virtual_buf.area);
 
