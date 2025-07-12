@@ -9,7 +9,6 @@ use ratatui::{
     text::Text,
     widgets::{Paragraph, Widget, Wrap},
 };
-use ratatui::style::Style;
 use strum::IntoEnumIterator;
 
 use super::{button::Button, input_box::InputBox};
@@ -496,7 +495,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         }
 
         if full_area.height < form_height {
-            //form is overflowing draw a scrollbar
+            // form is overflowing draw a scrollbar
             CustomScrollBar {
                 cursor: scroll_cursor as usize,
                 total: form_height as usize,
@@ -521,15 +520,17 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         page.x = full_area.x;
         page.height = full_area.height;
         page.y = full_area.y + current_page * page.height;
-        let item_overflow_top = (page.y).saturating_sub(scroll_cursor - scroll_cursor_item_height.div_ceil(2)) ;
-        let item_overflow_bottom = (scroll_cursor + scroll_cursor_item_height.div_ceil(2)).saturating_sub(page.y + page.height);
-        
+        let item_overflow_top =
+            (page.y).saturating_sub(scroll_cursor - scroll_cursor_item_height.div_ceil(2));
+        let item_overflow_bottom = (scroll_cursor + scroll_cursor_item_height.div_ceil(2))
+            .saturating_sub(page.y + page.height);
+
         page.y -= item_overflow_top;
         page.y += item_overflow_bottom;
 
         let visible_area = page.intersection(virtual_buf.area);
 
-        //Only show contents that are visible, copy contents from virtual buffer to the actual buffer
+        // Only show contents that are visible, copy contents from virtual buffer to the actual buffer
         for (src_row, dst_row) in visible_area.rows().zip(full_area.rows()) {
             for (src_col, dst_col) in src_row.columns().zip(dst_row.columns()) {
                 if let Some(dst) = buf.cell_mut((dst_col.x, dst_col.y)) {
