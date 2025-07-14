@@ -32,6 +32,7 @@ impl<const N: usize> CustomRender for [&str; N] {
     where
         Self: Sized,
     {
+        // TODO implement wrapping so that insufficient width does not overflow text
         let mut area = area;
         for line in self {
             let line_area = ratatui::prelude::Rect {

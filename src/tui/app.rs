@@ -29,7 +29,7 @@ use super::{
 use crate::{
     disk::{Config, DiskInterface},
     error::FmtError,
-    tui::events::helios::helios_thread,
+    tui::{app::widgets::invite_popup::InvitePopup, events::helios::helios_thread},
     utils::assets::Asset,
 };
 use crate::{
@@ -91,6 +91,8 @@ pub struct App {
 
     pub shared_state: SharedState,
 
+    pub invite_popup: InvitePopup,
+
     pub input_thread: Option<std::thread::JoinHandle<()>>,
     pub eth_price_thread: Option<tokio::task::JoinHandle<()>>,
     pub assets_thread: Option<tokio::task::JoinHandle<()>>,
@@ -122,12 +124,30 @@ impl App {
                 theme,
             },
 
+            invite_popup: InvitePopup::default(),
+
             input_thread: None,
             eth_price_thread: None,
             assets_thread: None,
             recent_addresses_thread: None,
             helios_thread: None,
         })
+    }
+
+    pub fn cli_args(&mut self, args: Vec<String>) -> crate::Result<()> {
+        if args.len() == 1 {
+            // TODO support for wallet connect URI
+            if args[0].ends_with("invite") {
+                self.invite_popup.set_invite_code(&args[0]);
+                self.invite_popup.open();
+            }
+        } else if args.len() > 1 {
+            self.fatal_error_popup.set_text(format!(
+                "Too many arguments provided to gm on the cli: {args:?}. Expected 0 or 1.",
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -280,21 +300,18 @@ impl App {
     ) -> crate::Result<()> {
         let [_, body_area, _] = self.get_areas(area);
 
-        // supply events to pages
-        let mut esc_ignores = if (!event.is_input() || !self.fatal_error_popup.is_shown())
-            && self.context.last().is_some()
-        {
+        let result = if self.fatal_error_popup.is_shown() {
+            self.fatal_error_popup.handle_event(&event, area)
+        } else if self.invite_popup.is_open() {
+            self.invite_popup.handle_event(&event, tr)
+        } else if self.context.last().is_some() {
             let page = self.context.last_mut().unwrap();
-            let result =
-                page.handle_event(&event, body_area.block_inner(), tr, sd, &self.shared_state);
-            self.process_result(result).await?
+            page.handle_event(&event, body_area.block_inner(), tr, sd, &self.shared_state)
         } else {
-            0
+            Ok(HandleResult::default())
         };
 
-        // suppy event to fatal error popup
-        let result = self.fatal_error_popup.handle_event(&event, area);
-        esc_ignores += self.process_result(result).await?;
+        let esc_ignores = self.process_result(result).await?;
 
         if self.context.is_empty() {
             self.exit = true;
@@ -531,6 +548,8 @@ impl Widget for &App {
             }
             .render(footer_area, buf, &self.shared_state.theme);
         }
+
+        self.invite_popup.render(area, buf, &self.shared_state);
 
         self.fatal_error_popup
             .render(area, buf, &self.shared_state.theme.error_popup());

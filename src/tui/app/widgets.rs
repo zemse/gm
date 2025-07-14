@@ -8,6 +8,7 @@ pub mod filter_select_popup;
 pub mod footer;
 pub mod form;
 pub mod input_box;
+pub mod invite_popup;
 pub mod networks_popup;
 pub mod popup;
 pub mod scroll_bar;

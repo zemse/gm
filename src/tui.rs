@@ -13,13 +13,14 @@ use std::sync::{
 use app::App;
 pub use events::Event;
 
-pub async fn run() -> crate::Result<()> {
+pub async fn run(args: Vec<String>) -> crate::Result<()> {
     let (event_tr, event_rc) = mpsc::channel::<Event>();
     let shutdown = Arc::new(AtomicBool::new(false));
 
     let mut terminal = ratatui::init();
 
     let mut app = App::new()?;
+    app.cli_args(args)?;
 
     app.init_threads(&event_tr, &shutdown);
 

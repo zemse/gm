@@ -1,4 +1,3 @@
-use clap::Parser;
 use figlet_rs::FIGfont;
 use gm_lib::{network::NetworkStore, tui};
 
@@ -6,18 +5,12 @@ use gm_lib::{network::NetworkStore, tui};
 async fn main() -> gm_lib::Result<()> {
     preload_hook();
 
-    // let cli = Cli::parse();
+    let args: Vec<String> = std::env::args().skip(1).collect();
 
-    tui::run().await?;
+    tui::run(args).await?;
 
     Ok(())
 }
-
-/// Top level CLI struct
-#[derive(Parser)]
-#[command(name = "gm")]
-#[command(about = "CLI tool for managing accounts and transactions")]
-pub struct Cli;
 
 #[allow(dead_code)]
 fn gm_art() {

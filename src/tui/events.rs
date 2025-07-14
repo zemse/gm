@@ -7,7 +7,10 @@ use alloy::{
 use walletconnect_sdk::wc_message::WcMessage;
 
 use crate::{
-    tui::app::widgets::tx_popup::TxStatus,
+    tui::app::widgets::{
+        invite_popup::{InviteCodeClaimStatus, InviteCodeValidity},
+        tx_popup::TxStatus,
+    },
     utils::assets::{Asset, LightClientVerification, TokenAddress},
 };
 
@@ -64,6 +67,9 @@ pub enum Event {
         status: LightClientVerification,
     },
     HeliosError(String),
+
+    InviteCodeValidity(InviteCodeValidity),
+    InviteCodeClaimStatus(InviteCodeClaimStatus),
 }
 
 impl Event {
