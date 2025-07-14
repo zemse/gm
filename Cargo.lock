@@ -3150,7 +3150,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 [[package]]
 name = "helios-common"
 version = "0.9.0"
-source = "git+https://github.com/zemse/helios?branch=master#5b934fd2ec3cbb76ac55faea3ad692aff07e55c8"
+source = "git+https://github.com/a16z/helios?rev=954db8c#954db8c673f8e8a65d2744f0641b7e7dde104a8a"
 dependencies = [
  "alloy",
  "async-trait",
@@ -3166,7 +3166,7 @@ dependencies = [
 [[package]]
 name = "helios-consensus-core"
 version = "0.9.0"
-source = "git+https://github.com/zemse/helios?branch=master#5b934fd2ec3cbb76ac55faea3ad692aff07e55c8"
+source = "git+https://github.com/a16z/helios?rev=954db8c#954db8c673f8e8a65d2744f0641b7e7dde104a8a"
 dependencies = [
  "alloy",
  "alloy-rlp",
@@ -3191,7 +3191,7 @@ dependencies = [
 [[package]]
 name = "helios-core"
 version = "0.9.0"
-source = "git+https://github.com/zemse/helios?branch=master#5b934fd2ec3cbb76ac55faea3ad692aff07e55c8"
+source = "git+https://github.com/a16z/helios?rev=954db8c#954db8c673f8e8a65d2744f0641b7e7dde104a8a"
 dependencies = [
  "alloy",
  "alloy-trie",
@@ -3221,7 +3221,7 @@ dependencies = [
 [[package]]
 name = "helios-ethereum"
 version = "0.9.0"
-source = "git+https://github.com/zemse/helios?branch=master#5b934fd2ec3cbb76ac55faea3ad692aff07e55c8"
+source = "git+https://github.com/a16z/helios?rev=954db8c#954db8c673f8e8a65d2744f0641b7e7dde104a8a"
 dependencies = [
  "alloy",
  "alloy-trie",
@@ -3260,7 +3260,7 @@ dependencies = [
 [[package]]
 name = "helios-revm-utils"
 version = "0.9.0"
-source = "git+https://github.com/zemse/helios?branch=master#5b934fd2ec3cbb76ac55faea3ad692aff07e55c8"
+source = "git+https://github.com/a16z/helios?rev=954db8c#954db8c673f8e8a65d2744f0641b7e7dde104a8a"
 dependencies = [
  "alloy",
  "eyre",
@@ -3275,7 +3275,7 @@ dependencies = [
 [[package]]
 name = "helios-verifiable-api-client"
 version = "0.9.0"
-source = "git+https://github.com/zemse/helios?branch=master#5b934fd2ec3cbb76ac55faea3ad692aff07e55c8"
+source = "git+https://github.com/a16z/helios?rev=954db8c#954db8c673f8e8a65d2744f0641b7e7dde104a8a"
 dependencies = [
  "alloy",
  "async-trait",
@@ -3294,7 +3294,7 @@ dependencies = [
 [[package]]
 name = "helios-verifiable-api-types"
 version = "0.9.0"
-source = "git+https://github.com/zemse/helios?branch=master#5b934fd2ec3cbb76ac55faea3ad692aff07e55c8"
+source = "git+https://github.com/a16z/helios?rev=954db8c#954db8c673f8e8a65d2744f0641b7e7dde104a8a"
 dependencies = [
  "alloy",
  "helios-common",
