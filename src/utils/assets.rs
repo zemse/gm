@@ -249,7 +249,8 @@ pub async fn get_all_assets() -> crate::Result<(Address, Vec<Asset>)> {
             light_client_verification: LightClientVerification::Pending,
         };
 
-        if asset.usd_value().map(|v| v > 0.0).unwrap_or_default()
+        if asset.value > U256::ZERO
+            && (config.testnet_mode || asset.usd_value().map(|v| v > 0.0).unwrap_or_default())
         // || has_token(&networks, &asset.r#type.token_address)
         {
             balances.push(asset);
