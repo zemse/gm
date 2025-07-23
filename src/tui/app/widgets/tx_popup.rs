@@ -318,15 +318,7 @@ pub fn send_tx_thread(
             // Estimate gas fees
             let fee_estimation = provider.estimate_eip1559_fees().await?;
             tx.max_priority_fee_per_gas = Some(fee_estimation.max_priority_fee_per_gas);
-            tx.max_fee_per_gas = Some(gm(fee_estimation.max_fee_per_gas));
-            fn gm(gas_price: u128) -> u128 {
-                let last_4_digits = gas_price % 10000;
-                if last_4_digits != 0 {
-                    gas_price - last_4_digits + 9393
-                } else {
-                    gas_price + 9393
-                }
-            }
+            tx.max_fee_per_gas = Some(gm_stamp(fee_estimation.max_fee_per_gas));
 
             tx.from = Some(sender_account);
             tx.gas = Some(provider.estimate_gas(tx.clone()).await?);
@@ -402,4 +394,36 @@ pub fn watch_tx_thread(
             }
         }
     }))
+}
+
+fn gm_stamp(gas_price: u128) -> u128 {
+    let last_4_digits = gas_price % 10000;
+    gas_price - last_4_digits + if last_4_digits > 9393 { 19393 } else { 9393 }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_gm_stamp() {
+        assert_eq!(super::gm_stamp(0), 9393);
+        assert_eq!(super::gm_stamp(1), 9393);
+        assert_eq!(super::gm_stamp(100), 9393);
+        assert_eq!(super::gm_stamp(456), 9393);
+
+        assert_eq!(super::gm_stamp(9999), 19393);
+        assert_eq!(super::gm_stamp(9998), 19393);
+        assert_eq!(super::gm_stamp(9998), 19393);
+
+        assert_eq!(super::gm_stamp(10000), 19393);
+        assert_eq!(super::gm_stamp(10001), 19393);
+        assert_eq!(super::gm_stamp(10002), 19393);
+        assert_eq!(super::gm_stamp(10003), 19393);
+        assert_eq!(super::gm_stamp(10004), 19393);
+
+        assert_eq!(super::gm_stamp(19998), 29393);
+        assert_eq!(super::gm_stamp(19999), 29393);
+
+        assert_eq!(super::gm_stamp(1238999), 1239393);
+        assert_eq!(super::gm_stamp(1239999), 1249393);
+    }
 }
