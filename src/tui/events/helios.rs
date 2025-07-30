@@ -34,6 +34,7 @@ pub async fn helios_thread(
         // Set the network to mainnet
         .network(HeliosNetwork::Mainnet)
         // Set the consensus rpc url
+        // TODO handle situation when this website is down
         .consensus_rpc("https://www.lightclientdata.org")?
         // Set the execution rpc url
         .execution_rpc(eth_network.get_rpc()?)?
