@@ -40,8 +40,8 @@ pub async fn helios_thread(
         .execution_rpc(eth_network.get_rpc()?)?
         // Set the checkpoint to the last known checkpoint
         .checkpoint(b256!(
-            // https://beaconcha.in/slot/12076896
-            "0x49b2878ce5fb686829ec159bfe619b816ec3c754c33ca4510f40a3dfdfefe5d0"
+            // https://beaconcha.in/slot/12256000
+            "0x41a6280f0bdd34b8c4a2bc53fe934418cc600dc7cb7ede8fa7bc0e527557a1bc"
         ))
         // Set the data dir
         .data_dir(PathBuf::from("/tmp/helios"))
@@ -51,8 +51,7 @@ pub async fn helios_thread(
         .load_external_fallback()
         // Select the FileDB
         .with_file_db()
-        .build()
-        .unwrap();
+        .build()?;
 
     eth_client.wait_synced().await;
 
