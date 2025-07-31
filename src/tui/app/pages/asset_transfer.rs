@@ -169,6 +169,7 @@ impl Component for AssetTransferPage {
                 result.esc_ignores = 1;
             } else {
                 self.form.handle_event(event, |label, form| {
+                    // Need to make changes in this section
                     if label == FormItem::TransferButton {
                         let to = form.get_text(FormItem::To);
                         let asset = self
@@ -193,7 +194,7 @@ impl Component for AssetTransferPage {
                             self.tx_popup.set_tx_req(
                                 NetworkStore::from_name(&asset.r#type.network)?,
                                 TransactionRequest::default()
-                                    .to(to)
+                                    .to(to.as_raw())
                                     .value(value)
                                     .input(calldata.into()),
                             );

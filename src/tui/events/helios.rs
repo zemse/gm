@@ -88,13 +88,17 @@ async fn run(
         }
 
         let actual_balance = match token_address {
-            TokenAddress::Native => eth_client.get_balance(owner, BlockId::latest()).await?,
+            TokenAddress::Native => {
+                eth_client
+                    .get_balance(owner.as_raw(), BlockId::latest())
+                    .await?
+            }
             TokenAddress::Contract(token_address) => {
                 let result = eth_client
                     .call(
                         &TransactionRequest {
-                            to: Some(TxKind::Call(*token_address)),
-                            input: TransactionInput::from(erc20::encode_balance_of(owner)),
+                            to: Some(TxKind::Call((*token_address).as_raw())),
+                            input: TransactionInput::from(erc20::encode_balance_of(owner.as_raw())),
                             ..Default::default()
                         },
                         BlockId::latest(),

@@ -39,7 +39,7 @@ pub fn sign_thread(
         .ok_or(crate::Error::CurrentAccountNotSet)?;
 
     Ok(tokio::spawn(async move {
-        let _ = match run(message, sender_account).await {
+        let _ = match run(message, sender_account.as_raw()).await {
             Ok(sig) => tr.send(Event::SignResult(sig)),
             Err(err) => tr.send(Event::SignError(err.fmt_err("SignError"))),
         };

@@ -6,6 +6,7 @@ use std::{
 
 use alloy::primitives::{address, Address};
 use crossterm::event::KeyCode;
+use fusion_plus_sdk::multichain_address::MultichainAddress;
 use ratatui::{
     buffer::Buffer,
     layout::{Offset, Rect},
@@ -41,7 +42,7 @@ pub struct AccountCreatePage {
     pub started_mining_at: Instant,
     pub vanity_thread: Option<JoinHandle<()>>,
     pub vanity_result: Option<(Address, usize, Duration)>,
-    pub mnemonic_result: Option<Address>,
+    pub mnemonic_result: Option<MultichainAddress>,
 }
 
 impl Default for AccountCreatePage {
@@ -147,7 +148,7 @@ impl Component for AccountCreatePage {
                 KeyCode::Enter => {
                     if self.is_mask_empty() {
                         let addr = AccountManager::create_mnemonic_wallet()?;
-                        self.mnemonic_result = Some(addr);
+                        self.mnemonic_result = Some(addr.into());
                     }
 
                     if !self.mining {

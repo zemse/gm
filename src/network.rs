@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Display};
 
-use alloy::{primitives::Address, providers::ProviderBuilder};
+use alloy::providers::ProviderBuilder;
+use fusion_plus_sdk::multichain_address::MultichainAddress;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -31,7 +32,7 @@ pub struct Token {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
-    pub contract_address: Address,
+    pub contract_address: MultichainAddress,
 }
 
 impl Display for Network {
@@ -113,7 +114,7 @@ impl NetworkStore {
         let mut networks = HashMap::<u32, Network>::new();
 
         let merge_tokens = |a: Vec<Token>, b: Vec<Token>| {
-            let mut tokens = HashMap::<Address, Token>::new();
+            let mut tokens = HashMap::<MultichainAddress, Token>::new();
             for token in a.into_iter().chain(b) {
                 tokens.insert(token.contract_address, token);
             }
@@ -226,7 +227,7 @@ impl NetworkStore {
     pub fn register_token(
         &mut self,
         network_name: &str,
-        token_address: Address,
+        token_address: MultichainAddress,
         token_symbol: Option<&str>,
         token_name: &str,
         token_decimals: u8,
@@ -258,7 +259,7 @@ impl NetworkStore {
         }
     }
 
-    pub fn has_token(&self, token_address: &Address) -> bool {
+    pub fn has_token(&self, token_address: &MultichainAddress) -> bool {
         self.networks.iter().any(|network| {
             network
                 .tokens

@@ -29,9 +29,8 @@ pub async fn run(args: Vec<String>) -> crate::Result<()> {
         let area = app.draw(&mut terminal)?;
 
         // make any changes to Controller state
-        let result = app
-            .handle_event(event_rc.recv()?, area, &event_tr, &shutdown)
-            .await;
+        let event = event_rc.recv()?;
+        let result = app.handle_event(event, area, &event_tr, &shutdown).await;
         if let Err(e) = result {
             app.fatal_error_popup.set_text(e.to_string());
         }

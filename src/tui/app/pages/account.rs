@@ -15,8 +15,9 @@ use crate::{
         cursor::Cursor,
     },
 };
-use alloy::primitives::Address;
+
 use crossterm::event::{KeyCode, KeyEventKind};
+use fusion_plus_sdk::multichain_address::MultichainAddress;
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 
 use super::{account_create::AccountCreatePage, account_import::AccountImportPage, Page};
@@ -24,7 +25,7 @@ use super::{account_create::AccountCreatePage, account_import::AccountImportPage
 enum AccountSelect {
     Create,
     Import,
-    Existing(Address),
+    Existing(MultichainAddress),
 }
 
 impl Display for AccountSelect {
@@ -49,7 +50,7 @@ impl AccountPage {
         list.extend(
             AccountManager::get_account_list()?
                 .into_iter()
-                .map(AccountSelect::Existing)
+                .map(|addr| AccountSelect::Existing(addr.into()))
                 .collect::<Vec<_>>(),
         );
         Ok(Self {

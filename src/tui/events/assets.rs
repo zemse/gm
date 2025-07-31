@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{error::FmtError, utils::assets::get_all_assets};
+use crate::{error::FmtError, utils::assets::get_all_assets_mock};
 
 use super::Event;
 
@@ -25,7 +25,7 @@ pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Arc<Atomi
             // Send result back to main thread. If main thread has already
             // shutdown, then we will get error. Since our event is not
             // critical, we do not store it to disk.
-            let _ = match get_all_assets().await {
+            let _ = match get_all_assets_mock().await {
                 Ok((wallet_address, assets)) => {
                     transmitter.send(Event::AssetsUpdate(wallet_address, assets))
                 }

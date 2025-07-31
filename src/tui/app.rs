@@ -4,8 +4,8 @@ use std::{
     sync::{atomic::AtomicBool, mpsc, Arc, RwLock, RwLockWriteGuard},
 };
 
-use alloy::primitives::Address;
 use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
+use fusion_plus_sdk::multichain_address::MultichainAddress;
 use pages::{
     config::ConfigPage,
     dev_key_capture::DevKeyCapturePage,
@@ -51,10 +51,10 @@ pub enum Focus {
 pub struct SharedState {
     pub online: Option<bool>,
     pub asset_manager: Arc<RwLock<AssetManager>>,
-    pub recent_addresses: Option<Vec<Address>>,
+    pub recent_addresses: Option<Vec<MultichainAddress>>,
     pub testnet_mode: bool,
     pub developer_mode: bool,
-    pub current_account: Option<Address>,
+    pub current_account: Option<MultichainAddress>,
     pub alchemy_api_key_available: bool,
     pub eth_price: Option<String>,
     pub theme: Theme,
@@ -171,6 +171,14 @@ impl App {
         self.eth_price_thread = Some(tokio::spawn(async move {
             events::eth_price::watch_eth_price_change(tr_eth_price, shutdown_signal).await
         }));
+
+        if self.assets_thread.is_none() {
+            let tr_assets = tr.clone();
+            let shutdown_signal = sd.clone();
+            self.assets_thread = Some(tokio::spawn(async move {
+                events::assets::watch_assets(tr_assets, shutdown_signal).await
+            }));
+        }
     }
 
     fn start_other_threads(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {

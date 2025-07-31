@@ -57,3 +57,4 @@ data3 = "0.2.0"
 walletconnect-sdk = "0.2.0"
 helios-ethereum = { git = "https://github.com/a16z/helios", package = "helios-ethereum", rev = "954db8c" }
 eyre = "*"
+fusion_plus_sdk = { path = "../fusion_plus_sdk" }

@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use alloy::primitives::Address;
+use fusion_plus_sdk::multichain_address::MultichainAddress;
 
 use crate::{disk::Config, error::FmtError};
 
@@ -47,14 +47,14 @@ pub async fn watch_recent_addresses(transmitter: Sender<Event>, shutdown_signal:
     }
 }
 
-async fn get_recent_addresses() -> crate::Result<Option<Vec<Address>>> {
+async fn get_recent_addresses() -> crate::Result<Option<Vec<MultichainAddress>>> {
     let Some(current_address) = Config::current_account()? else {
         return Ok(None);
     };
 
     // TODO support all networks
     let result = BlockScout::from_network(Network::ArbitrumMainnet)
-        .address_transactions(current_address)
+        .address_transactions(current_address.as_raw())
         .await?;
 
     Ok(Some(

@@ -1,4 +1,5 @@
-use alloy::primitives::{Address, U256};
+use alloy::primitives::U256;
+use fusion_plus_sdk::multichain_address::MultichainAddress;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -7,10 +8,10 @@ use crate::{disk::Config, error::Error, utils::SerdeResponseParse}; // for build
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokensByWalletEntry {
-    pub address: Address,
+    pub address: MultichainAddress,
     pub network: String,
     #[serde(rename = "tokenAddress")]
-    pub token_address: Option<Address>,
+    pub token_address: Option<MultichainAddress>,
     #[serde(rename = "tokenBalance")]
     pub token_balance: U256,
     #[serde(rename = "tokenMetadata")]
@@ -38,10 +39,10 @@ pub struct TokenPricesEntry {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenBalancesByWalletEntry {
-    address: Address,
+    address: MultichainAddress,
     network: String,
     #[serde(rename = "tokenAddress")]
-    token_address: Address,
+    token_address: MultichainAddress,
     #[serde(rename = "tokenBalance")]
     token_balance: U256,
 }
@@ -130,7 +131,7 @@ impl Alchemy {
 
     // docs: https://docs.alchemy.com/reference/get-tokens-by-address
     pub async fn get_tokens_by_wallet(
-        address: Address,
+        address: MultichainAddress,
         networks: Vec<String>,
     ) -> Result<Vec<TokensByWalletEntry>, Error> {
         let api_key = Config::alchemy_api_key()?;
@@ -178,7 +179,7 @@ impl Alchemy {
     }
 
     pub async fn get_token_balances_by_wallet(
-        address: Address,
+        address: MultichainAddress,
     ) -> Result<Vec<TokenBalancesByWalletEntry>, Error> {
         // Build the request body using serde_json::json! macro:
         let body = json!({

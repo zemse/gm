@@ -293,7 +293,7 @@ pub fn send_tx_thread(
     let network = network.clone();
     let tx_req = tx_req.clone();
     Ok(tokio::spawn(async move {
-        let _ = match run(sender_account, network, tx_req, shutdown_signal).await {
+        let _ = match run(sender_account.as_raw(), network, tx_req, shutdown_signal).await {
             Ok(hash) => tr.send(Event::TxUpdate(TxStatus::Pending(hash))),
             Err(err) => tr.send(Event::TxError(err.fmt_err("TxSubmitError"))),
         };

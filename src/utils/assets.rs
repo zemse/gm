@@ -1,6 +1,11 @@
 use std::fmt::{Display, Formatter};
 
-use alloy::primitives::{map::HashMap, utils::format_units, Address, U256};
+use alloy::primitives::{
+    map::HashMap,
+    utils::{format_units, parse_units},
+    U256,
+};
+use fusion_plus_sdk::multichain_address::MultichainAddress;
 
 use crate::{
     alchemy::Alchemy,
@@ -10,19 +15,19 @@ use crate::{
 
 #[derive(Default)]
 pub struct AssetManager {
-    assets: HashMap<Address, Option<Vec<Asset>>>,
+    assets: HashMap<MultichainAddress, Option<Vec<Asset>>>,
     // prices: HashMap<String, Price>,
 }
 
 impl AssetManager {
-    pub fn clear_data_for(&mut self, account: Address) {
+    pub fn clear_data_for(&mut self, account: MultichainAddress) {
         self.assets.remove(&account);
     }
 
     // Update asset
     pub fn update_assets(
         &mut self,
-        account: Address,
+        account: MultichainAddress,
         mut new_assets: Vec<Asset>,
     ) -> crate::Result<()> {
         let old_assets = self.assets.remove(&account).flatten().unwrap_or_default();
@@ -47,7 +52,7 @@ impl AssetManager {
     // Update light client info
     pub fn update_light_client_verification(
         &mut self,
-        account: Address,
+        account: MultichainAddress,
         network: String,
         token_address: TokenAddress,
         status: LightClientVerification,
@@ -69,7 +74,7 @@ impl AssetManager {
     // TODO impl
 
     // Get fn for render which should also factor in the price
-    pub fn get_assets(&self, address: &Address) -> Option<&Vec<Asset>> {
+    pub fn get_assets(&self, address: &MultichainAddress) -> Option<&Vec<Asset>> {
         self.assets.get(address).and_then(|r| r.as_ref())
     }
 }
@@ -95,7 +100,7 @@ impl Price {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenAddress {
     Native,
-    Contract(Address),
+    Contract(MultichainAddress),
 }
 
 impl TokenAddress {
@@ -133,7 +138,7 @@ pub enum LightClientVerification {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Asset {
-    pub wallet_address: Address,
+    pub wallet_address: MultichainAddress,
     pub r#type: AssetType,
     pub value: U256,
     pub light_client_verification: LightClientVerification,
@@ -186,7 +191,72 @@ fn has_token(networks: &NetworkStore, token_address: &TokenAddress) -> bool {
     }
 }
 
-pub async fn get_all_assets() -> crate::Result<(Address, Vec<Asset>)> {
+pub async fn get_all_assets_mock() -> crate::Result<(MultichainAddress, Vec<Asset>)> {
+    let config = Config::load()?;
+    let wallet_address = config
+        .current_account
+        .ok_or(crate::Error::CurrentAccountNotSet)?;
+
+    Ok((
+        wallet_address,
+        vec![
+            Asset {
+                wallet_address,
+                r#type: AssetType {
+                    token_address: TokenAddress::Native,
+                    network: "Mainnet".to_string(),
+                    symbol: "ETH".to_string(),
+                    name: "Ethereum".to_string(),
+                    decimals: 18,
+                    price: Price::InUSD(3500.0),
+                },
+                value: parse_units("1.2", 18).unwrap().get_absolute(),
+                light_client_verification: LightClientVerification::Pending,
+            },
+            Asset {
+                wallet_address,
+                r#type: AssetType {
+                    token_address: TokenAddress::Native,
+                    network: "Tron".to_string(),
+                    symbol: "TRX".to_string(),
+                    name: "Tron".to_string(),
+                    decimals: 8,
+                    price: Price::InUSD(0.3),
+                },
+                value: U256::from(1e10),
+                light_client_verification: LightClientVerification::Pending,
+            },
+            Asset {
+                wallet_address,
+                r#type: AssetType {
+                    token_address: TokenAddress::Native,
+                    network: "Tron".to_string(),
+                    symbol: "USDT".to_string(),
+                    name: "USD Tether".to_string(),
+                    decimals: 6,
+                    price: Price::InUSD(1.0),
+                },
+                value: U256::from(1e10),
+                light_client_verification: LightClientVerification::Pending,
+            },
+            Asset {
+                wallet_address,
+                r#type: AssetType {
+                    token_address: TokenAddress::Native,
+                    network: "Mainnet".to_string(),
+                    symbol: "USDT".to_string(),
+                    name: "USD Tether".to_string(),
+                    decimals: 6,
+                    price: Price::InUSD(1.0),
+                },
+                value: U256::from(2e10),
+                light_client_verification: LightClientVerification::Pending,
+            },
+        ],
+    ))
+}
+
+pub async fn get_all_assets() -> crate::Result<(MultichainAddress, Vec<Asset>)> {
     let config = Config::load()?;
     let wallet_address = config
         .current_account

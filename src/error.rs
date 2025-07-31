@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use alloy::primitives::Address;
+use fusion_plus_sdk::multichain_address::MultichainAddress;
 use serde_json::Value;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -12,7 +12,7 @@ pub enum Error {
     DiskError(String),
     NetworkNotFound(String),
     AddressBook(&'static str),
-    SecretNotFound(Address),
+    SecretNotFound(MultichainAddress),
     InternalError(String),
     InternalErrorStr(&'static str),
     ParseIntError(Box<std::num::ParseIntError>),
@@ -48,6 +48,7 @@ pub enum Error {
     Data3Error(Box<data3::error::Error>),
     WalletConnectError(walletconnect_sdk::Error),
     EyreError(Box<eyre::Report>), // TODO Helios should expose this
+    FusionPlus(Box<fusion_plus_sdk::error::Error>),
 }
 
 impl Error {
@@ -266,6 +267,12 @@ impl From<walletconnect_sdk::Error> for Error {
 impl From<eyre::Report> for Error {
     fn from(e: eyre::Report) -> Self {
         Error::EyreError(Box::new(e))
+    }
+}
+
+impl From<fusion_plus_sdk::error::Error> for Error {
+    fn from(e: fusion_plus_sdk::error::Error) -> Self {
+        Error::FusionPlus(Box::new(e))
     }
 }
 

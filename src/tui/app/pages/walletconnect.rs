@@ -363,7 +363,8 @@ impl Component for WalletConnectPage {
                         let pairing_clone = pairing.clone();
                         self.watch_thread = Some(tokio::spawn(async move {
                             let mut pairing = pairing_clone;
-                            let Ok(msgs) = pairing.approve_with_session_settle(addr).await else {
+                            let Ok(msgs) = pairing.approve_with_session_settle(addr.as_raw()).await
+                            else {
                                 let _ = tr.send(Event::WalletConnectStatus(
                                     WalletConnectStatus::SessionSettleFailed,
                                 ));

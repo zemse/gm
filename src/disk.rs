@@ -1,7 +1,7 @@
 use std::{fmt, fmt::Debug, fs, path::PathBuf};
 
-use alloy::primitives::Address;
 use directories::BaseDirs;
+use fusion_plus_sdk::multichain_address::MultichainAddress;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::error::Error;
@@ -88,7 +88,7 @@ impl DiskInterface for AddressBook {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct AddressBookEntry {
     pub name: String,
-    pub address: Address,
+    pub address: MultichainAddress,
     // TODO we can add more fields here like last interacted time
 }
 
@@ -115,7 +115,10 @@ impl AddressBook {
         self.save()
     }
 
-    pub fn find_by_address(&self, address: &Address) -> Option<(usize, AddressBookEntry)> {
+    pub fn find_by_address(
+        &self,
+        address: &MultichainAddress,
+    ) -> Option<(usize, AddressBookEntry)> {
         self.entries.iter().enumerate().find_map(|(index, entry)| {
             if &entry.address == address {
                 Some((index, entry.clone()))
@@ -138,7 +141,7 @@ impl AddressBook {
     pub fn find(
         &self,
         id: &Option<usize>,
-        address: &Option<Address>,
+        address: &Option<MultichainAddress>,
         name: &Option<&String>,
     ) -> crate::Result<Option<(usize, AddressBookEntry)>> {
         if let Some(address) = address {
@@ -174,7 +177,7 @@ impl AddressBook {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Config {
-    pub current_account: Option<Address>,
+    pub current_account: Option<MultichainAddress>,
     pub testnet_mode: bool,
     #[serde(default)]
     pub developer_mode: bool,
@@ -193,11 +196,11 @@ impl DiskInterface for Config {
 }
 
 impl Config {
-    pub fn current_account() -> crate::Result<Option<Address>> {
+    pub fn current_account() -> crate::Result<Option<MultichainAddress>> {
         Ok(Config::load()?.current_account)
     }
 
-    pub fn set_current_account(address: Address) -> crate::Result<()> {
+    pub fn set_current_account(address: MultichainAddress) -> crate::Result<()> {
         let mut config = Config::load()?;
         config.current_account = Some(address);
         config.save()?;

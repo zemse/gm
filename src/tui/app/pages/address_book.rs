@@ -3,8 +3,8 @@ use std::{
     sync::{atomic::AtomicBool, mpsc, Arc},
 };
 
-use alloy::primitives::Address;
 use crossterm::event::{KeyCode, KeyEventKind};
+use fusion_plus_sdk::multichain_address::MultichainAddress;
 use ratatui::widgets::Widget;
 
 use crate::{
@@ -28,8 +28,8 @@ use super::{
 pub enum AddressBookMenuItem {
     Create,
     View(AddressBookEntry),
-    UnnamedOwned(Address),
-    RecentlyInteracted(Address),
+    UnnamedOwned(MultichainAddress),
+    RecentlyInteracted(MultichainAddress),
 }
 
 impl Display for AddressBookMenuItem {
@@ -50,7 +50,7 @@ impl Display for AddressBookMenuItem {
 impl AddressBookMenuItem {
     pub fn get_menu(
         with_create: bool,
-        recently_interacted: Option<Vec<Address>>,
+        recently_interacted: Option<Vec<MultichainAddress>>,
     ) -> crate::Result<Vec<AddressBookMenuItem>> {
         let mut entries = vec![];
 
@@ -73,11 +73,11 @@ impl AddressBookMenuItem {
                 .into_iter()
                 .filter(|address| {
                     !entries.iter().any(|entry| match entry {
-                        AddressBookMenuItem::View(entry) => entry.address == *address,
+                        AddressBookMenuItem::View(entry) => entry.address.as_raw() == *address,
                         _ => false,
                     })
                 })
-                .map(AddressBookMenuItem::UnnamedOwned)
+                .map(|addr| AddressBookMenuItem::UnnamedOwned(addr.into()))
                 .collect::<Vec<AddressBookMenuItem>>(),
         );
 
@@ -98,7 +98,7 @@ impl AddressBookMenuItem {
         Ok(entries)
     }
 
-    pub fn address(&self) -> Option<Address> {
+    pub fn address(&self) -> Option<MultichainAddress> {
         match self {
             AddressBookMenuItem::Create => None,
             AddressBookMenuItem::View(entry) => Some(entry.address),
@@ -109,7 +109,7 @@ impl AddressBookMenuItem {
 
     // TODO remove
     // Must only be used if you are sure that the list will not contain Create
-    pub fn address_unwrap(&self) -> Address {
+    pub fn address_unwrap(&self) -> MultichainAddress {
         match self {
             AddressBookMenuItem::Create => {
                 unreachable!("AddressBookMenuItem::Create entry must not be present")

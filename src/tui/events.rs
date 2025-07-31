@@ -1,9 +1,7 @@
 use std::time::Duration;
 
-use alloy::{
-    primitives::Address,
-    signers::{k256::ecdsa::SigningKey, Signature},
-};
+use alloy::signers::{k256::ecdsa::SigningKey, Signature};
+use fusion_plus_sdk::multichain_address::MultichainAddress;
 use walletconnect_sdk::wc_message::WcMessage;
 
 use crate::{
@@ -31,7 +29,7 @@ pub mod recent_addresses;
 pub enum Event {
     Input(crossterm::event::KeyEvent),
 
-    AccountChange(Address),
+    AccountChange(MultichainAddress),
     ConfigUpdate,
 
     EthPriceUpdate(String),
@@ -41,10 +39,10 @@ pub enum Event {
     HashRateError(String),
     VanityResult(SigningKey, usize, Duration),
 
-    AssetsUpdate(Address, Vec<Asset>),
+    AssetsUpdate(MultichainAddress, Vec<Asset>),
     AssetsUpdateError(String, bool), // bool - whether to silence the error
 
-    RecentAddressesUpdate(Vec<Address>),
+    RecentAddressesUpdate(Vec<MultichainAddress>),
     RecentAddressesUpdateError(String),
 
     CandlesUpdate(Vec<Candle>, Interval),
@@ -57,11 +55,11 @@ pub enum Event {
     SignError(String),
 
     WalletConnectStatus(WalletConnectStatus),
-    WalletConnectMessage(Address, Box<WcMessage>),
-    WalletConnectError(Address, String),
+    WalletConnectMessage(MultichainAddress, Box<WcMessage>),
+    WalletConnectError(MultichainAddress, String),
 
     HeliosUpdate {
-        account: Address,
+        account: MultichainAddress,
         network: String,
         token_address: TokenAddress,
         status: LightClientVerification,

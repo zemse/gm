@@ -381,7 +381,7 @@ pub mod linux_insecure {
         fn get_secret(address: &Address) -> crate::Result<Secret> {
             InsecurePrivateKeyStore::load()?
                 .find_by_address(address)
-                .ok_or(crate::Error::SecretNotFound(*address))
+                .ok_or(crate::Error::SecretNotFound((*address).into()))
         }
     }
 
