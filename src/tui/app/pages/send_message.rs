@@ -151,28 +151,32 @@ impl Component for SendMessagePage {
                 self.networks_popup
                     .set_items(Some(NetworkStore::load_networks(ss.testnet_mode)?));
             } else {
-                self.form.handle_event(event, |label, form| {
-                    if label == FormItem::SendMessageButton {
-                        let to = form.get_text(FormItem::To);
-                        let message = form.get_text(FormItem::Message);
-                        let network_name = form.get_text(FormItem::Network);
-                        if message.is_empty() {
-                            return Err("Message cannot be empty".into());
+                self.form.handle_event(
+                    event,
+                    |_, _| Ok(()),
+                    |label, form| {
+                        if label == FormItem::SendMessageButton {
+                            let to = form.get_text(FormItem::To);
+                            let message = form.get_text(FormItem::Message);
+                            let network_name = form.get_text(FormItem::Network);
+                            if message.is_empty() {
+                                return Err("Message cannot be empty".into());
+                            }
+
+                            self.tx_popup.set_tx_req(
+                                NetworkStore::from_name(network_name)?,
+                                TransactionRequest::default().to(to.parse()?).input(
+                                    TransactionInput::from(Bytes::from(
+                                        message.to_owned().into_bytes(),
+                                    )),
+                                ),
+                            );
+                            self.tx_popup.open();
                         }
 
-                        self.tx_popup.set_tx_req(
-                            NetworkStore::from_name(network_name)?,
-                            TransactionRequest::default().to(to.parse()?).input(
-                                TransactionInput::from(Bytes::from(
-                                    message.to_owned().into_bytes(),
-                                )),
-                            ),
-                        );
-                        self.tx_popup.open();
-                    }
-
-                    Ok(())
-                })?;
+                        Ok(())
+                    },
+                )?;
             }
         }
 

@@ -13,10 +13,11 @@ use crate::tui::{
 };
 use crate::utils::assets::{Asset, TokenAddress};
 use crate::utils::erc20;
-use crate::Result;
+use crate::{gm_log, Result};
 use alloy::primitives::utils::parse_units;
 use alloy::primitives::{Bytes, U256};
 use alloy::rpc::types::TransactionRequest;
+use fusion_plus_sdk::multichain_address::MultichainAddress;
 use std::str::FromStr;
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
@@ -171,58 +172,73 @@ impl Component for AssetTransferPage {
                 self.asset_popup.set_items(ss.assets_read()?);
                 result.esc_ignores = 1;
             } else {
-                self.form.handle_event(event, |label, form| {
-                    // Need to make changes in this section
-                    if label == FormItem::TransferButton {
-                        let to = form.get_text(FormItem::To);
-                        let asset = self
-                            .asset
-                            .as_ref()
-                            .ok_or(crate::Error::InternalErrorStr("No asset selected"))?;
-                        let amount =
-                            parse_units(form.get_text(FormItem::Amount), asset.r#type.decimals)?;
-
-                        let (to, calldata, value) = match asset.r#type.token_address {
-                            TokenAddress::Native => {
-                                (to.parse()?, Bytes::new(), amount.get_absolute())
+                self.form.handle_event(
+                    event,
+                    |label, form| {
+                        if label == FormItem::To {
+                            let to_content = form.get_text_mut(FormItem::To);
+                            if let Ok(addr) = MultichainAddress::from_str(to_content) {
+                                gm_log!("MultichainAddress::from_str {addr}");
+                                *to_content = addr.to_string();
                             }
-                            TokenAddress::Contract(address) => (
-                                address,
-                                erc20::encode_transfer(to.parse()?, amount.get_absolute()),
-                                U256::ZERO,
-                            ),
-                        };
+                        }
+                        Ok(())
+                    },
+                    |label, form| {
+                        // Need to make xchanges in this section
+                        if label == FormItem::TransferButton {
+                            let to = form.get_text(FormItem::To);
+                            let asset = self
+                                .asset
+                                .as_ref()
+                                .ok_or(crate::Error::InternalErrorStr("No asset selected"))?;
+                            let amount = parse_units(
+                                form.get_text(FormItem::Amount),
+                                asset.r#type.decimals,
+                            )?;
 
-                        let asset_network = Network::from_str(&asset.r#type.network);
-                        let receiver_chain_id = to.get_chain_id();
+                            let (to, calldata, value) = match asset.r#type.token_address {
+                                TokenAddress::Native => {
+                                    (to.parse()?, Bytes::new(), amount.get_absolute())
+                                }
+                                TokenAddress::Contract(address) => (
+                                    address,
+                                    erc20::encode_transfer(to.parse()?, amount.get_absolute()),
+                                    U256::ZERO,
+                                ),
+                            };
 
-                        if let Ok(asset_network) = asset_network {
-                            if let Some(receiver_chain_id) = receiver_chain_id {
-                                // if the network where assets exist is different than the address then use 1inch fusion+
-                                if asset_network.chain_id != receiver_chain_id as u32 {
-                                    result
-                                        .page_inserts
-                                        .push(Page::FusionPlus(FusionPlusPage {}));
+                            let asset_network = Network::from_str(&asset.r#type.network);
+                            let receiver_chain_id = to.get_chain_id();
 
-                                    return Ok(());
+                            if let Ok(asset_network) = asset_network {
+                                if let Some(receiver_chain_id) = receiver_chain_id {
+                                    // if the network where assets exist is different than the address then use 1inch fusion+
+                                    if asset_network.chain_id != receiver_chain_id as u32 {
+                                        result
+                                            .page_inserts
+                                            .push(Page::FusionPlus(FusionPlusPage {}));
+
+                                        return Ok(());
+                                    }
                                 }
                             }
-                        }
 
-                        if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
-                            self.tx_popup.set_tx_req(
-                                NetworkStore::from_name(&asset.r#type.network)?,
-                                TransactionRequest::default()
-                                    .to(to.as_raw())
-                                    .value(value)
-                                    .input(calldata.into()),
-                            );
-                        }
+                            if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
+                                self.tx_popup.set_tx_req(
+                                    NetworkStore::from_name(&asset.r#type.network)?,
+                                    TransactionRequest::default()
+                                        .to(to.as_raw())
+                                        .value(value)
+                                        .input(calldata.into()),
+                                );
+                            }
 
-                        self.tx_popup.open();
-                    }
-                    Ok(())
-                })?;
+                            self.tx_popup.open();
+                        }
+                        Ok(())
+                    },
+                )?;
             }
         }
 

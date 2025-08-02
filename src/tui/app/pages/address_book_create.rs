@@ -76,37 +76,42 @@ impl Component for AddressBookCreatePage {
     ) -> crate::Result<HandleResult> {
         let mut handle_result = HandleResult::default();
 
-        self.form.handle_event(event, |label, form| {
-            if label == FormItem::SaveButton {
-                let name = form.get_text(FormItem::Name);
-                if name.is_empty() {
-                    let error = form.get_text_mut(FormItem::ErrorText);
-                    *error = "Please enter name, you cannot leave it empty".to_string();
-                } else {
-                    let mut address_book = AddressBook::load()?;
-
-                    let address = form.get_text(FormItem::Address);
-
-                    let result = address
-                        .parse()
-                        .map_err(crate::Error::from)
-                        .and_then(|address| {
-                            address_book.add(AddressBookEntry {
-                                name: name.clone(),
-                                address,
-                            })
-                        });
-                    if let Err(e) = result {
+        self.form.handle_event(
+            event,
+            |_, _| Ok(()),
+            |label, form| {
+                if label == FormItem::SaveButton {
+                    let name = form.get_text(FormItem::Name);
+                    if name.is_empty() {
                         let error = form.get_text_mut(FormItem::ErrorText);
-                        *error = format!("{e:?}");
+                        *error = "Please enter name, you cannot leave it empty".to_string();
                     } else {
-                        handle_result.page_pops = 1;
-                        handle_result.reload = true;
+                        let mut address_book = AddressBook::load()?;
+
+                        let address = form.get_text(FormItem::Address);
+
+                        let result =
+                            address
+                                .parse()
+                                .map_err(crate::Error::from)
+                                .and_then(|address| {
+                                    address_book.add(AddressBookEntry {
+                                        name: name.clone(),
+                                        address,
+                                    })
+                                });
+                        if let Err(e) = result {
+                            let error = form.get_text_mut(FormItem::ErrorText);
+                            *error = format!("{e:?}");
+                        } else {
+                            handle_result.page_pops = 1;
+                            handle_result.reload = true;
+                        }
                     }
                 }
-            }
-            Ok(())
-        })?;
+                Ok(())
+            },
+        )?;
 
         Ok(handle_result)
     }

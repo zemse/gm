@@ -284,22 +284,37 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
             .any(|item| matches!(item, FormWidget::SelectInput { popup, .. } if popup.is_open()))
     }
 
-    pub fn handle_event<F>(&mut self, event: &Event, mut on_button: F) -> crate::Result<()>
+    pub fn current_label_enum(&self) -> crate::Result<E> {
+        E::iter()
+            .nth(self.cursor)
+            .ok_or(crate::Error::InternalErrorStr("form index out of bounds"))
+    }
+
+    pub fn handle_event<F1, F2>(
+        &mut self,
+        event: &Event,
+        mut on_focus_change: F2,
+        mut on_button_press: F1,
+    ) -> crate::Result<()>
     where
-        F: FnMut(E, &mut Self) -> crate::Result<()>,
+        F1: FnMut(E, &mut Self) -> crate::Result<()>,
+        F2: FnMut(E, &mut Self) -> crate::Result<()>,
     {
         if let Event::Input(key_event) = event {
             if key_event.kind == KeyEventKind::Press {
                 if !self.is_some_popup_open() {
                     match key_event.code {
                         KeyCode::Up => {
+                            on_focus_change(self.current_label_enum()?, self)?;
                             self.retreat_cursor();
                         }
                         KeyCode::Down | KeyCode::Tab => {
+                            on_focus_change(self.current_label_enum()?, self)?;
                             self.advance_cursor();
                         }
                         KeyCode::Enter => {
                             if !self.is_button_focused() {
+                                on_focus_change(self.current_label_enum()?, self)?;
                                 self.advance_cursor();
                             }
                         }
@@ -344,7 +359,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         if matches!(key_event.code, KeyCode::Enter) {
                             let enum_repr =
                                 E::iter().nth(self.cursor).expect("Invalid cursor index");
-                            on_button(enum_repr, self)?
+                            on_button_press(enum_repr, self)?
                         }
                     }
                     _ => {}
