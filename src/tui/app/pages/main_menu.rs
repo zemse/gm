@@ -4,6 +4,13 @@ use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{layout::Rect, widgets::Widget};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
+use super::{
+    account::AccountPage, address_book::AddressBookPage, assets::AssetsPage,
+    complete_setup::CompleteSetupPage, config::ConfigPage, dev_key_capture::DevKeyCapturePage,
+    send_message::SendMessagePage, sign_message::SignMessagePage, walletconnect::WalletConnectPage,
+    Page,
+};
+use crate::tui::app::pages::network::NetworkPage;
 use crate::{
     disk::Config,
     tui::{
@@ -12,13 +19,6 @@ use crate::{
         traits::{Component, HandleResult},
     },
     utils::cursor::Cursor,
-};
-use crate::tui::app::pages::network::NetworkPage;
-use super::{
-    account::AccountPage, address_book::AddressBookPage, assets::AssetsPage,
-    complete_setup::CompleteSetupPage, config::ConfigPage, dev_key_capture::DevKeyCapturePage,
-    send_message::SendMessagePage, sign_message::SignMessagePage, walletconnect::WalletConnectPage,
-    Page,
 };
 
 #[derive(Display, EnumIter)]
