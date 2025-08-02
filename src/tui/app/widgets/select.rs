@@ -1,13 +1,13 @@
 use std::fmt::Display;
 
+use crate::utils::cursor::Cursor;
+use ratatui::text::Text;
 use ratatui::{
     layout::{Constraint, Layout},
     style::Style,
     text::Line,
     widgets::{List, ListItem, Widget},
 };
-
-use crate::utils::cursor::Cursor;
 
 use super::scroll_bar::CustomScrollBar;
 
@@ -26,9 +26,23 @@ impl<T: Display> Widget for Select<'_, T> {
         let capacity = area.height as usize;
         let page_number = self.cursor.current / capacity;
         let idx = self.cursor.current % capacity;
+        let horizontal_layout = Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]);
+        let [list_area, scroll_area] = horizontal_layout.areas(area);
 
-        let render_item = |(i, member)| {
-            let content = Line::from(format!("{member}"));
+        let render_item = |(i, member): (_, &T)| {
+            let content = Text::from(
+                textwrap::wrap(
+                    &format!("{member}"),
+                    if capacity < self.list.len() {
+                        list_area.width as usize
+                    } else {
+                        area.width as usize
+                    },
+                )
+                .iter()
+                .map(|s| Line::from(s.clone().into_owned()))
+                .collect::<Vec<_>>(),
+            );
             let style = if idx == i && self.focus {
                 self.focus_style
             } else {
@@ -48,8 +62,6 @@ impl<T: Display> Widget for Select<'_, T> {
                 .map(render_item)
                 .collect::<Vec<ListItem>>();
 
-            let horizontal_layout = Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]);
-            let [list_area, scroll_area] = horizontal_layout.areas(area);
             List::new(display_items).render(list_area, buf);
             CustomScrollBar {
                 cursor: self.cursor.current,
