@@ -1,4 +1,6 @@
-use crate::network::NetworkStore;
+use crate::network::{Network, NetworkStore};
+use crate::tui::app::pages::fusion_plus::FusionPlusPage;
+use crate::tui::app::pages::Page;
 use crate::tui::app::widgets::address_book_popup::AddressBookPopup;
 use crate::tui::app::widgets::assets_popup::AssetsPopup;
 use crate::tui::app::widgets::form::FormItemIndex;
@@ -15,6 +17,7 @@ use crate::Result;
 use alloy::primitives::utils::parse_units;
 use alloy::primitives::{Bytes, U256};
 use alloy::rpc::types::TransactionRequest;
+use std::str::FromStr;
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use strum::EnumIter;
@@ -189,6 +192,22 @@ impl Component for AssetTransferPage {
                                 U256::ZERO,
                             ),
                         };
+
+                        let asset_network = Network::from_str(&asset.r#type.network);
+                        let receiver_chain_id = to.get_chain_id();
+
+                        if let Ok(asset_network) = asset_network {
+                            if let Some(receiver_chain_id) = receiver_chain_id {
+                                // if the network where assets exist is different than the address then use 1inch fusion+
+                                if asset_network.chain_id != receiver_chain_id as u32 {
+                                    result
+                                        .page_inserts
+                                        .push(Page::FusionPlus(FusionPlusPage {}));
+
+                                    return Ok(());
+                                }
+                            }
+                        }
 
                         if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
                             self.tx_popup.set_tx_req(

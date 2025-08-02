@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, str::FromStr};
 
 use alloy::providers::ProviderBuilder;
 use fusion_plus_sdk::multichain_address::MultichainAddress;
@@ -269,14 +269,14 @@ impl NetworkStore {
     }
 }
 
-impl TryFrom<String> for Network {
-    type Error = crate::Error;
+impl FromStr for Network {
+    type Err = crate::Error;
 
-    fn try_from(value: String) -> crate::Result<Self> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let networks = NetworkStore::load()?;
         networks
-            .get_by_name(&value)
-            .ok_or(crate::Error::NetworkNotFound(value))
+            .get_by_name(s)
+            .ok_or(crate::Error::NetworkNotFound(s.to_string()))
     }
 }
 

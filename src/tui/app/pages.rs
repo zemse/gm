@@ -19,6 +19,7 @@ use trade::TradePage;
 use walletconnect::WalletConnectPage;
 
 use crate::tui::{
+    app::pages::fusion_plus::FusionPlusPage,
     events::Event,
     traits::{Component, HandleResult},
 };
@@ -36,6 +37,7 @@ pub mod assets;
 pub mod complete_setup;
 pub mod config;
 pub mod dev_key_capture;
+pub mod fusion_plus;
 pub mod main_menu;
 pub mod send_message;
 pub mod sign_message;
@@ -66,6 +68,8 @@ pub enum Page {
     WalletConnect(WalletConnectPage),
 
     Trade(TradePage),
+
+    FusionPlus(FusionPlusPage),
 
     Text(TextPage),
     DevKeyCapture(DevKeyCapturePage),
@@ -120,6 +124,8 @@ impl Component for Page {
 
             Page::Trade(page) => page.set_focus(focus),
 
+            Page::FusionPlus(page) => page.set_focus(focus),
+
             Page::Text(page) => page.set_focus(focus),
             Page::DevKeyCapture(page) => page.set_focus(focus),
         }
@@ -149,6 +155,8 @@ impl Component for Page {
 
             Page::Trade(page) => page.exit_threads().await,
 
+            Page::FusionPlus(page) => page.exit_threads().await,
+
             Page::Text(page) => page.exit_threads().await,
             Page::DevKeyCapture(page) => page.exit_threads().await,
         }
@@ -177,6 +185,8 @@ impl Component for Page {
             Page::WalletConnect(page) => page.reload(ss),
 
             Page::Trade(page) => page.reload(ss),
+
+            Page::FusionPlus(page) => page.reload(ss),
 
             Page::Text(page) => page.reload(ss),
             Page::DevKeyCapture(page) => page.reload(ss),
@@ -214,6 +224,8 @@ impl Component for Page {
 
             Page::Trade(page) => page.handle_event(event, area, tr, sd, ss),
 
+            Page::FusionPlus(page) => page.handle_event(event, area, tr, sd, ss),
+
             Page::Text(page) => page.handle_event(event, area, tr, sd, ss),
             Page::DevKeyCapture(page) => page.handle_event(event, area, tr, sd, ss),
         }
@@ -250,6 +262,8 @@ impl Component for Page {
             Page::WalletConnect(page) => page.render_component(area, buf, shared_state),
 
             Page::Trade(page) => page.render_component(area, buf, shared_state),
+
+            Page::FusionPlus(page) => page.render_component(area, buf, shared_state),
 
             Page::Text(page) => page.render_component(area, buf, shared_state),
             Page::DevKeyCapture(page) => page.render_component(area, buf, shared_state),
