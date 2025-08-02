@@ -13,7 +13,7 @@ use crate::tui::{
 };
 use crate::utils::assets::{Asset, TokenAddress};
 use crate::utils::erc20;
-use crate::{gm_log, Result};
+use crate::Result;
 use alloy::primitives::utils::parse_units;
 use alloy::primitives::{Bytes, U256};
 use alloy::rpc::types::TransactionRequest;
@@ -33,6 +33,7 @@ pub enum FormItem {
     Amount,
     ErrorText,
     TransferButton,
+    TransferViaFusionPlusButton,
 }
 impl FormItemIndex for FormItem {
     fn index(self) -> usize {
@@ -50,6 +51,7 @@ impl TryFrom<FormItem> for FormWidget {
                 empty_text: Some("<press SPACE to select from address book>"),
                 currency: None,
             },
+            // TODO change to Select
             FormItem::AssetType => FormWidget::DisplayBox {
                 label: "Asset Type",
                 text: String::new(),
@@ -63,6 +65,9 @@ impl TryFrom<FormItem> for FormWidget {
             },
             FormItem::ErrorText => FormWidget::ErrorText(String::new()),
             FormItem::TransferButton => FormWidget::Button { label: "Transfer" },
+            FormItem::TransferViaFusionPlusButton => FormWidget::Button {
+                label: "Transfer via Fusion+",
+            },
         };
         Ok(widget)
     }
@@ -79,7 +84,10 @@ pub struct AssetTransferPage {
 impl AssetTransferPage {
     fn try_default() -> crate::Result<Self> {
         Ok(Self {
-            form: Form::init(|_| Ok(()))?,
+            form: Form::init(|form| {
+                form.hide_item(FormItem::TransferViaFusionPlusButton);
+                Ok(())
+            })?,
             asset: None,
             address_book_popup: AddressBookPopup::default(),
             asset_popup: AssetsPopup::default(),
@@ -126,6 +134,7 @@ impl Component for AssetTransferPage {
             result.merge(self.address_book_popup.handle_event(event, |entry| {
                 *self.form.get_text_mut(FormItem::To) = entry.address_unwrap().to_string();
                 self.form.advance_cursor();
+                Ok(())
             })?);
         } else if self.asset_popup.is_open() {
             result.merge(self.asset_popup.handle_event(event, |asset| {
@@ -137,6 +146,7 @@ impl Component for AssetTransferPage {
                     .expect("currency not found in this input entry, please check idx") =
                     Some(asset.r#type.symbol.clone());
                 self.form.advance_cursor();
+                Ok(())
             })?);
         } else if self.tx_popup.is_open() {
             let is_confirmed = self.tx_popup.is_confirmed();
@@ -178,10 +188,11 @@ impl Component for AssetTransferPage {
                         if label == FormItem::To {
                             let to_content = form.get_text_mut(FormItem::To);
                             if let Ok(addr) = MultichainAddress::from_str(to_content) {
-                                gm_log!("MultichainAddress::from_str {addr}");
                                 *to_content = addr.to_string();
+                                form.text_cursor = to_content.len();
                             }
                         }
+
                         Ok(())
                     },
                     |label, form| {
@@ -208,22 +219,6 @@ impl Component for AssetTransferPage {
                                 ),
                             };
 
-                            let asset_network = Network::from_str(&asset.r#type.network);
-                            let receiver_chain_id = to.get_chain_id();
-
-                            if let Ok(asset_network) = asset_network {
-                                if let Some(receiver_chain_id) = receiver_chain_id {
-                                    // if the network where assets exist is different than the address then use 1inch fusion+
-                                    if asset_network.chain_id != receiver_chain_id as u32 {
-                                        result
-                                            .page_inserts
-                                            .push(Page::FusionPlus(FusionPlusPage {}));
-
-                                        return Ok(());
-                                    }
-                                }
-                            }
-
                             if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
                                 self.tx_popup.set_tx_req(
                                     NetworkStore::from_name(&asset.r#type.network)?,
@@ -239,6 +234,31 @@ impl Component for AssetTransferPage {
                         Ok(())
                     },
                 )?;
+            }
+        }
+
+        {
+            let receiver_chain_id = MultichainAddress::from_str(self.form.get_text(FormItem::To))
+                .ok()
+                .and_then(|addr| addr.get_chain_id());
+            let asset_network = self
+                .asset
+                .as_ref()
+                .and_then(|asset| Network::from_str(&asset.r#type.network).ok());
+
+            if let Some(asset_network) = asset_network {
+                let via_fusion_plus = match receiver_chain_id {
+                    Some(id) => asset_network.chain_id != id as u32,
+                    None => asset_network.multichain_address_requires_chain_id,
+                };
+
+                if via_fusion_plus {
+                    self.form.hide_item(FormItem::TransferButton);
+                    self.form.show_item(FormItem::TransferViaFusionPlusButton);
+                } else {
+                    self.form.show_item(FormItem::TransferButton);
+                    self.form.hide_item(FormItem::TransferViaFusionPlusButton);
+                }
             }
         }
 

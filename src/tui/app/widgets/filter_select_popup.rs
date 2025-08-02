@@ -71,7 +71,7 @@ impl<Item: Display> FilterSelectPopup<Item> {
         mut on_enter: F,
     ) -> crate::Result<HandleResult>
     where
-        F: FnMut(&Item),
+        F: FnMut(&Item) -> crate::Result<()>,
     {
         let mut result = HandleResult::default();
 
@@ -90,7 +90,7 @@ impl<Item: Display> FilterSelectPopup<Item> {
                             self.search_string.pop();
                         }
                         KeyCode::Enter => {
-                            on_enter(&items[self.cursor.current]);
+                            on_enter(&items[self.cursor.current])?;
                             self.close();
                         }
                         _ => {}

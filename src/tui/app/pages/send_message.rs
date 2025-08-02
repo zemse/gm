@@ -118,12 +118,14 @@ impl Component for SendMessagePage {
                 let to_address = self.form.get_text_mut(FormItem::To);
                 *to_address = entry.address_unwrap().to_string();
                 self.form.advance_cursor();
+                Ok(())
             })?);
         } else if self.networks_popup.is_open() {
             result.merge(self.networks_popup.handle_event(event, |network| {
                 let network_str = self.form.get_text_mut(FormItem::Network);
                 *network_str = network.name.clone();
                 self.form.advance_cursor();
+                Ok(())
             })?);
         } else if self.tx_popup.is_open() {
             let r = self.tx_popup.handle_event(
