@@ -81,7 +81,7 @@ pub struct AddressBook {
 }
 
 impl DiskInterface for AddressBook {
-    const FILE_NAME: &'static str = "address_book";
+    const FILE_NAME: &'static str = "address_book_multichain";
     const FORMAT: FileFormat = FileFormat::YAML;
 }
 
