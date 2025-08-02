@@ -13,7 +13,7 @@ use crate::{
     },
     utils::cursor::Cursor,
 };
-
+use crate::tui::app::pages::network::NetworkPage;
 use super::{
     account::AccountPage, address_book::AddressBookPage, assets::AssetsPage,
     complete_setup::CompleteSetupPage, config::ConfigPage, dev_key_capture::DevKeyCapturePage,
@@ -27,6 +27,7 @@ pub enum MainMenuItem {
     Portfolio,
     Accounts,
     AddressBook,
+    Network,
     WalletConnect,
     SignMessage,
     SendMessage,
@@ -41,6 +42,7 @@ impl MainMenuItem {
             MainMenuItem::Portfolio => Page::Assets(AssetsPage::default()),
             MainMenuItem::Accounts => Page::Account(AccountPage::new()?),
             MainMenuItem::AddressBook => Page::AddressBook(AddressBookPage::new()?),
+            MainMenuItem::Network => Page::Network(NetworkPage::new()?),
             MainMenuItem::WalletConnect => Page::WalletConnect(WalletConnectPage::new()?),
             MainMenuItem::SignMessage => Page::SignMessage(SignMessagePage::new()?),
             MainMenuItem::SendMessage => Page::SendMessage(SendMessagePage::new()?),
@@ -53,6 +55,7 @@ impl MainMenuItem {
         match self {
             MainMenuItem::CompleteSetup
             | MainMenuItem::AddressBook
+            | MainMenuItem::Network
             | MainMenuItem::Accounts
             | MainMenuItem::WalletConnect
             | MainMenuItem::DevKeyInput
@@ -68,6 +71,7 @@ impl MainMenuItem {
             | MainMenuItem::Portfolio
             | MainMenuItem::Accounts
             | MainMenuItem::AddressBook
+            | MainMenuItem::Network
             | MainMenuItem::WalletConnect
             | MainMenuItem::SignMessage
             | MainMenuItem::SendMessage
