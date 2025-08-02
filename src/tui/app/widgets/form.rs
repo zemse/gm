@@ -104,7 +104,7 @@ impl FormWidget {
             | FormWidget::DisplayBox { text, .. }
             | FormWidget::SelectInput { text, .. } => {
                 let lines = split_string(text, (area.width - 2) as usize);
-                (2 + lines.len()) as u16
+                (3 + lines.len()) as u16
             }
 
             FormWidget::BooleanInput { value, .. } => {
@@ -547,23 +547,10 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
             .render(scroll_area, buf);
         }
 
-        // Render popups at the end so they appear on the top
-        for item in &self.items {
-            #[allow(clippy::single_match)]
-            match item {
-                FormWidget::SelectInput { popup, .. } => {
-                    popup.render(full_area, &mut virtual_buf, theme);
-                }
-                _ => {}
-            }
-        }
-        let capacity = full_area.height;
-        let current_page = scroll_cursor / capacity;
-
         let mut page = area;
         page.x = full_area.x;
         page.height = full_area.height;
-        page.y = full_area.y + current_page * page.height;
+        page.y = full_area.y;
         let item_overflow_top = (page.y).saturating_sub(scroll_cursor - 1);
         let item_overflow_bottom =
             (scroll_cursor + scroll_cursor_item_height + 1).saturating_sub(page.y + page.height);
@@ -580,6 +567,16 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         *dst = src.clone();
                     }
                 };
+            }
+        }
+        // Render popups at the end so they appear on the top
+        for item in &self.items {
+            #[allow(clippy::single_match)]
+            match item {
+                FormWidget::SelectInput { popup, .. } => {
+                    popup.render(full_area, buf, theme);
+                }
+                _ => {}
             }
         }
     }
