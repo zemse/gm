@@ -3,6 +3,7 @@ use crate::tui::app::pages::fusion_plus::FusionPlusPage;
 use crate::tui::app::pages::Page;
 use crate::tui::app::widgets::address_book_popup::AddressBookPopup;
 use crate::tui::app::widgets::assets_popup::AssetsPopup;
+use crate::tui::app::widgets::filter_select_popup::FilterSelectPopup;
 use crate::tui::app::widgets::form::FormItemIndex;
 use crate::tui::app::widgets::tx_popup::TxPopup;
 use crate::tui::app::SharedState;
@@ -13,7 +14,7 @@ use crate::tui::{
 };
 use crate::utils::assets::{Asset, TokenAddress};
 use crate::utils::erc20;
-use crate::Result;
+use crate::{gm_log, Result};
 use alloy::primitives::utils::parse_units;
 use alloy::primitives::{Bytes, U256};
 use alloy::rpc::types::TransactionRequest;
@@ -31,6 +32,7 @@ pub enum FormItem {
     To,
     AssetType,
     Amount,
+    DestinationAsset,
     ErrorText,
     TransferButton,
     TransferViaFusionPlusButton,
@@ -63,6 +65,12 @@ impl TryFrom<FormItem> for FormWidget {
                 empty_text: None,
                 currency: None,
             },
+            FormItem::DestinationAsset => FormWidget::SelectInput {
+                label: "Destination Asset",
+                text: String::new(),
+                empty_text: Some("<press SPACE to select a destination asset>"),
+                popup: FilterSelectPopup::new("Destination Asset", Some("No assets found")),
+            },
             FormItem::ErrorText => FormWidget::ErrorText(String::new()),
             FormItem::TransferButton => FormWidget::Button { label: "Transfer" },
             FormItem::TransferViaFusionPlusButton => FormWidget::Button {
@@ -85,6 +93,7 @@ impl AssetTransferPage {
     fn try_default() -> crate::Result<Self> {
         Ok(Self {
             form: Form::init(|form| {
+                form.hide_item(FormItem::DestinationAsset);
                 form.hide_item(FormItem::TransferViaFusionPlusButton);
                 Ok(())
             })?,
@@ -182,7 +191,7 @@ impl Component for AssetTransferPage {
                 self.asset_popup.set_items(ss.assets_read()?);
                 result.esc_ignores = 1;
             } else {
-                self.form.handle_event(
+                let form_result = self.form.handle_event(
                     event,
                     |label, form| {
                         if label == FormItem::To {
@@ -196,7 +205,6 @@ impl Component for AssetTransferPage {
                         Ok(())
                     },
                     |label, form| {
-                        // Need to make xchanges in this section
                         if label == FormItem::TransferButton {
                             let to = form.get_text(FormItem::To);
                             let asset = self
@@ -230,10 +238,22 @@ impl Component for AssetTransferPage {
                             }
 
                             self.tx_popup.open();
+                        } else if label == FormItem::TransferViaFusionPlusButton {
+                            result.page_inserts.push(Page::FusionPlus(FusionPlusPage {
+                                src_chain_id: todo!(),
+                                dst_chain_id: todo!(),
+                                dst_address: todo!(),
+                                src_token: todo!(),
+                                dst_token: todo!(),
+                                src_amount: todo!(),
+                                est_amounts_thread: todo!(),
+                            }));
                         }
                         Ok(())
                     },
                 )?;
+                result.merge(form_result);
+                gm_log!("handle result after form: {}", result.esc_ignores);
             }
         }
 
@@ -254,9 +274,30 @@ impl Component for AssetTransferPage {
 
                 if via_fusion_plus {
                     self.form.hide_item(FormItem::TransferButton);
+                    self.form.show_item(FormItem::DestinationAsset);
                     self.form.show_item(FormItem::TransferViaFusionPlusButton);
+
+                    let popup = self.form.get_popup_mut(FormItem::DestinationAsset);
+                    if let Some(receiver_chain_id) = receiver_chain_id {
+                        let receiver_network =
+                            NetworkStore::from_chain_id(receiver_chain_id as u32)?;
+
+                        popup.set_items(Some(
+                            receiver_network
+                                .tokens
+                                .iter()
+                                .map(|token| {
+                                    format!(
+                                        "{} - {} ({})",
+                                        receiver_network.name, token.symbol, token.contract_address
+                                    )
+                                })
+                                .collect::<Vec<String>>(),
+                        ));
+                    }
                 } else {
                     self.form.show_item(FormItem::TransferButton);
+                    self.form.hide_item(FormItem::DestinationAsset);
                     self.form.hide_item(FormItem::TransferViaFusionPlusButton);
                 }
             }

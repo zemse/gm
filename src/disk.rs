@@ -182,6 +182,7 @@ pub struct Config {
     #[serde(default)]
     pub developer_mode: bool,
     pub alchemy_api_key: Option<String>,
+    pub oneinch_api_key: Option<String>,
     #[serde(default = "default_theme_name")]
     pub theme_name: String,
 }
@@ -213,9 +214,22 @@ impl Config {
             .ok_or(crate::Error::AlchemyApiKeyNotSet)
     }
 
+    pub fn oneinch_api_key() -> crate::Result<String> {
+        Config::load()?
+            .oneinch_api_key
+            .ok_or(crate::Error::OneInchApiKeyNotSet)
+    }
+
     pub fn set_alchemy_api_key(alchemy_api_key: String) -> crate::Result<()> {
         let mut config = Config::load()?;
         config.alchemy_api_key = Some(alchemy_api_key);
+        config.save()?;
+        Ok(())
+    }
+
+    pub fn set_oneinch_api_key(oneinch_api_key: String) -> crate::Result<()> {
+        let mut config = Config::load()?;
+        config.oneinch_api_key = Some(oneinch_api_key);
         config.save()?;
         Ok(())
     }

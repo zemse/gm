@@ -9,6 +9,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     CurrentAccountNotSet,
     AlchemyApiKeyNotSet,
+    OneInchApiKeyNotSet,
     DiskError(String),
     NetworkNotFound(String),
     AddressBook(&'static str),

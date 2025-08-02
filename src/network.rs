@@ -83,11 +83,12 @@ pub struct NetworkStore {
 }
 
 impl DiskInterface for NetworkStore {
-    const FILE_NAME: &'static str = "networks";
+    const FILE_NAME: &'static str = "networks-fusion";
     const FORMAT: FileFormat = FileFormat::YAML;
 }
 
 impl NetworkStore {
+    // TODO This function should be on Network
     pub fn from_name(network_name: &str) -> crate::Result<Network> {
         let network_store = NetworkStore::load()?;
         network_store
@@ -95,6 +96,7 @@ impl NetworkStore {
             .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))
     }
 
+    // TODO This function should be on Network
     pub fn from_chain_id(chain_id: u32) -> crate::Result<Network> {
         let network_store = NetworkStore::load()?;
         network_store
@@ -456,7 +458,12 @@ fn default_networks() -> Vec<Network> {
             rpc_infura: None,
             explorer_url: None,
             is_testnet: false,
-            tokens: vec![],
+            tokens: vec![Token {
+                name: "Tether USD".to_string(),
+                symbol: "USDT".to_string(),
+                decimals: 6,
+                contract_address: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t".parse().unwrap(),
+            }],
         },
         Network {
             name: "Sepolia".to_string(),

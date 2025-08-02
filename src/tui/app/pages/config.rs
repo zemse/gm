@@ -25,6 +25,7 @@ use crate::{
 #[derive(EnumIter, PartialEq)]
 pub enum FormItem {
     Heading,
+    OneInchApiKey,
     AlchemyApiKey,
     TestnetMode,
     DeveloperMode,
@@ -42,6 +43,12 @@ impl TryFrom<FormItem> for FormWidget {
     fn try_from(value: FormItem) -> crate::Result<Self> {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Configuration"),
+            FormItem::OneInchApiKey => FormWidget::InputBox {
+                label: "1inch API key",
+                text: String::new(),
+                empty_text: Some("Please get a 1inch API key from https://portal.1inch.io/"),
+                currency: None,
+            },
             FormItem::AlchemyApiKey => FormWidget::InputBox {
                 label: "Alchemy API key",
                 text: String::new(),
@@ -77,6 +84,8 @@ impl ConfigPage {
     pub fn new() -> crate::Result<Self> {
         let form = Form::init(|form| {
             let config = Config::load()?;
+            *form.get_text_mut(FormItem::OneInchApiKey) =
+                config.oneinch_api_key.clone().unwrap_or_default();
             *form.get_text_mut(FormItem::AlchemyApiKey) =
                 config.alchemy_api_key.clone().unwrap_or_default();
             *form.get_boolean_mut(FormItem::TestnetMode) = config.testnet_mode;
@@ -117,6 +126,7 @@ impl Component for ConfigPage {
                 handle_result.reload = true;
 
                 let mut config = Config::load()?;
+                config.oneinch_api_key = Some(form.get_text(FormItem::OneInchApiKey).clone());
                 config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
                 config.testnet_mode = form.get_boolean(FormItem::TestnetMode);
                 config.developer_mode = form.get_boolean(FormItem::DeveloperMode);

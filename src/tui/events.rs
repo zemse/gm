@@ -66,6 +66,8 @@ pub enum Event {
     },
     HeliosError(String),
 
+    FusionPlusError(String),
+
     InviteCodeValidity(InviteCodeValidity),
     InviteCodeClaimStatus(InviteCodeClaimStatus),
 }

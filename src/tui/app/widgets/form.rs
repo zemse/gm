@@ -13,11 +13,9 @@ use strum::IntoEnumIterator;
 
 use super::{button::Button, input_box::InputBox};
 use crate::tui::app::widgets::scroll_bar::CustomScrollBar;
+use crate::tui::traits::HandleResult;
 use crate::tui::{
-    app::widgets::filter_select_popup::FilterSelectPopup,
-    theme::Theme,
-    traits::{RectUtil, WidgetHeight},
-    Event,
+    app::widgets::filter_select_popup::FilterSelectPopup, theme::Theme, traits::WidgetHeight, Event,
 };
 use crate::utils::text::split_string;
 
@@ -119,7 +117,7 @@ impl FormWidget {
                 (text.len() as u16).div_ceil(area.width) + 1
             }
             FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
-                (text.len() as u16).div_ceil(area.width) + 1
+                (text.len() as u16).div_ceil(area.width) + 3
             }
         }
     }
@@ -310,11 +308,13 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         event: &Event,
         mut on_value_change: F2,
         mut on_button_press: F1,
-    ) -> crate::Result<()>
+    ) -> crate::Result<HandleResult>
     where
         F1: FnMut(E, &mut Self) -> crate::Result<()>,
         F2: FnMut(E, &mut Self) -> crate::Result<()>,
     {
+        let mut result = HandleResult::default();
+
         if let Event::Input(key_event) = event {
             if key_event.kind == KeyEventKind::Press {
                 if !self.is_some_popup_open() {
@@ -355,14 +355,16 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                     }
                     FormWidget::SelectInput { text, popup, .. } => {
                         // self.update_text_cursor();
-                        popup.handle_event(event, |selected| {
+                        let popup_result = popup.handle_event(event, |selected| {
                             *text = selected.clone();
                             self.text_cursor = selected.len();
                             Ok(())
                         })?;
+                        result.merge(popup_result);
 
                         if !popup.is_open() {
                             match key_event.code {
+                                // Press any key to open the popup
                                 KeyCode::Backspace | KeyCode::Char(_) => {
                                     popup.open();
                                 }
@@ -384,7 +386,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                 }
             }
         }
-        Ok(())
+        Ok(result)
     }
 
     pub fn render(&self, mut area: Rect, buf: &mut Buffer, theme: &Theme)
@@ -392,7 +394,10 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         Self: Sized,
     {
         let full_area = area;
-        let form_height: u16 = self.items.iter().fold(0, |acc, i| acc + i.height(area));
+        let form_height: u16 = std::cmp::max(
+            self.items.iter().fold(0, |acc, i| acc + i.height(area)),
+            full_area.height,
+        );
         let mut virtual_buf = Buffer::empty(Rect::new(0, 0, buf.area.width, form_height));
         let mut scroll_cursor: u16 = 0;
         let mut scroll_cursor_item_height: u16 = 0;
@@ -518,9 +523,10 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                 FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
                     if !text.is_empty() {
                         area.y += 1;
+                        text.render(area, buf);
                         Paragraph::new(Text::raw(text))
                             .wrap(Wrap { trim: false })
-                            .render(area.margin_h(1), &mut virtual_buf);
+                            .render(area, &mut virtual_buf);
                         area.y += (text.len() as u16).div_ceil(area.width) + 1;
                     }
                 }
