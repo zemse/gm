@@ -1,13 +1,13 @@
-use std::fmt::{format, Display};
+use std::fmt::Display;
 
+use crate::utils::cursor::Cursor;
+use ratatui::text::Text;
 use ratatui::{
     layout::{Constraint, Layout},
     style::Style,
     text::Line,
     widgets::{List, ListItem, Widget},
 };
-use ratatui::text::{Text, ToText};
-use crate::utils::cursor::Cursor;
 
 use super::scroll_bar::CustomScrollBar;
 
@@ -28,7 +28,12 @@ impl<T: Display> Widget for Select<'_, T> {
         let idx = self.cursor.current % capacity;
 
         let render_item = |(i, member): (_, &T)| {
-            let content = Text::from(textwrap::wrap(&format!("{member}"), area.width as usize).iter().map(|s| Line::from(s.clone().into_owned())).collect::<Vec<_>>());
+            let content = Text::from(
+                textwrap::wrap(&format!("{member}"), area.width as usize)
+                    .iter()
+                    .map(|s| Line::from(s.clone().into_owned()))
+                    .collect::<Vec<_>>(),
+            );
             let style = if idx == i && self.focus {
                 self.focus_style
             } else {
