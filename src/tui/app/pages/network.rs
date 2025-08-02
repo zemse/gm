@@ -37,7 +37,8 @@ impl NetworkPage {
     pub fn new() -> crate::Result<Self> {
         let mut list = vec![NetworkSelect::Create];
         list.extend(
-            NetworkStore::load()?.networks
+            NetworkStore::load()?
+                .networks
                 .into_iter()
                 .map(|network| NetworkSelect::Existing(Box::new(network)))
                 .collect::<Vec<_>>(),
@@ -64,7 +65,7 @@ impl Component for NetworkPage {
         &mut self,
         event: &Event,
         _area: Rect,
-        transmitter: &mpsc::Sender<Event>,
+        _transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
@@ -78,7 +79,6 @@ impl Component for NetworkPage {
                 #[allow(clippy::single_match)]
                 match key_event.code {
                     KeyCode::Enter => {
-
                         match &self.list[self.cursor.current] {
                             NetworkSelect::Create => {
                                 let network_index = network_store.networks.len();
@@ -89,7 +89,11 @@ impl Component for NetworkPage {
                             }
 
                             NetworkSelect::Existing(name) => {
-                                let network_index = network_store.networks.iter().position(|n| n.name == name.name).unwrap();
+                                let network_index = network_store
+                                    .networks
+                                    .iter()
+                                    .position(|n| n.name == name.name)
+                                    .unwrap();
                                 result.page_inserts.push(Page::NetworkCreate(
                                     NetworkCreatePage::new(network_index, *name.clone())?,
                                 ));
@@ -101,7 +105,6 @@ impl Component for NetworkPage {
                 }
             }
         };
-
 
         Ok(result)
     }

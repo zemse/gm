@@ -1,22 +1,20 @@
-use std::ops::Not;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use std::ops::Not;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 
 use crate::disk::DiskInterface;
 use crate::network::{Network, NetworkStore, Token};
+use crate::tui::app::pages::token::TokenPage;
+use crate::tui::app::pages::Page;
+use crate::tui::app::widgets::confirm_popup::ConfirmPopup;
 use crate::tui::app::widgets::form::{Form, FormItemIndex, FormWidget};
 use crate::tui::app::SharedState;
 use crate::tui::traits::{Component, HandleResult};
 use crate::tui::Event;
 use strum::EnumIter;
-use crate::tui::app::pages::Page;
-use crate::tui::app::pages::token::TokenPage;
-use crate::tui::app::pages::token_create::TokenCreatePage;
-use crate::tui::app::widgets::confirm_popup::ConfirmPopup;
-use crate::tui::app::widgets::filter_select_popup::FilterSelectPopup;
 
 #[derive(EnumIter, PartialEq)]
 pub enum FormItem {
@@ -111,11 +109,9 @@ impl TryFrom<FormItem> for FormWidget {
                 label: "Testnet",
                 value: false,
             },
-            FormItem::TokensButton => FormWidget::Button {
-                label: "Tokens",
-            },
+            FormItem::TokensButton => FormWidget::Button { label: "Tokens" },
             FormItem::SaveButton => FormWidget::Button { label: "Save" },
-            FormItem::RemoveButton => FormWidget::Button { label: "Remove"},
+            FormItem::RemoveButton => FormWidget::Button { label: "Remove" },
             FormItem::ErrorText => FormWidget::ErrorText(String::new()),
         };
         Ok(widget)
@@ -126,7 +122,7 @@ pub struct NetworkCreatePage {
     pub tokens: Vec<Token>,
     pub network_index: usize,
     pub network: Network,
-    pub remove_popup: ConfirmPopup
+    pub remove_popup: ConfirmPopup,
 }
 impl NetworkCreatePage {
     pub fn new(network_index: usize, network: Network) -> crate::Result<Self> {
@@ -168,25 +164,60 @@ impl NetworkCreatePage {
             })?,
             network_index,
             tokens: network.tokens,
-            remove_popup: ConfirmPopup::new("Remove Network", format!("Are you sure you want to remove the network '{}'?", network.name), "Remove", "Cancel")
-
+            remove_popup: ConfirmPopup::new(
+                "Remove Network",
+                format!(
+                    "Are you sure you want to remove the network '{}'?",
+                    network.name
+                ),
+                "Remove",
+                "Cancel",
+            ),
         })
     }
-    fn network(form: &Form<FormItem>, tokens: &Vec<Token>) -> Network {
+    fn network(form: &Form<FormItem>, tokens: &[Token]) -> Network {
         Network {
             name: form.get_text(FormItem::Name).clone(),
-            name_alchemy: form.get_text(FormItem::NameAlchemy).is_empty().not().then(|| form.get_text(FormItem::NameAlchemy).clone()),
+            name_alchemy: form
+                .get_text(FormItem::NameAlchemy)
+                .is_empty()
+                .not()
+                .then(|| form.get_text(FormItem::NameAlchemy).clone()),
             name_aliases: vec![],
             chain_id: form.get_text(FormItem::ChainId).parse().unwrap_or_default(),
-            symbol: form.get_text(FormItem::Symbol).is_empty().not().then(|| form.get_text(FormItem::Symbol).clone()),
+            symbol: form
+                .get_text(FormItem::Symbol)
+                .is_empty()
+                .not()
+                .then(|| form.get_text(FormItem::Symbol).clone()),
             native_decimals: form.get_text(FormItem::NativeDecimals).parse().ok(),
-            price_ticker: form.get_text(FormItem::PriceTicker).is_empty().not().then(|| form.get_text(FormItem::PriceTicker).clone()),
-            rpc_url: form.get_text(FormItem::RpcUrl).is_empty().not().then(|| form.get_text(FormItem::RpcUrl).clone()),
-            rpc_alchemy: form.get_text(FormItem::RpcAlchemy).is_empty().not().then(|| form.get_text(FormItem::RpcAlchemy).clone()),
-            rpc_infura: form.get_text(FormItem::RpcInfura).is_empty().not().then(|| form.get_text(FormItem::RpcInfura).clone()),
-            explorer_url: form.get_text(FormItem::ExplorerUrl).is_empty().not().then(|| form.get_text(FormItem::ExplorerUrl).clone()),
+            price_ticker: form
+                .get_text(FormItem::PriceTicker)
+                .is_empty()
+                .not()
+                .then(|| form.get_text(FormItem::PriceTicker).clone()),
+            rpc_url: form
+                .get_text(FormItem::RpcUrl)
+                .is_empty()
+                .not()
+                .then(|| form.get_text(FormItem::RpcUrl).clone()),
+            rpc_alchemy: form
+                .get_text(FormItem::RpcAlchemy)
+                .is_empty()
+                .not()
+                .then(|| form.get_text(FormItem::RpcAlchemy).clone()),
+            rpc_infura: form
+                .get_text(FormItem::RpcInfura)
+                .is_empty()
+                .not()
+                .then(|| form.get_text(FormItem::RpcInfura).clone()),
+            explorer_url: form
+                .get_text(FormItem::ExplorerUrl)
+                .is_empty()
+                .not()
+                .then(|| form.get_text(FormItem::ExplorerUrl).clone()),
             is_testnet: form.get_boolean(FormItem::IsTestnet),
-            tokens: tokens.clone(),
+            tokens: tokens.to_owned(),
         }
     }
 }
@@ -196,71 +227,65 @@ impl Component for NetworkCreatePage {
         &mut self,
         event: &Event,
         area: Rect,
-        transmitter: &Sender<Event>,
-        shutdown_signal: &Arc<AtomicBool>,
-        shared_state: &SharedState,
+        _transmitter: &Sender<Event>,
+        _shutdown_signal: &Arc<AtomicBool>,
+        _shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
         let mut handle_result = HandleResult::default();
         if self.remove_popup.is_open() {
-            self.remove_popup.handle_event(event, area, || {
-                let mut config = NetworkStore::load()?;
-                if config.networks.get(self.network_index).is_some() {
-                    config.networks.remove(self.network_index);
-                }
-                let _ = config.save();
-                handle_result.page_pops = 1;
-                handle_result.reload = true;
-                Ok(())
-            }, || {
-                Ok(())
-            })?;
+            self.remove_popup.handle_event(
+                event,
+                area,
+                || {
+                    let mut config = NetworkStore::load()?;
+                    if config.networks.get(self.network_index).is_some() {
+                        config.networks.remove(self.network_index);
+                    }
+                    let _ = config.save();
+                    handle_result.page_pops = 1;
+                    handle_result.reload = true;
+                    Ok(())
+                },
+                || Ok(()),
+            )?;
         }
-        self.form.handle_event(
-            event,
-            |label, form| {
-                match label {
-                    FormItem::SaveButton => {
-                        if form.get_text(FormItem::Name).is_empty() {
-                            let error = form.get_text_mut(FormItem::ErrorText);
-                            *error = "Please enter name, you cannot leave it empty".to_string();
-                        } else if form.get_text(FormItem::ChainId).is_empty() {
-                            let error = form.get_text_mut(FormItem::ErrorText);
-                            *error = "Please enter chain id, you cannot leave it empty".to_string();
+        self.form.handle_event(event, |label, form| {
+            match label {
+                FormItem::SaveButton => {
+                    if form.get_text(FormItem::Name).is_empty() {
+                        let error = form.get_text_mut(FormItem::ErrorText);
+                        *error = "Please enter name, you cannot leave it empty".to_string();
+                    } else if form.get_text(FormItem::ChainId).is_empty() {
+                        let error = form.get_text_mut(FormItem::ErrorText);
+                        *error = "Please enter chain id, you cannot leave it empty".to_string();
+                    } else {
+                        let mut config = NetworkStore::load()?;
+                        if config.networks.get(self.network_index).is_some() {
+                            config.networks[self.network_index] = Self::network(form, &self.tokens);
+                        } else {
+                            config.networks.push(Self::network(form, &self.tokens));
                         }
-                        else {
-                            let mut config = NetworkStore::load()?;
-                            if config.networks.get(self.network_index).is_some() {
-                                config.networks[self.network_index] = Self::network(form, &self.tokens);
-                            } else {
-                                config.networks.push(Self::network(form, &self.tokens));
-                            }
-                            let _ = config.save();
-                            handle_result.page_pops = 1;
-                            handle_result.reload = true;
-                        }
-                    },
-                    FormItem::TokensButton => {
-                        let network = Self::network(form, &self.tokens);
+                        let _ = config.save();
                         handle_result.page_pops = 1;
-                        handle_result.page_inserts.push(Page::Token(
-                            TokenPage::new(self.network_index, network)?
-                        ));
                         handle_result.reload = true;
-                    },
-                    FormItem::RemoveButton => {
-                      self.remove_popup.open();
-                    },
-                    _ => {}
+                    }
                 }
-
-
-                Ok(())
+                FormItem::TokensButton => {
+                    let network = Self::network(form, &self.tokens);
+                    handle_result.page_pops = 1;
+                    handle_result
+                        .page_inserts
+                        .push(Page::Token(TokenPage::new(self.network_index, network)?));
+                    handle_result.reload = true;
+                }
+                FormItem::RemoveButton => {
+                    self.remove_popup.open();
+                }
+                _ => {}
             }
-        )?;
 
-
-
-
+            Ok(())
+        })?;
 
         Ok(handle_result)
     }

@@ -1,5 +1,14 @@
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
+use super::SharedState;
+use crate::tui::app::pages::network::NetworkPage;
+use crate::tui::app::pages::network_create::NetworkCreatePage;
+use crate::tui::app::pages::token::TokenPage;
+use crate::tui::app::pages::token_create::TokenCreatePage;
+use crate::tui::{
+    events::Event,
+    traits::{Component, HandleResult},
+};
 use account::AccountPage;
 use account_create::AccountCreatePage;
 use account_import::AccountImportPage;
@@ -17,16 +26,6 @@ use sign_message::SignMessagePage;
 use text::TextPage;
 use trade::TradePage;
 use walletconnect::WalletConnectPage;
-use crate::network::Token;
-use super::SharedState;
-use crate::tui::app::pages::network::NetworkPage;
-use crate::tui::app::pages::network_create::NetworkCreatePage;
-use crate::tui::{
-    events::Event,
-    traits::{Component, HandleResult},
-};
-use crate::tui::app::pages::token::TokenPage;
-use crate::tui::app::pages::token_create::TokenCreatePage;
 
 pub mod account;
 pub mod account_create;
@@ -48,8 +47,8 @@ pub mod trade;
 pub mod walletconnect;
 
 pub mod network;
-pub mod token_create;
 pub mod token;
+pub mod token_create;
 
 #[allow(clippy::large_enum_variant)]
 pub enum Page {
