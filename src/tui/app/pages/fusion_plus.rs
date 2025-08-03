@@ -1,49 +1,85 @@
 use std::{
+    fmt::Display,
     sync::{atomic::AtomicBool, mpsc::Sender, Arc},
     time::Duration,
 };
 
-use alloy::{
-    primitives::{keccak256, utils::format_units, B256, U256, U64},
-    signers::SignerSync,
-};
+use alloy::primitives::{keccak256, utils::format_units, B256, U256, U64};
 
 use fusion_plus_sdk::{
     addresses::get_limit_order_contract_address,
-    api::Api as FusionPlusApi,
+    api::{
+        types::{OrderStatus, OrderStatusResponse},
+        Api as FusionPlusApi,
+    },
     chain_id::ChainId,
     constants::UINT_256_MAX,
     cross_chain_order::{CrossChainOrderParams, Fee, PreparedOrder},
     hash_lock::HashLock,
+    limit::eip712::{get_limit_order_v4_domain, LimitOrderV4},
     multichain_address::MultichainAddress,
     quote::{QuoteRequest, QuoteResult},
     relayer_request::RelayerRequest,
     utils::{alloy::ERC20, random::get_random_bytes32},
 };
-use ratatui::{buffer::Buffer, layout::Rect};
+use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 
 use crate::{
     disk::Config,
-    gm_log,
     network::{Network, Token},
     tui::{
         app::{
-            widgets::{confirm_popup::ConfirmPopup, tx_popup::TxPopup},
+            widgets::{
+                confirm_popup::ConfirmPopup, sign_712_popup::Sign712Popup, text_scroll::TextScroll,
+                tx_popup::TxPopup,
+            },
             SharedState,
         },
-        traits::{Component, CustomRender, HandleResult},
+        traits::{Component, CustomRender, HandleResult, RectUtil},
         Event,
     },
-    utils::{account::AccountManager, Provider},
+    utils::Provider,
 };
+
+#[allow(dead_code)]
+enum State {
+    Idle,
+    Quoting,
+    CheckingAllowance,
+    ApprovingTokens,
+    PreparingOrder,
+    SigningOrder,
+    SubmittingOrder,
+    WaitingForFinality,
+    PublishingSecret,
+    WaitingForUnlock,
+    Done,
+}
+
+impl Display for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            State::Idle => "Starting",
+            State::Quoting => "Getting quote from Relayer",
+            State::CheckingAllowance => "Checking Allowance",
+            State::ApprovingTokens => "Approving Tokens",
+            State::PreparingOrder => "Preparing Order",
+            State::SigningOrder => "Signing Order",
+            State::SubmittingOrder => "Submitting Order",
+            State::WaitingForFinality => "Waiting for Finality",
+            State::PublishingSecret => "Publishing Secret",
+            State::WaitingForUnlock => "Waiting for Unlock",
+            State::Done => "Completed!",
+        };
+        write!(f, "{str}")
+    }
+}
 
 fn spawn_quoter_thread(
     tr: Sender<Event>,
     quote_request: QuoteRequest,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        gm_log!("quote_request: {:#?}", quote_request);
-
         let Ok(oneinch_api_key) = Config::oneinch_api_key() else {
             let _ = tr.send(Event::FusionPlusError(
                 "OneInch API key not found in config".to_string(),
@@ -65,7 +101,7 @@ fn spawn_quoter_thread(
     })
 }
 
-fn spawn_allowance_thread(
+fn spawn_allowance_check_thread(
     tr: Sender<Event>,
     src_token: MultichainAddress,
     src_amount: U256,
@@ -105,7 +141,11 @@ fn spawn_allowance_thread(
     })
 }
 
-fn spawn_submit_order_thread(tr: Sender<Event>, rr: RelayerRequest) -> tokio::task::JoinHandle<()> {
+fn spawn_submit_order_thread(
+    tr: Sender<Event>,
+    rr: RelayerRequest,
+    secrets: Vec<B256>,
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let Ok(oneinch_api_key) = Config::oneinch_api_key() else {
             let _ = tr.send(Event::FusionPlusError(
@@ -115,6 +155,7 @@ fn spawn_submit_order_thread(tr: Sender<Event>, rr: RelayerRequest) -> tokio::ta
         };
         let api = FusionPlusApi::new("https://api.1inch.dev/fusion-plus", oneinch_api_key);
 
+        let order_hash = rr.order_hash();
         match api.submit_order(rr).await {
             Ok(_) => {
                 let _ = tr.send(Event::FusionPlusOrderSubmitted);
@@ -122,6 +163,50 @@ fn spawn_submit_order_thread(tr: Sender<Event>, rr: RelayerRequest) -> tokio::ta
             Err(err) => {
                 let _ = tr.send(Event::FusionPlusError(err.to_string()));
             }
+        }
+
+        loop {
+            // let mut done = false;
+            match api.get_ready_to_accept_secret_fills(&order_hash).await {
+                Ok(read) => {
+                    for fill in read.fills {
+                        println!("Fill {fill:#?}");
+                        api.submit_secret(&order_hash, &secrets[fill.idx as usize])
+                            .await
+                            .unwrap();
+                        // done = true;
+                    }
+                }
+                Err(err) => {
+                    let _ = tr.send(Event::FusionPlusError(err.to_string()));
+                }
+            }
+
+            // if done {
+            //     break;
+            // }
+
+            match api.get_order_status(order_hash).await {
+                Ok(order_status) => {
+                    let status = order_status.status;
+                    let _ = tr.send(Event::FusionPlusOrderStatus(Box::new(order_status)));
+                    if matches!(
+                        status,
+                        OrderStatus::Executed
+                            | OrderStatus::Expired
+                            | OrderStatus::Cancelled
+                            | OrderStatus::Refunded
+                    ) {
+                        let _ = tr.send(Event::FusionPlusOrderDone);
+                        break;
+                    }
+                }
+                Err(err) => {
+                    let _ = tr.send(Event::FusionPlusError(err.to_string()));
+                }
+            }
+
+            tokio::time::sleep(Duration::from_secs(5)).await;
         }
     })
 }
@@ -146,33 +231,38 @@ fn prepare_secrets(quote_result: &QuoteResult) -> crate::Result<(Vec<B256>, Vec<
                     keccak256(encoded)
                 })
                 .collect(),
-        )
-        .unwrap()
+        )?
     };
     Ok((secret_hashes, secrets, hash_lock))
 }
 
 pub struct FusionPlusPage {
-    pub src_chain: Network,
-    pub src_token: Token,
-    pub src_amount: U256,
-    pub dst_chain: Network,
-    pub dst_token: Token,
-    pub dst_address: MultichainAddress,
+    src_chain: Network,
+    src_token: Token,
+    src_amount: U256,
+    dst_chain: Network,
+    dst_token: Token,
+    dst_address: MultichainAddress,
 
-    pub quote_request: QuoteRequest,
-    pub quote_thread: Option<tokio::task::JoinHandle<()>>,
-    pub quote_result: Option<QuoteResult>,
-    pub quote_confirm_popup: ConfirmPopup,
+    quote_request: QuoteRequest,
+    quote_thread: Option<tokio::task::JoinHandle<()>>,
+    quote_result: Option<QuoteResult>,
+    quote_confirm_popup: ConfirmPopup,
 
-    pub allowance_thread: Option<tokio::task::JoinHandle<()>>,
-    pub allowance_result: Option<U256>,
-    pub approve_tx_popup: TxPopup,
+    allowance_thread: Option<tokio::task::JoinHandle<()>>,
+    allowance_result: Option<U256>,
+    approve_tx_popup: TxPopup,
 
-    pub secrets: Option<Vec<B256>>,
-    pub prepared_order: Option<PreparedOrder>,
-    pub submit_order_thread: Option<tokio::task::JoinHandle<()>>,
-    pub order_submitted: bool,
+    secrets: Option<Vec<B256>>,
+    secret_hashes: Option<Vec<B256>>,
+    prepared_order: Option<PreparedOrder>,
+    sign_popup: Sign712Popup<LimitOrderV4>,
+
+    submit_order_thread: Option<tokio::task::JoinHandle<()>>,
+    order_status: Option<OrderStatusResponse>,
+    display: TextScroll,
+
+    state: State,
 }
 
 impl FusionPlusPage {
@@ -184,15 +274,20 @@ impl FusionPlusPage {
         dst_token: Token,
         dst_address: MultichainAddress,
     ) -> Self {
+        let src_chain_id = ChainId::from_u32(src_chain.chain_id);
+        let dst_chain_id = ChainId::from_u32(dst_chain.chain_id);
+
         let quote_request = QuoteRequest::new(
-            ChainId::from_u32(src_chain.chain_id),
-            ChainId::from_u32(dst_chain.chain_id),
+            src_chain_id,
+            dst_chain_id,
             src_token.contract_address,
             dst_token.contract_address,
             src_amount,
             true,
             MultichainAddress::ZERO,
         );
+
+        let eip712_domain = get_limit_order_v4_domain(src_chain_id);
 
         FusionPlusPage {
             src_chain,
@@ -217,9 +312,15 @@ impl FusionPlusPage {
             approve_tx_popup: TxPopup::default(),
 
             secrets: None,
+            secret_hashes: None,
             prepared_order: None,
+            sign_popup: Sign712Popup::new(eip712_domain),
+
             submit_order_thread: None,
-            order_submitted: false,
+            order_status: None,
+            display: TextScroll::default(),
+
+            state: State::Idle,
         }
     }
 }
@@ -237,8 +338,8 @@ impl Component for FusionPlusPage {
 
         if self.quote_thread.is_none() {
             if let Some(current_account) = &shared_state.current_account {
+                self.state = State::Quoting;
                 self.quote_request.maker_address = *current_account;
-
                 self.quote_thread = Some(spawn_quoter_thread(
                     transmitter.clone(),
                     self.quote_request.clone(),
@@ -248,7 +349,6 @@ impl Component for FusionPlusPage {
 
         match event {
             Event::FusionPlusQuoteResult(quote_result) => {
-                gm_log!("quote_result: {:#?}", quote_result);
                 self.quote_result = Some(*quote_result.clone());
                 *self.quote_confirm_popup.text_mut() = format!(
                     "Input tokens {src_parsed} {src_symbol}:\nEstimated output tokens {dst_parsed} {dst_symbol}.",
@@ -267,39 +367,29 @@ impl Component for FusionPlusPage {
                 src_token,
                 allowance,
             } => {
-                gm_log!("allowance received");
-                gm_log!(
-                    "src_chain_id: {src_chain_id}, self.src_chain.chain_id: {}",
-                    self.src_chain.chain_id
-                );
-                gm_log!(
-                    "src_token: {src_token}, self.src_token.contract_address: {}",
-                    self.src_token.contract_address
-                );
                 if *src_chain_id as u32 == self.src_chain.chain_id
                     && src_token.as_raw() == self.src_token.contract_address.as_raw()
                 {
-                    gm_log!("allowance: {allowance}");
                     self.allowance_result = Some(*allowance);
 
                     if *allowance < self.src_amount {
-                        gm_log!("allowance < src");
                         let src_erc20 =
                             ERC20::new(src_token.as_raw(), self.src_chain.get_provider()?);
                         let spender = get_limit_order_contract_address(*src_chain_id);
                         let call = src_erc20
                             .approve(spender.as_raw(), UINT_256_MAX)
                             .into_transaction_request();
-                        gm_log!("self.src_chain {}", self.src_chain);
+
                         if !self.approve_tx_popup.is_open() {
                             self.approve_tx_popup
                                 .set_tx_req(self.src_chain.clone(), call);
                             self.approve_tx_popup.open();
                         }
                     } else if let Some(quote_result) = &self.quote_result {
-                        gm_log!("allowance > src");
+                        self.state = State::PreparingOrder;
                         let (secret_hashes, secrets, hash_lock) = prepare_secrets(quote_result)?;
                         self.secrets = Some(secrets);
+                        self.secret_hashes = Some(secret_hashes.clone());
 
                         let order = PreparedOrder::from_quote(
                             &self.quote_request,
@@ -307,51 +397,40 @@ impl Component for FusionPlusPage {
                             CrossChainOrderParams {
                                 dst_address: self.dst_address.without_chain_id(),
                                 hash_lock,
-                                secret_hashes: secret_hashes.clone(),
+                                secret_hashes,
                                 fee: Some(Fee {
                                     taking_fee_bps: 100,
                                     taking_fee_receiver: MultichainAddress::ZERO,
                                 }),
                                 preset: None,
                             },
-                        )
-                        .unwrap();
-                        self.prepared_order = Some(order.clone());
-                        gm_log!("prepared order: {:#?}", order);
-                        let signer = AccountManager::load_wallet(
-                            &shared_state.try_current_account()?.as_raw(),
                         )?;
-                        let order_hash = order.eip712_signing_hash();
-                        let signature = signer.sign_hash_sync(&order_hash)?;
-                        let relayer_request = RelayerRequest::from_prepared_order(
-                            &order,
-                            signature,
-                            quote_result.quote_id.clone().unwrap(),
-                            if secret_hashes.len() == 1 {
-                                None
-                            } else {
-                                Some(secret_hashes)
-                            },
-                        );
-                        gm_log!("relayer_request: {:#?}", relayer_request);
-
-                        self.submit_order_thread = Some(spawn_submit_order_thread(
-                            transmitter.clone(),
-                            relayer_request,
-                        ));
+                        self.prepared_order = Some(order.clone());
+                        self.sign_popup.set_data_struct(order.to_v4());
+                        self.state = State::SigningOrder;
+                        self.sign_popup.open();
                     }
                 }
             }
-            Event::FusionPlusOrderSubmitted => self.order_submitted = true,
+            Event::FusionPlusOrderSubmitted => {
+                self.state = State::WaitingForFinality;
+            }
+            Event::FusionPlusOrderStatus(order_status) => {
+                self.order_status = Some(*order_status.clone());
+                self.display.text = format!("{order_status:#?}");
+            }
+            Event::FusionPlusOrderDone => self.state = State::Done,
             _ => {}
         }
+
+        self.display.handle_event(event, area.margin_top(2))?;
 
         let confirm_popup_result = self.quote_confirm_popup.handle_event(
             event,
             area,
             || {
-                gm_log!("allowance started, self.src_chain = {:#?}", self.src_chain);
-                self.allowance_thread = Some(spawn_allowance_thread(
+                self.state = State::CheckingAllowance;
+                self.allowance_thread = Some(spawn_allowance_check_thread(
                     transmitter.clone(),
                     self.src_token.contract_address,
                     self.src_amount,
@@ -368,41 +447,99 @@ impl Component for FusionPlusPage {
 
         let approve_tx_popup_result = self.approve_tx_popup.handle_event(
             (event, area, transmitter, shutdown_signal, shared_state),
-            |_| Ok(()),
+            |_| {
+                self.state = State::ApprovingTokens;
+                Ok(())
+            },
             |_| Ok(()),
             || Ok(()),
             || Ok(()),
         )?;
         result.merge(approve_tx_popup_result);
 
+        let mut page_pop_on_cancel = false;
+        let mut page_pop_on_esc = false;
+        let sign_popup_result = self.sign_popup.handle_event(
+            (event, area, transmitter, shared_state),
+            |signature, popup| {
+                let Some(prepared_order) = &self.prepared_order else {
+                    return Err(crate::Error::InternalErrorStr("Prepared order is None"));
+                };
+                let Some(secret_hashes) = &self.secret_hashes else {
+                    return Err(crate::Error::InternalErrorStr("secret_hashes is None"));
+                };
+                let Some(secrets) = &self.secrets else {
+                    return Err(crate::Error::InternalErrorStr("secrets is None"));
+                };
+
+                self.state = State::SubmittingOrder;
+
+                let relayer_request = RelayerRequest::from_prepared_order(
+                    prepared_order,
+                    signature,
+                    self.quote_result
+                        .as_ref()
+                        .and_then(|q| q.quote_id.clone())
+                        .ok_or(crate::Error::InternalErrorStr(
+                            "No quote ID in quote result",
+                        ))?,
+                    if secret_hashes.len() == 1 {
+                        None
+                    } else {
+                        Some(secret_hashes.clone())
+                    },
+                );
+
+                self.submit_order_thread = Some(spawn_submit_order_thread(
+                    transmitter.clone(),
+                    relayer_request,
+                    secrets.clone(),
+                ));
+
+                popup.close();
+                Ok(())
+            },
+            || {
+                page_pop_on_cancel = true;
+                Ok(())
+            },
+            || {
+                page_pop_on_esc = true;
+                Ok(())
+            },
+        )?;
+        result.merge(sign_popup_result);
+        if page_pop_on_cancel || page_pop_on_esc {
+            result.page_pops += 1;
+        }
+
         Ok(result)
     }
 
     fn render_component(
         &self,
-        area: Rect,
+        mut area: Rect,
         buf: &mut Buffer,
         shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,
     {
-        [
-            "Fusion Plus Transfer",
-            &format!("Source Chain: {}", self.src_chain),
-            &format!("Source Token: {}", self.src_token),
-            &format!("Source Amount: {}", self.src_amount),
-            &format!("Destination Chain: {}", self.dst_chain),
-            &format!("Destination Token: {}", self.dst_token),
-            &format!("Destination Address: {}", self.dst_address),
-            &format!("Order submited: {}", self.order_submitted),
-        ]
-        .render(area, buf, ());
+        [format!(
+            "Transfer via Fusion Plus\n{} to {}\nCurrent Status: {}",
+            self.src_chain.name, self.dst_chain.name, self.state
+        )]
+        .render(area, buf, false);
+        area = area.margin_top(2);
+
+        self.display.render(area, buf);
 
         self.quote_confirm_popup
             .render(area, buf, &shared_state.theme);
 
         self.approve_tx_popup.render(area, buf, &shared_state.theme);
+
+        self.sign_popup.render(area, buf, &shared_state.theme);
 
         area
     }

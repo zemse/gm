@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     disk::{Config, DiskInterface, FileFormat},
-    gm_log,
     utils::Provider,
 };
 
@@ -82,7 +81,6 @@ impl Token {
 
 impl Network {
     pub fn get_rpc(&self) -> crate::Result<String> {
-        gm_log!("Network - {:?}", self);
         if let Some(rpc_url) = &self.rpc_url {
             Ok(rpc_url.clone())
         } else if let Some(rpc_alchemy) = &self.rpc_alchemy {

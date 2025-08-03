@@ -14,11 +14,10 @@ use crate::tui::{
 };
 use crate::utils::assets::{Asset, AssetType, TokenAddress};
 use crate::utils::erc20;
-use crate::{gm_log, Result};
+use crate::Result;
 use alloy::primitives::utils::parse_units;
 use alloy::primitives::{Bytes, U256};
 use alloy::rpc::types::TransactionRequest;
-use fusion_plus_sdk::chain_id::ChainId;
 use fusion_plus_sdk::multichain_address::MultichainAddress;
 use std::str::FromStr;
 use std::sync::mpsc;
@@ -115,10 +114,7 @@ impl AssetTransferPage {
         // Update the form with the asset type, this is because the `asset` is
         // not directly linked to the ASSET_TYPE in form state
         *page.form.get_text_mut(FormItem::AssetType) = format!("{}", asset.r#type);
-        gm_log!(
-            "AssetTransferPage::new: asset type set to: {}",
-            asset.r#type
-        );
+
         *page
             .form
             .get_currency_mut(FormItem::Amount)
@@ -254,7 +250,6 @@ impl Component for AssetTransferPage {
                             if !dst_asset.is_empty() {
                                 let (dst_token, dst_chain) = Token::parse_str(dst_asset)?;
 
-                                gm_log!("src_chain {src_chain}, dst_chain {dst_chain}");
                                 result
                                     .page_inserts
                                     .push(Page::FusionPlus(FusionPlusPage::new(

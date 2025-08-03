@@ -24,7 +24,6 @@ use tokio::task::JoinHandle;
 
 use crate::{
     error::FmtError,
-    gm_log,
     network::Network,
     tui::{
         app::{
@@ -307,7 +306,6 @@ pub fn send_tx_thread(
             mut tx: TransactionRequest,
             shutdown_signal: Arc<AtomicBool>,
         ) -> crate::Result<FixedBytes<32>> {
-            gm_log!("network in run = {:#?}", network);
             let provider = network.get_provider()?;
 
             let wallet = AccountManager::load_wallet(&sender_account)?;

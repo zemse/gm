@@ -5,7 +5,8 @@ use alloy::{
     signers::{k256::ecdsa::SigningKey, Signature},
 };
 use fusion_plus_sdk::{
-    chain_id::ChainId, multichain_address::MultichainAddress, quote::QuoteResult,
+    api::types::OrderStatusResponse, chain_id::ChainId, multichain_address::MultichainAddress,
+    quote::QuoteResult,
 };
 use walletconnect_sdk::wc_message::WcMessage;
 
@@ -78,6 +79,8 @@ pub enum Event {
         allowance: U256,
     },
     FusionPlusOrderSubmitted,
+    FusionPlusOrderStatus(Box<OrderStatusResponse>),
+    FusionPlusOrderDone,
     FusionPlusError(String),
 
     InviteCodeValidity(InviteCodeValidity),

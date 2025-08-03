@@ -21,12 +21,12 @@ impl Widget for CustomScrollBar {
         let bottom = ((current_page + 1)..num_pages)
             .map(|i| get_page_height(i, capacity, num_pages))
             .sum::<usize>();
-        assert_eq!(
-            top + middle + bottom,
-            capacity,
-            "self.total = {}, capacity = {}, current_page = {current_page}, num_pages = {num_pages}, top = {top}, middle = {middle}, bottom = {bottom}",
-            self.total, capacity
-        );
+        // assert_eq!(
+        //     top + middle + bottom,
+        //     capacity,
+        //     "self.total = {}, capacity = {}, current_page = {current_page}, num_pages = {num_pages}, top = {top}, middle = {middle}, bottom = {bottom}",
+        //     self.total, capacity
+        // );
 
         let mut i = 0;
         for _ in 0..top {
