@@ -518,7 +518,7 @@ impl Component for FusionPlusPage {
 
     fn render_component(
         &self,
-        mut area: Rect,
+        area: Rect,
         buf: &mut Buffer,
         shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
@@ -530,9 +530,8 @@ impl Component for FusionPlusPage {
             self.src_chain.name, self.dst_chain.name, self.state
         )]
         .render(area, buf, false);
-        area = area.margin_top(2);
 
-        self.display.render(area, buf);
+        self.display.render(area.margin_top(2), buf);
 
         self.quote_confirm_popup
             .render(area, buf, &shared_state.theme);
