@@ -149,8 +149,7 @@ impl AddressBook {
         } else if let Some(name) = name {
             Ok(self.find_by_name(name))
         } else if let Some(id) = id {
-            let index = *id - 1;
-            let entry = AddressBook::load()?.list()[index].clone();
+            let entry = AddressBook::load()?.list()[*id].clone();
             Ok(Some((*id, entry)))
         } else {
             Ok(None)
@@ -158,7 +157,7 @@ impl AddressBook {
     }
 
     pub fn update(&mut self, id: usize, new_entry: AddressBookEntry) -> crate::Result<()> {
-        self.entries[id - 1] = new_entry;
+        self.entries[id] = new_entry;
         self.save()
     }
 

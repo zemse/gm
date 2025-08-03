@@ -10,7 +10,7 @@ use fusion_plus_sdk::multichain_address::MultichainAddress;
 use crate::{
     alchemy::Alchemy,
     disk::{Config, DiskInterface},
-    network::NetworkStore,
+    network::{Network, NetworkStore, Token},
 };
 
 #[derive(Default)]
@@ -117,6 +117,7 @@ impl TokenAddress {
 pub struct AssetType {
     pub token_address: TokenAddress,
     pub network: String,
+    pub chain_id: u32,
     pub symbol: String,
     pub name: String,
     pub decimals: u8,
@@ -125,7 +126,36 @@ pub struct AssetType {
 
 impl Display for AssetType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.symbol, self.network)
+        write!(f, "{} ({})", self.symbol, self.network)
+    }
+}
+
+impl AssetType {
+    pub fn parse_str(s: &str) -> crate::Result<(Token, Network)> {
+        let start_paren = s.find('(').ok_or_else(|| {
+            crate::Error::InternalError(format!("AssetType::parse_str({s:?}) .find '(' failed"))
+        })?;
+        let end_paren = s.find(')').ok_or_else(|| {
+            crate::Error::InternalError(format!("AssetType::parse_str({s:?}) .find ')' failed"))
+        })?;
+
+        // Extract the symbol (trim to remove trailing space)
+        let symbol = s[..start_paren].trim();
+
+        // Extract the network name inside parentheses
+        let network_name = s[start_paren + 1..end_paren].trim();
+        let network = NetworkStore::from_name(network_name)?;
+
+        let token = network
+            .tokens
+            .iter()
+            .find(|token| token.symbol == symbol)
+            .ok_or(crate::Error::InternalError(format!(
+                "token {symbol:?} not found"
+            )))?
+            .clone();
+
+        Ok((token, network))
     }
 }
 
@@ -205,6 +235,7 @@ pub async fn get_all_assets_mock() -> crate::Result<(MultichainAddress, Vec<Asse
                 r#type: AssetType {
                     token_address: TokenAddress::Native,
                     network: "Mainnet".to_string(),
+                    chain_id: 1,
                     symbol: "ETH".to_string(),
                     name: "Ethereum".to_string(),
                     decimals: 18,
@@ -218,19 +249,7 @@ pub async fn get_all_assets_mock() -> crate::Result<(MultichainAddress, Vec<Asse
                 r#type: AssetType {
                     token_address: TokenAddress::Native,
                     network: "Tron".to_string(),
-                    symbol: "TRX".to_string(),
-                    name: "Tron".to_string(),
-                    decimals: 8,
-                    price: Price::InUSD(0.3),
-                },
-                value: U256::from(1e10),
-                light_client_verification: LightClientVerification::Pending,
-            },
-            Asset {
-                wallet_address,
-                r#type: AssetType {
-                    token_address: TokenAddress::Native,
-                    network: "Tron".to_string(),
+                    chain_id: 728126428,
                     symbol: "USDT".to_string(),
                     name: "USD Tether".to_string(),
                     decimals: 6,
@@ -244,6 +263,7 @@ pub async fn get_all_assets_mock() -> crate::Result<(MultichainAddress, Vec<Asse
                 r#type: AssetType {
                     token_address: TokenAddress::Native,
                     network: "Mainnet".to_string(),
+                    chain_id: 1,
                     symbol: "USDT".to_string(),
                     name: "USD Tether".to_string(),
                     decimals: 6,
@@ -283,6 +303,7 @@ pub async fn get_all_assets() -> crate::Result<(MultichainAddress, Vec<Asset>)> 
                     None => TokenAddress::Native,
                 },
                 network: network.name.clone(),
+                chain_id: network.chain_id,
                 symbol: entry
                     .token_metadata
                     .symbol

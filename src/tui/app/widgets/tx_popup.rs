@@ -24,6 +24,7 @@ use tokio::task::JoinHandle;
 
 use crate::{
     error::FmtError,
+    gm_log,
     network::Network,
     tui::{
         app::{
@@ -129,80 +130,82 @@ impl TxPopup {
     {
         let mut result = HandleResult::default();
 
-        let r = self
-            .text
-            .handle_event(event, Popup::inner_area(area).block_inner().margin_down(3))?;
-        result.merge(r);
+        if self.is_open() {
+            let r = self
+                .text
+                .handle_event(event, Popup::inner_area(area).block_inner().margin_down(3))?;
+            result.merge(r);
 
-        match event {
-            Event::Input(key_event) => {
-                if key_event.kind == KeyEventKind::Press {
-                    match self.status {
-                        TxStatus::NotSent => match key_event.code {
-                            KeyCode::Left => {
-                                self.button_cursor = false;
-                            }
-                            KeyCode::Right => {
-                                self.button_cursor = true;
-                            }
-                            KeyCode::Enter => {
-                                if self.button_cursor {
-                                    self.send_tx_thread = Some(send_tx_thread(
-                                        &self.tx_req,
-                                        &self.network,
-                                        tr,
-                                        sd,
-                                        ss,
-                                    )?);
-                                    self.status = TxStatus::Signing;
-                                } else {
-                                    self.close();
-                                    on_cancel()?;
+            match event {
+                Event::Input(key_event) => {
+                    if key_event.kind == KeyEventKind::Press {
+                        match self.status {
+                            TxStatus::NotSent => match key_event.code {
+                                KeyCode::Left => {
+                                    self.button_cursor = false;
                                 }
-                            }
-                            KeyCode::Esc => {
-                                self.close();
-                                on_esc()?;
-                            }
-                            _ => {}
-                        },
-                        TxStatus::Signing
-                        | TxStatus::Pending(_)
-                        | TxStatus::Confirmed(_)
-                        | TxStatus::Failed(_) =>
-                        {
-                            #[allow(clippy::single_match)]
-                            match key_event.code {
+                                KeyCode::Right => {
+                                    self.button_cursor = true;
+                                }
+                                KeyCode::Enter => {
+                                    if self.button_cursor {
+                                        self.send_tx_thread = Some(send_tx_thread(
+                                            &self.tx_req,
+                                            &self.network,
+                                            tr,
+                                            sd,
+                                            ss,
+                                        )?);
+                                        self.status = TxStatus::Signing;
+                                    } else {
+                                        self.close();
+                                        on_cancel()?;
+                                    }
+                                }
                                 KeyCode::Esc => {
                                     self.close();
                                     on_esc()?;
                                 }
                                 _ => {}
+                            },
+                            TxStatus::Signing
+                            | TxStatus::Pending(_)
+                            | TxStatus::Confirmed(_)
+                            | TxStatus::Failed(_) =>
+                            {
+                                #[allow(clippy::single_match)]
+                                match key_event.code {
+                                    KeyCode::Esc => {
+                                        self.close();
+                                        on_esc()?;
+                                    }
+                                    _ => {}
+                                }
                             }
                         }
                     }
                 }
-            }
-            Event::TxUpdate(status) => {
-                self.status = *status;
+                Event::TxUpdate(status) => {
+                    self.status = *status;
 
-                match status {
-                    TxStatus::Pending(tx_hash) => {
-                        on_tx_submit(*tx_hash)?;
+                    match status {
+                        TxStatus::Pending(tx_hash) => {
+                            on_tx_submit(*tx_hash)?;
 
-                        self.watch_tx_thread =
-                            Some(watch_tx_thread(&self.network, tr, sd, *tx_hash)?);
+                            self.watch_tx_thread =
+                                Some(watch_tx_thread(&self.network, tr, sd, *tx_hash)?);
+                        }
+                        TxStatus::Confirmed(tx_hash) | TxStatus::Failed(tx_hash) => {
+                            on_tx_confirm(*tx_hash)?;
+                        }
+                        _ => {}
                     }
-                    TxStatus::Confirmed(tx_hash) | TxStatus::Failed(tx_hash) => {
-                        on_tx_confirm(*tx_hash)?;
-                    }
-                    _ => {}
                 }
+                Event::TxError(_) => self.reset(),
+                _ => {}
             }
-            Event::TxError(_) => self.reset(),
-            _ => {}
+            result.esc_ignores = 1;
         }
-        result.esc_ignores = 1;
         Ok(result)
     }
 
@@ -304,6 +307,7 @@ pub fn send_tx_thread(
             mut tx: TransactionRequest,
             shutdown_signal: Arc<AtomicBool>,
         ) -> crate::Result<FixedBytes<32>> {
+            gm_log!("network in run = {:#?}", network);
             let provider = network.get_provider()?;
 
             let wallet = AccountManager::load_wallet(&sender_account)?;

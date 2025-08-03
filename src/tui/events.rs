@@ -1,7 +1,12 @@
 use std::time::Duration;
 
-use alloy::signers::{k256::ecdsa::SigningKey, Signature};
-use fusion_plus_sdk::multichain_address::MultichainAddress;
+use alloy::{
+    primitives::U256,
+    signers::{k256::ecdsa::SigningKey, Signature},
+};
+use fusion_plus_sdk::{
+    chain_id::ChainId, multichain_address::MultichainAddress, quote::QuoteResult,
+};
 use walletconnect_sdk::wc_message::WcMessage;
 
 use crate::{
@@ -66,6 +71,13 @@ pub enum Event {
     },
     HeliosError(String),
 
+    FusionPlusQuoteResult(Box<QuoteResult>),
+    FusionPlusAllowanceResult {
+        src_chain_id: ChainId,
+        src_token: MultichainAddress,
+        allowance: U256,
+    },
+    FusionPlusOrderSubmitted,
     FusionPlusError(String),
 
     InviteCodeValidity(InviteCodeValidity),

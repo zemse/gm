@@ -73,7 +73,9 @@ impl AddressBookMenuItem {
                 .into_iter()
                 .filter(|address| {
                     !entries.iter().any(|entry| match entry {
-                        AddressBookMenuItem::View(entry) => entry.address.as_raw() == *address,
+                        AddressBookMenuItem::View(entry) => {
+                            entry.address == MultichainAddress::from_raw(*address)
+                        }
                         _ => false,
                     })
                 })

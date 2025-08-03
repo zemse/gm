@@ -123,6 +123,7 @@ impl FormWidget {
     }
 }
 
+#[derive(Debug)]
 pub struct Form<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>> {
     pub cursor: usize,
     pub text_cursor: usize,
@@ -297,6 +298,10 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
             .any(|item| matches!(item, FormWidget::SelectInput { popup, .. } if popup.is_open()))
     }
 
+    pub fn is_select_focused(&self) -> bool {
+        matches!(self.items[self.cursor], FormWidget::SelectInput { .. })
+    }
+
     pub fn current_label_enum(&self) -> crate::Result<E> {
         E::iter()
             .nth(self.cursor)
@@ -326,7 +331,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                             self.advance_cursor();
                         }
                         KeyCode::Enter => {
-                            if !self.is_button_focused() {
+                            if !self.is_button_focused() && !self.is_select_focused() {
                                 self.advance_cursor();
                             }
                         }
@@ -354,7 +359,8 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         }
                     }
                     FormWidget::SelectInput { text, popup, .. } => {
-                        // self.update_text_cursor();
+                        let is_open = popup.is_open();
+
                         let popup_result = popup.handle_event(event, |selected| {
                             *text = selected.clone();
                             self.text_cursor = selected.len();
@@ -362,10 +368,10 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         })?;
                         result.merge(popup_result);
 
-                        if !popup.is_open() {
+                        if !is_open {
                             match key_event.code {
                                 // Press any key to open the popup
-                                KeyCode::Backspace | KeyCode::Char(_) => {
+                                KeyCode::Backspace | KeyCode::Char(_) | KeyCode::Enter => {
                                     popup.open();
                                 }
                                 _ => {}

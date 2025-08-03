@@ -80,6 +80,15 @@ impl SharedState {
             .write()
             .map_err(|e| format!("poison error - please restart gm - {e}"))?)
     }
+
+    pub fn try_current_account(&self) -> crate::Result<MultichainAddress> {
+        self.current_account.ok_or_else(|| {
+            crate::Error::InternalError(
+                "No account is loaded, please create an account if you don't have already"
+                    .to_string(),
+            )
+        })
+    }
 }
 
 pub struct App {
@@ -430,6 +439,10 @@ impl App {
             Event::TxError(error) => self.fatal_error_popup.set_text(error),
 
             Event::WalletConnectError(_, error) => {
+                self.fatal_error_popup.set_text(error);
+            }
+
+            Event::FusionPlusError(error) => {
                 self.fatal_error_popup.set_text(error);
             }
 

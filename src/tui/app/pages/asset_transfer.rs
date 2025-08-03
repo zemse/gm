@@ -1,4 +1,4 @@
-use crate::network::{Network, NetworkStore};
+use crate::network::{Network, NetworkStore, Token};
 use crate::tui::app::pages::fusion_plus::FusionPlusPage;
 use crate::tui::app::pages::Page;
 use crate::tui::app::widgets::address_book_popup::AddressBookPopup;
@@ -12,12 +12,13 @@ use crate::tui::{
     events::Event,
     traits::{Component, HandleResult},
 };
-use crate::utils::assets::{Asset, TokenAddress};
+use crate::utils::assets::{Asset, AssetType, TokenAddress};
 use crate::utils::erc20;
 use crate::{gm_log, Result};
 use alloy::primitives::utils::parse_units;
 use alloy::primitives::{Bytes, U256};
 use alloy::rpc::types::TransactionRequest;
+use fusion_plus_sdk::chain_id::ChainId;
 use fusion_plus_sdk::multichain_address::MultichainAddress;
 use std::str::FromStr;
 use std::sync::mpsc;
@@ -26,7 +27,7 @@ use strum::EnumIter;
 
 use super::address_book::AddressBookMenuItem;
 
-#[derive(EnumIter, PartialEq)]
+#[derive(Debug, EnumIter, PartialEq)]
 pub enum FormItem {
     Heading,
     To,
@@ -114,6 +115,10 @@ impl AssetTransferPage {
         // Update the form with the asset type, this is because the `asset` is
         // not directly linked to the ASSET_TYPE in form state
         *page.form.get_text_mut(FormItem::AssetType) = format!("{}", asset.r#type);
+        gm_log!(
+            "AssetTransferPage::new: asset type set to: {}",
+            asset.r#type
+        );
         *page
             .form
             .get_currency_mut(FormItem::Amount)
@@ -239,21 +244,33 @@ impl Component for AssetTransferPage {
 
                             self.tx_popup.open();
                         } else if label == FormItem::TransferViaFusionPlusButton {
-                            result.page_inserts.push(Page::FusionPlus(FusionPlusPage {
-                                src_chain_id: todo!(),
-                                dst_chain_id: todo!(),
-                                dst_address: todo!(),
-                                src_token: todo!(),
-                                dst_token: todo!(),
-                                src_amount: todo!(),
-                                est_amounts_thread: todo!(),
-                            }));
+                            let src_asset = form.get_text(FormItem::AssetType);
+                            let (src_token, src_chain) = AssetType::parse_str(src_asset)?;
+                            let src_amount =
+                                parse_units(form.get_text(FormItem::Amount), src_token.decimals)?
+                                    .get_absolute();
+
+                            let dst_asset = form.get_text(FormItem::DestinationAsset);
+                            if !dst_asset.is_empty() {
+                                let (dst_token, dst_chain) = Token::parse_str(dst_asset)?;
+
+                                gm_log!("src_chain {src_chain}, dst_chain {dst_chain}");
+                                result
+                                    .page_inserts
+                                    .push(Page::FusionPlus(FusionPlusPage::new(
+                                        src_chain,
+                                        src_token,
+                                        src_amount,
+                                        dst_chain,
+                                        dst_token,
+                                        MultichainAddress::from_str(form.get_text(FormItem::To))?,
+                                    )));
+                            }
                         }
                         Ok(())
                     },
                 )?;
                 result.merge(form_result);
-                gm_log!("handle result after form: {}", result.esc_ignores);
             }
         }
 
@@ -285,14 +302,9 @@ impl Component for AssetTransferPage {
                         popup.set_items(Some(
                             receiver_network
                                 .tokens
-                                .iter()
-                                .map(|token| {
-                                    format!(
-                                        "{} - {} ({})",
-                                        receiver_network.name, token.symbol, token.contract_address
-                                    )
-                                })
-                                .collect::<Vec<String>>(),
+                                .into_iter()
+                                .map(|t| format!("{t}"))
+                                .collect(),
                         ));
                     }
                 } else {

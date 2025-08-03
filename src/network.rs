@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     disk::{Config, DiskInterface, FileFormat},
+    gm_log,
     utils::Provider,
 };
 
@@ -35,6 +36,7 @@ pub struct Token {
     pub symbol: String,
     pub decimals: u8,
     pub contract_address: MultichainAddress,
+    pub network_name: String,
 }
 
 impl Display for Network {
@@ -43,8 +45,44 @@ impl Display for Network {
     }
 }
 
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.symbol, self.network_name)
+    }
+}
+
+impl Token {
+    pub fn parse_str(s: &str) -> crate::Result<(Token, Network)> {
+        let start_paren = s.find('(').ok_or_else(|| {
+            crate::Error::InternalError(format!("Token::parse_str({s:?}) .find '(' failed"))
+        })?;
+        let end_paren = s.find(')').ok_or_else(|| {
+            crate::Error::InternalError(format!("Token::parse_str({s:?}) .find ')' failed"))
+        })?;
+
+        // Extract the symbol (trim to remove trailing space)
+        let symbol = s[..start_paren].trim();
+
+        // Extract the network name inside parentheses
+        let network_name = s[start_paren + 1..end_paren].trim();
+        let network = NetworkStore::from_name(network_name)?;
+
+        let token = network
+            .tokens
+            .iter()
+            .find(|token| token.symbol == symbol)
+            .ok_or(crate::Error::InternalError(format!(
+                "token {symbol:?} not found"
+            )))?
+            .clone();
+
+        Ok((token, network))
+    }
+}
+
 impl Network {
     pub fn get_rpc(&self) -> crate::Result<String> {
+        gm_log!("Network - {:?}", self);
         if let Some(rpc_url) = &self.rpc_url {
             Ok(rpc_url.clone())
         } else if let Some(rpc_alchemy) = &self.rpc_alchemy {
@@ -53,14 +91,20 @@ impl Network {
                 // TODO handle this error when alchemy API key not present
                 &Config::alchemy_api_key()?,
             ))
+        } else if let Some(name_alchemy) = &self.name_alchemy {
+            Ok(format!(
+                "https://{}.g.alchemy.com/v2/{}",
+                name_alchemy,
+                Config::alchemy_api_key()?
+            ))
         } else if let Some(rpc_infura) = &self.rpc_infura {
             Ok(rpc_infura.clone())
         } else {
             // TODO remove this panic and allow user to gracefully handle this situation like providing
             // their own RPC URL or ALCHEMY_API_KEY
             Err(crate::Error::InternalError(format!(
-                "No RPC URL found for network {}",
-                self.name
+                "No RPC URL found for network {} - chain_id {}",
+                self.name, self.chain_id
             )))
         }
     }
@@ -262,6 +306,7 @@ impl NetworkStore {
                 symbol: token_symbol.unwrap_or("UNKNOWN").to_string(),
                 decimals: token_decimals,
                 contract_address: token_address,
+                network_name: network.name.clone(),
             });
         }
     }
@@ -311,6 +356,7 @@ fn default_networks() -> Vec<Network> {
                     contract_address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
                         .parse()
                         .unwrap(),
+                    network_name: "Mainnet".to_string(),
                 },
                 Token {
                     name: "MakerDAO's DAI".to_string(),
@@ -319,6 +365,7 @@ fn default_networks() -> Vec<Network> {
                     contract_address: "0x6b175474e89094c44da98b954eedeac495271d0f"
                         .parse()
                         .unwrap(),
+                    network_name: "Mainnet".to_string(),
                 },
                 Token {
                     name: "Coinbase USD Coin".to_string(),
@@ -327,6 +374,7 @@ fn default_networks() -> Vec<Network> {
                     contract_address: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
                         .parse()
                         .unwrap(),
+                    network_name: "Mainnet".to_string(),
                 },
                 Token {
                     name: "Tether USD".to_string(),
@@ -335,6 +383,7 @@ fn default_networks() -> Vec<Network> {
                     contract_address: "0xdAC17F958D2ee523a2206206994597C13D831ec7"
                         .parse()
                         .unwrap(),
+                    network_name: "Mainnet".to_string(),
                 },
             ],
         },
@@ -360,6 +409,7 @@ fn default_networks() -> Vec<Network> {
                     contract_address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
                         .parse()
                         .unwrap(),
+                    network_name: "Arbitrum".to_string(),
                 },
                 Token {
                     name: "MakerDAO's DAI".to_string(),
@@ -368,6 +418,7 @@ fn default_networks() -> Vec<Network> {
                     contract_address: "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1"
                         .parse()
                         .unwrap(),
+                    network_name: "Arbitrum".to_string(),
                 },
                 Token {
                     name: "Coinbase USD Coin".to_string(),
@@ -376,6 +427,7 @@ fn default_networks() -> Vec<Network> {
                     contract_address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
                         .parse()
                         .unwrap(),
+                    network_name: "Arbitrum".to_string(),
                 },
                 Token {
                     name: "Coinbase USD Coin Bridged".to_string(),
@@ -384,6 +436,7 @@ fn default_networks() -> Vec<Network> {
                     contract_address: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
                         .parse()
                         .unwrap(),
+                    network_name: "Arbitrum".to_string(),
                 },
                 Token {
                     name: "Tether USD".to_string(),
@@ -392,8 +445,25 @@ fn default_networks() -> Vec<Network> {
                     contract_address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"
                         .parse()
                         .unwrap(),
+                    network_name: "Arbitrum".to_string(),
                 },
             ],
+        },
+        Network {
+            name: "Optimism".to_string(),
+            name_alchemy: Some("opt-mainnet".to_string()),
+            name_aliases: vec![],
+            chain_id: 10,
+            multichain_address_requires_chain_id: false,
+            symbol: Some("OpETH".to_string()),
+            native_decimals: Some(18),
+            price_ticker: Some("ETH".to_string()),
+            rpc_url: None,
+            rpc_alchemy: Some(("https://opt-mainnet.g.alchemy.com/v2/{}").to_string()),
+            rpc_infura: None,
+            explorer_url: None,
+            is_testnet: false,
+            tokens: vec![],
         },
         Network {
             name: "Base".to_string(),
@@ -417,6 +487,7 @@ fn default_networks() -> Vec<Network> {
                     contract_address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
                         .parse()
                         .unwrap(),
+                    network_name: "Base".to_string(),
                 },
                 Token {
                     name: "Coinbase USD Coin".to_string(),
@@ -425,6 +496,7 @@ fn default_networks() -> Vec<Network> {
                     contract_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
                         .parse()
                         .unwrap(),
+                    network_name: "Base".to_string(),
                 },
             ],
         },
@@ -463,6 +535,7 @@ fn default_networks() -> Vec<Network> {
                 symbol: "USDT".to_string(),
                 decimals: 6,
                 contract_address: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t".parse().unwrap(),
+                network_name: "Tron".to_string(),
             }],
         },
         Network {
