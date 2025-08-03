@@ -526,7 +526,7 @@ impl Component for FusionPlusPage {
         Self: Sized,
     {
         [format!(
-            "Transfer via Fusion Plus\n{} to {}\nCurrent Status: {}",
+            "Transfer via Fusion Plus - {} to {} - Current Status: {}",
             self.src_chain.name, self.dst_chain.name, self.state
         )]
         .render(area, buf, false);
