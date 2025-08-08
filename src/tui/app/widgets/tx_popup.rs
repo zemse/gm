@@ -287,9 +287,7 @@ pub fn send_tx_thread(
 ) -> crate::Result<JoinHandle<()>> {
     let tr = tr.clone();
     let shutdown_signal = shutdown_signal.clone();
-    let sender_account = shared_state
-        .current_account
-        .ok_or(crate::Error::CurrentAccountNotSet)?;
+    let sender_account = shared_state.try_current_account()?;
     let network = network.clone();
     let tx_req = tx_req.clone();
     Ok(tokio::spawn(async move {

@@ -357,7 +357,7 @@ impl Component for WalletConnectPage {
                     ));
 
                     {
-                        let addr = ss.current_account.unwrap();
+                        let addr = ss.try_current_account()?;
                         let tr = tr.clone();
                         let shutdown_signal = sd.clone();
                         let pairing_clone = pairing.clone();
@@ -409,7 +409,7 @@ impl Component for WalletConnectPage {
                     {
                         let (tr_2, rc_2) = mpsc::channel::<WcEvent>();
                         self.tr_2 = Some(tr_2);
-                        let addr = ss.current_account.unwrap();
+                        let addr = ss.try_current_account()?;
                         let tr = tr.clone();
                         let shutdown_signal = sd.clone();
                         self.send_thread = Some(tokio::spawn(async move {

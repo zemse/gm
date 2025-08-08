@@ -188,9 +188,7 @@ fn has_token(networks: &NetworkStore, token_address: &TokenAddress) -> bool {
 
 pub async fn get_all_assets() -> crate::Result<(Address, Vec<Asset>)> {
     let config = Config::load()?;
-    let wallet_address = config
-        .current_account
-        .ok_or(crate::Error::CurrentAccountNotSet)?;
+    let wallet_address = config.try_current_account()?;
 
     let mut networks = NetworkStore::load()?;
 

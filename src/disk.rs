@@ -197,6 +197,11 @@ impl Config {
         Ok(Config::load()?.current_account)
     }
 
+    pub fn try_current_account(&self) -> crate::Result<Address> {
+        self.current_account
+            .ok_or_else(|| crate::Error::CurrentAccountNotSet)
+    }
+
     pub fn set_current_account(address: Address) -> crate::Result<()> {
         let mut config = Config::load()?;
         config.current_account = Some(address);

@@ -34,9 +34,7 @@ pub fn sign_thread(
 ) -> crate::Result<JoinHandle<()>> {
     let message = message.to_string();
     let tr = tr.clone();
-    let sender_account = shared_state
-        .current_account
-        .ok_or(crate::Error::CurrentAccountNotSet)?;
+    let sender_account = shared_state.try_current_account()?;
 
     Ok(tokio::spawn(async move {
         let _ = match run(message, sender_account).await {

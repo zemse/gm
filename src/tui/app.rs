@@ -54,7 +54,7 @@ pub struct SharedState {
     pub recent_addresses: Option<Vec<Address>>,
     pub testnet_mode: bool,
     pub developer_mode: bool,
-    pub current_account: Option<Address>,
+    current_account: Option<Address>,
     pub alchemy_api_key_available: bool,
     pub eth_price: Option<String>,
     pub theme: Theme,
@@ -79,6 +79,11 @@ impl SharedState {
             .asset_manager
             .write()
             .map_err(|e| format!("poison error - please restart gm - {e}"))?)
+    }
+
+    pub fn try_current_account(&self) -> crate::Result<Address> {
+        self.current_account
+            .ok_or_else(|| crate::Error::CurrentAccountNotSet)
     }
 }
 
