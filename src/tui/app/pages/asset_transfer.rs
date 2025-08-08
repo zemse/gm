@@ -122,6 +122,7 @@ impl Component for AssetTransferPage {
             result.merge(self.address_book_popup.handle_event(event, |entry| {
                 *self.form.get_text_mut(FormItem::To) = entry.address_unwrap().to_string();
                 self.form.advance_cursor();
+                Ok(())
             })?);
         } else if self.asset_popup.is_open() {
             result.merge(self.asset_popup.handle_event(event, |asset| {
@@ -133,6 +134,7 @@ impl Component for AssetTransferPage {
                     .expect("currency not found in this input entry, please check idx") =
                     Some(asset.r#type.symbol.clone());
                 self.form.advance_cursor();
+                Ok(())
             })?);
         } else if self.tx_popup.is_open() {
             let is_confirmed = self.tx_popup.is_confirmed();
@@ -168,41 +170,47 @@ impl Component for AssetTransferPage {
                 self.asset_popup.set_items(ss.assets_read()?);
                 result.esc_ignores = 1;
             } else {
-                self.form.handle_event(event, |label, form| {
-                    if label == FormItem::TransferButton {
-                        let to = form.get_text(FormItem::To);
-                        let asset = self
-                            .asset
-                            .as_ref()
-                            .ok_or(crate::Error::InternalErrorStr("No asset selected"))?;
-                        let amount =
-                            parse_units(form.get_text(FormItem::Amount), asset.r#type.decimals)?;
+                self.form.handle_event(
+                    event,
+                    |_, _| Ok(()),
+                    |label, form| {
+                        if label == FormItem::TransferButton {
+                            let to = form.get_text(FormItem::To);
+                            let asset = self
+                                .asset
+                                .as_ref()
+                                .ok_or(crate::Error::InternalErrorStr("No asset selected"))?;
+                            let amount = parse_units(
+                                form.get_text(FormItem::Amount),
+                                asset.r#type.decimals,
+                            )?;
 
-                        let (to, calldata, value) = match asset.r#type.token_address {
-                            TokenAddress::Native => {
-                                (to.parse()?, Bytes::new(), amount.get_absolute())
+                            let (to, calldata, value) = match asset.r#type.token_address {
+                                TokenAddress::Native => {
+                                    (to.parse()?, Bytes::new(), amount.get_absolute())
+                                }
+                                TokenAddress::Contract(address) => (
+                                    address,
+                                    erc20::encode_transfer(to.parse()?, amount.get_absolute()),
+                                    U256::ZERO,
+                                ),
+                            };
+
+                            if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
+                                self.tx_popup.set_tx_req(
+                                    NetworkStore::from_name(&asset.r#type.network)?,
+                                    TransactionRequest::default()
+                                        .to(to)
+                                        .value(value)
+                                        .input(calldata.into()),
+                                );
                             }
-                            TokenAddress::Contract(address) => (
-                                address,
-                                erc20::encode_transfer(to.parse()?, amount.get_absolute()),
-                                U256::ZERO,
-                            ),
-                        };
 
-                        if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
-                            self.tx_popup.set_tx_req(
-                                NetworkStore::from_name(&asset.r#type.network)?,
-                                TransactionRequest::default()
-                                    .to(to)
-                                    .value(value)
-                                    .input(calldata.into()),
-                            );
+                            self.tx_popup.open();
                         }
-
-                        self.tx_popup.open();
-                    }
-                    Ok(())
-                })?;
+                        Ok(())
+                    },
+                )?;
             }
         }
 

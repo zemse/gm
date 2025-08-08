@@ -107,24 +107,28 @@ impl Component for CompleteSetupPage {
 
         let mut handle_result = HandleResult::default();
 
-        self.form.handle_event(event, |label, form| {
-            if label == FormItem::CreateOrImportWallet {
-                handle_result
-                    .page_inserts
-                    .push(Page::Account(AccountPage::new()?));
-            } else {
-                handle_result.reload = true;
+        self.form.handle_event(
+            event,
+            |_, _| Ok(()),
+            |label, form| {
+                if label == FormItem::CreateOrImportWallet {
+                    handle_result
+                        .page_inserts
+                        .push(Page::Account(AccountPage::new()?));
+                } else {
+                    handle_result.reload = true;
 
-                let mut config = Config::load()?;
-                config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
-                config.save()?;
-                transmitter.send(Event::ConfigUpdate)?;
+                    let mut config = Config::load()?;
+                    config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
+                    config.save()?;
+                    transmitter.send(Event::ConfigUpdate)?;
 
-                let display_text = form.get_text_mut(FormItem::Display);
-                *display_text = "Configuration saved".to_string();
-            }
-            Ok(())
-        })?;
+                    let display_text = form.get_text_mut(FormItem::Display);
+                    *display_text = "Configuration saved".to_string();
+                }
+                Ok(())
+            },
+        )?;
 
         Ok(handle_result)
     }

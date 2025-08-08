@@ -13,11 +13,9 @@ use strum::IntoEnumIterator;
 
 use super::{button::Button, input_box::InputBox};
 use crate::tui::app::widgets::scroll_bar::CustomScrollBar;
+use crate::tui::traits::{HandleResult, RectUtil};
 use crate::tui::{
-    app::widgets::filter_select_popup::FilterSelectPopup,
-    theme::Theme,
-    traits::{RectUtil, WidgetHeight},
-    Event,
+    app::widgets::filter_select_popup::FilterSelectPopup, theme::Theme, traits::WidgetHeight, Event,
 };
 use crate::utils::text::split_string;
 
@@ -85,6 +83,21 @@ impl FormWidget {
             | FormWidget::ErrorText(_) => 0,
         }
     }
+
+    pub fn to_value(&self) -> Option<String> {
+        match self {
+            FormWidget::InputBox { text, .. }
+            | FormWidget::DisplayBox { text, .. }
+            | FormWidget::SelectInput { text, .. } => Some(text.clone()),
+            FormWidget::BooleanInput { value, .. } => Some(value.to_string()),
+            FormWidget::Button { .. }
+            | FormWidget::Heading(_)
+            | FormWidget::StaticText(_)
+            | FormWidget::DisplayText(_)
+            | FormWidget::ErrorText(_) => None,
+        }
+    }
+
     pub fn height(&self, area: Rect) -> u16 {
         match self {
             FormWidget::InputBox { text, .. }
@@ -104,12 +117,13 @@ impl FormWidget {
                 (text.len() as u16).div_ceil(area.width) + 1
             }
             FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
-                (text.len() as u16).div_ceil(area.width) + 1
+                (text.len() as u16).div_ceil(area.width) + 3
             }
         }
     }
 }
 
+#[derive(Debug)]
 pub struct Form<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Error>> {
     pub cursor: usize,
     pub text_cursor: usize,
@@ -284,10 +298,28 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
             .any(|item| matches!(item, FormWidget::SelectInput { popup, .. } if popup.is_open()))
     }
 
-    pub fn handle_event<F>(&mut self, event: &Event, mut on_button: F) -> crate::Result<()>
+    pub fn is_select_focused(&self) -> bool {
+        matches!(self.items[self.cursor], FormWidget::SelectInput { .. })
+    }
+
+    pub fn current_label_enum(&self) -> crate::Result<E> {
+        E::iter()
+            .nth(self.cursor)
+            .ok_or(crate::Error::InternalErrorStr("form index out of bounds"))
+    }
+
+    pub fn handle_event<F1, F2>(
+        &mut self,
+        event: &Event,
+        mut on_value_change: F2,
+        mut on_button_press: F1,
+    ) -> crate::Result<HandleResult>
     where
-        F: FnMut(E, &mut Self) -> crate::Result<()>,
+        F1: FnMut(E, &mut Self) -> crate::Result<()>,
+        F2: FnMut(E, &mut Self) -> crate::Result<()>,
     {
+        let mut result = HandleResult::default();
+
         if let Event::Input(key_event) = event {
             if key_event.kind == KeyEventKind::Press {
                 if !self.is_some_popup_open() {
@@ -299,7 +331,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                             self.advance_cursor();
                         }
                         KeyCode::Enter => {
-                            if !self.is_button_focused() {
+                            if !self.is_button_focused() && !self.is_select_focused() {
                                 self.advance_cursor();
                             }
                         }
@@ -307,6 +339,8 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         _ => {}
                     }
                 }
+
+                let value_before = self.items[self.cursor].to_value();
 
                 match &mut self.items[self.cursor] {
                     FormWidget::InputBox { text, .. } => {
@@ -325,15 +359,19 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                         }
                     }
                     FormWidget::SelectInput { text, popup, .. } => {
-                        // self.update_text_cursor();
-                        popup.handle_event(event, |selected| {
+                        let is_open = popup.is_open();
+
+                        let popup_result = popup.handle_event(event, |selected| {
                             *text = selected.clone();
                             self.text_cursor = selected.len();
+                            Ok(())
                         })?;
+                        result.merge(popup_result);
 
-                        if !popup.is_open() {
+                        if !is_open {
                             match key_event.code {
-                                KeyCode::Backspace | KeyCode::Char(_) => {
+                                // Press any key to open the popup
+                                KeyCode::Backspace | KeyCode::Char(_) | KeyCode::Enter => {
                                     popup.open();
                                 }
                                 _ => {}
@@ -342,16 +380,19 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
                     }
                     FormWidget::Button { .. } => {
                         if matches!(key_event.code, KeyCode::Enter) {
-                            let enum_repr =
-                                E::iter().nth(self.cursor).expect("Invalid cursor index");
-                            on_button(enum_repr, self)?
+                            on_button_press(self.current_label_enum()?, self)?
                         }
                     }
                     _ => {}
                 }
+
+                let value_after = self.items[self.cursor].to_value();
+                if value_after != value_before {
+                    on_value_change(self.current_label_enum()?, self)?;
+                }
             }
         }
-        Ok(())
+        Ok(result)
     }
 
     pub fn render(&self, mut area: Rect, buf: &mut Buffer, theme: &Theme)

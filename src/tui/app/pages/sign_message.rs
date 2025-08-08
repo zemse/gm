@@ -73,20 +73,25 @@ impl Component for SignMessagePage {
         _shutdown_signal: &Arc<AtomicBool>,
         shared_state: &SharedState,
     ) -> crate::Result<HandleResult> {
-        self.form.handle_event(event, |item, form| {
-            if item == FormItem::SignMessageButton && form.get_text(FormItem::Signature).is_empty()
-            {
-                let message = form.get_text(FormItem::Message);
+        self.form.handle_event(
+            event,
+            |_, _| Ok(()),
+            |item, form| {
+                if item == FormItem::SignMessageButton
+                    && form.get_text(FormItem::Signature).is_empty()
+                {
+                    let message = form.get_text(FormItem::Message);
 
-                let wallet_address = shared_state
-                    .current_account
-                    .ok_or(crate::Error::CurrentAccountNotSet)?;
-                let wallet = AccountManager::load_wallet(&wallet_address)?;
-                let signature = wallet.sign_message_sync(message.as_bytes())?;
-                *form.get_text_mut(FormItem::Signature) = format!("Signature:\n{signature}");
-            }
-            Ok(())
-        })?;
+                    let wallet_address = shared_state
+                        .current_account
+                        .ok_or(crate::Error::CurrentAccountNotSet)?;
+                    let wallet = AccountManager::load_wallet(&wallet_address)?;
+                    let signature = wallet.sign_message_sync(message.as_bytes())?;
+                    *form.get_text_mut(FormItem::Signature) = format!("Signature:\n{signature}");
+                }
+                Ok(())
+            },
+        )?;
         Ok(HandleResult::default())
     }
 

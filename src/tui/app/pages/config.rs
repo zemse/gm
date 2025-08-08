@@ -110,23 +110,27 @@ impl Component for ConfigPage {
 
         let mut handle_result = HandleResult::default();
 
-        self.form.handle_event(event, |_, form| {
-            handle_result.reload = true;
+        self.form.handle_event(
+            event,
+            |_, _| Ok(()),
+            |_, form| {
+                handle_result.reload = true;
 
-            let mut config = Config::load()?;
-            config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
-            config.testnet_mode = form.get_boolean(FormItem::TestnetMode);
-            config.developer_mode = form.get_boolean(FormItem::DeveloperMode);
-            let theme_name = form.get_text(FormItem::Theme).clone();
-            config.theme_name = theme::ThemeName::from_str(&theme_name)?.to_string();
+                let mut config = Config::load()?;
+                config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
+                config.testnet_mode = form.get_boolean(FormItem::TestnetMode);
+                config.developer_mode = form.get_boolean(FormItem::DeveloperMode);
+                let theme_name = form.get_text(FormItem::Theme).clone();
+                config.theme_name = theme::ThemeName::from_str(&theme_name)?.to_string();
 
-            config.save()?;
+                config.save()?;
 
-            let display_text = form.get_text_mut(FormItem::DisplayText);
-            *display_text = "Configuration saved".to_string();
+                let display_text = form.get_text_mut(FormItem::DisplayText);
+                *display_text = "Configuration saved".to_string();
 
-            Ok(())
-        })?;
+                Ok(())
+            },
+        )?;
 
         Ok(handle_result)
     }

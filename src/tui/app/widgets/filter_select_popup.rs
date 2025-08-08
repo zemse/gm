@@ -71,7 +71,7 @@ impl<Item: Display> FilterSelectPopup<Item> {
         mut on_enter: F,
     ) -> crate::Result<HandleResult>
     where
-        F: FnMut(&Item),
+        F: FnMut(&Item) -> crate::Result<()>,
     {
         let mut result = HandleResult::default();
 

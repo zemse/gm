@@ -118,12 +118,14 @@ impl Component for SendMessagePage {
                 let to_address = self.form.get_text_mut(FormItem::To);
                 *to_address = entry.address_unwrap().to_string();
                 self.form.advance_cursor();
+                Ok(())
             })?);
         } else if self.networks_popup.is_open() {
             result.merge(self.networks_popup.handle_event(event, |network| {
                 let network_str = self.form.get_text_mut(FormItem::Network);
                 *network_str = network.name.clone();
                 self.form.advance_cursor();
+                Ok(())
             })?);
         } else if self.tx_popup.is_open() {
             let r = self.tx_popup.handle_event(
@@ -151,28 +153,32 @@ impl Component for SendMessagePage {
                 self.networks_popup
                     .set_items(Some(NetworkStore::load_networks(ss.testnet_mode)?));
             } else {
-                self.form.handle_event(event, |label, form| {
-                    if label == FormItem::SendMessageButton {
-                        let to = form.get_text(FormItem::To);
-                        let message = form.get_text(FormItem::Message);
-                        let network_name = form.get_text(FormItem::Network);
-                        if message.is_empty() {
-                            return Err("Message cannot be empty".into());
+                self.form.handle_event(
+                    event,
+                    |_, _| Ok(()),
+                    |label, form| {
+                        if label == FormItem::SendMessageButton {
+                            let to = form.get_text(FormItem::To);
+                            let message = form.get_text(FormItem::Message);
+                            let network_name = form.get_text(FormItem::Network);
+                            if message.is_empty() {
+                                return Err("Message cannot be empty".into());
+                            }
+
+                            self.tx_popup.set_tx_req(
+                                NetworkStore::from_name(network_name)?,
+                                TransactionRequest::default().to(to.parse()?).input(
+                                    TransactionInput::from(Bytes::from(
+                                        message.to_owned().into_bytes(),
+                                    )),
+                                ),
+                            );
+                            self.tx_popup.open();
                         }
 
-                        self.tx_popup.set_tx_req(
-                            NetworkStore::from_name(network_name)?,
-                            TransactionRequest::default().to(to.parse()?).input(
-                                TransactionInput::from(Bytes::from(
-                                    message.to_owned().into_bytes(),
-                                )),
-                            ),
-                        );
-                        self.tx_popup.open();
-                    }
-
-                    Ok(())
-                })?;
+                        Ok(())
+                    },
+                )?;
             }
         }
 
