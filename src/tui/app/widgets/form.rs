@@ -359,7 +359,10 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
         Self: Sized,
     {
         let full_area = area;
-        let form_height: u16 = self.items.iter().fold(0, |acc, i| acc + i.height(area));
+        let form_height: u16 = std::cmp::max(
+            self.items.iter().fold(0, |acc, i| acc + i.height(area)),
+            full_area.height,
+        );
         let mut virtual_buf = Buffer::empty(Rect::new(0, 0, buf.area.width, form_height));
         let mut scroll_cursor: u16 = 0;
         let mut scroll_cursor_item_height: u16 = 0;
