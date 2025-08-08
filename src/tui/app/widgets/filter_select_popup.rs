@@ -75,25 +75,27 @@ impl<Item: Display> FilterSelectPopup<Item> {
     {
         let mut result = HandleResult::default();
 
-        if self.open && self.items.is_some() {
-            let items = self.items.as_ref().unwrap();
-            let cursor_max = items.len();
-            self.cursor.handle(event, cursor_max);
+        if self.open {
+            if self.items.is_some() {
+                let items = self.items.as_ref().unwrap();
+                let cursor_max = items.len();
+                self.cursor.handle(event, cursor_max);
 
-            if let Event::Input(key_event) = event {
-                if key_event.kind == KeyEventKind::Press {
-                    match key_event.code {
-                        KeyCode::Char(char) => {
-                            self.search_string.push(char);
+                if let Event::Input(key_event) = event {
+                    if key_event.kind == KeyEventKind::Press {
+                        match key_event.code {
+                            KeyCode::Char(char) => {
+                                self.search_string.push(char);
+                            }
+                            KeyCode::Backspace => {
+                                self.search_string.pop();
+                            }
+                            KeyCode::Enter => {
+                                on_enter(&items[self.cursor.current])?;
+                                self.close();
+                            }
+                            _ => {}
                         }
-                        KeyCode::Backspace => {
-                            self.search_string.pop();
-                        }
-                        KeyCode::Enter => {
-                            on_enter(&items[self.cursor.current]);
-                            self.close();
-                        }
-                        _ => {}
                     }
                 }
             }
