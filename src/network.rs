@@ -50,14 +50,20 @@ impl Network {
                 // TODO handle this error when alchemy API key not present
                 &Config::alchemy_api_key()?,
             ))
+        } else if let Some(name_alchemy) = &self.name_alchemy {
+            Ok(format!(
+                "https://{}.g.alchemy.com/v2/{}",
+                name_alchemy,
+                Config::alchemy_api_key()?
+            ))
         } else if let Some(rpc_infura) = &self.rpc_infura {
             Ok(rpc_infura.clone())
         } else {
             // TODO remove this panic and allow user to gracefully handle this situation like providing
             // their own RPC URL or ALCHEMY_API_KEY
             Err(crate::Error::InternalError(format!(
-                "No RPC URL found for network {}",
-                self.name
+                "No RPC URL found for network {} - chain_id {}",
+                self.name, self.chain_id
             )))
         }
     }
@@ -85,6 +91,7 @@ impl DiskInterface for NetworkStore {
 }
 
 impl NetworkStore {
+    // TODO This function should be on Network
     pub fn from_name(network_name: &str) -> crate::Result<Network> {
         let network_store = NetworkStore::load()?;
         network_store
@@ -92,6 +99,7 @@ impl NetworkStore {
             .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))
     }
 
+    // TODO This function should be on Network
     pub fn from_chain_id(chain_id: u32) -> crate::Result<Network> {
         let network_store = NetworkStore::load()?;
         network_store
