@@ -27,7 +27,7 @@ pub enum MainMenuItem {
     Portfolio,
     Accounts,
     AddressBook,
-    Network,
+    Networks,
     WalletConnect,
     SignMessage,
     SendMessage,
@@ -42,7 +42,7 @@ impl MainMenuItem {
             MainMenuItem::Portfolio => Page::Assets(AssetsPage::default()),
             MainMenuItem::Accounts => Page::Account(AccountPage::new()?),
             MainMenuItem::AddressBook => Page::AddressBook(AddressBookPage::new()?),
-            MainMenuItem::Network => Page::Network(NetworkPage::new()?),
+            MainMenuItem::Networks => Page::Network(NetworkPage::new()?),
             MainMenuItem::WalletConnect => Page::WalletConnect(WalletConnectPage::new()?),
             MainMenuItem::SignMessage => Page::SignMessage(SignMessagePage::new()?),
             MainMenuItem::SendMessage => Page::SendMessage(SendMessagePage::new()?),
@@ -55,7 +55,7 @@ impl MainMenuItem {
         match self {
             MainMenuItem::CompleteSetup
             | MainMenuItem::AddressBook
-            | MainMenuItem::Network
+            | MainMenuItem::Networks
             | MainMenuItem::Accounts
             | MainMenuItem::WalletConnect
             | MainMenuItem::DevKeyInput
@@ -71,7 +71,7 @@ impl MainMenuItem {
             | MainMenuItem::Portfolio
             | MainMenuItem::Accounts
             | MainMenuItem::AddressBook
-            | MainMenuItem::Network
+            | MainMenuItem::Networks
             | MainMenuItem::WalletConnect
             | MainMenuItem::SignMessage
             | MainMenuItem::SendMessage

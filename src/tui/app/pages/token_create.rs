@@ -1,4 +1,4 @@
-use crate::network::{Network, Token};
+use crate::network::{Network, NetworkStore, Token};
 use crate::tui::app::pages::token::TokenPage;
 use crate::tui::app::pages::Page;
 use crate::tui::app::widgets::confirm_popup::ConfirmPopup;
@@ -13,6 +13,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use strum_macros::EnumIter;
+use crate::disk::DiskInterface;
 
 #[derive(EnumIter, PartialEq)]
 pub enum FormItem {
@@ -133,6 +134,9 @@ impl Component for TokenCreatePage {
                 || {
                     if self.network.tokens.get(self.token_index).is_some() {
                         self.network.tokens.remove(self.token_index);
+                        let mut config = NetworkStore::load()?;
+                        config.networks[self.network_index] = self.network.clone();
+                        config.save()?;
                     }
                     handle_result.page_pops = 1;
                     handle_result.page_inserts.push(Page::Token(TokenPage::new(
@@ -154,6 +158,11 @@ impl Component for TokenCreatePage {
                 } else {
                     self.network.tokens.push(token);
                 }
+
+                let mut config = NetworkStore::load()?;
+                config.networks[self.network_index] = self.network.clone();
+                config.save()?;
+
                 handle_result.page_pops = 1;
                 handle_result.page_inserts.push(Page::Token(TokenPage::new(
                     self.network_index,

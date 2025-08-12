@@ -126,7 +126,11 @@ pub struct NetworkCreatePage {
 }
 impl NetworkCreatePage {
     pub fn new(network_index: usize, network: Network) -> crate::Result<Self> {
-        let config = NetworkStore::load()?;
+        let mut config = NetworkStore::load()?;
+        if config.networks.get(network_index).is_none() {
+            config.networks.push(network.clone());
+            config.save()?;
+        }
         Ok(Self {
             network: network.clone(),
             form: Form::init(|form| {
