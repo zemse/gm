@@ -1,3 +1,4 @@
+use crate::disk::DiskInterface;
 use crate::network::{Network, NetworkStore, Token};
 use crate::tui::app::pages::token::TokenPage;
 use crate::tui::app::pages::Page;
@@ -13,7 +14,6 @@ use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use strum_macros::EnumIter;
-use crate::disk::DiskInterface;
 
 #[derive(EnumIter, PartialEq)]
 pub enum FormItem {
