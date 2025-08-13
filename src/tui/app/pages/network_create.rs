@@ -21,6 +21,7 @@ pub enum FormItem {
     Heading,
     Name,
     NameAlchemy,
+    NameAliases,
     ChainId,
     Symbol,
     NativeDecimals,
@@ -53,6 +54,12 @@ impl TryFrom<FormItem> for FormWidget {
             },
             FormItem::NameAlchemy => FormWidget::InputBox {
                 label: "Name Alchemy",
+                text: String::new(),
+                empty_text: None,
+                currency: None,
+            },
+            FormItem::NameAliases => FormWidget::InputBox {
+                label: "Name Aliases",
                 text: String::new(),
                 empty_text: None,
                 currency: None,
@@ -135,6 +142,10 @@ impl NetworkCreatePage {
                 if let Some(name_alchemy) = network.name_alchemy {
                     *form.get_text_mut(FormItem::NameAlchemy) = name_alchemy;
                 }
+                if network.name_aliases.is_empty().not() {
+                    *form.get_text_mut(FormItem::NameAliases) = network.name_aliases[0].clone();
+                }
+
                 *form.get_text_mut(FormItem::ChainId) = network.chain_id.to_string();
                 if let Some(symbol) = network.symbol {
                     *form.get_text_mut(FormItem::Symbol) = symbol;
@@ -184,7 +195,7 @@ impl NetworkCreatePage {
                 .is_empty()
                 .not()
                 .then(|| form.get_text(FormItem::NameAlchemy).clone()),
-            name_aliases: vec![],
+            name_aliases: vec![form.get_text(FormItem::NameAliases).clone()],
             chain_id: form.get_text(FormItem::ChainId).parse().unwrap_or_default(),
             symbol: form
                 .get_text(FormItem::Symbol)
