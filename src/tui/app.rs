@@ -522,6 +522,9 @@ impl Widget for &App {
                     MainMenuItem::AddressBook => {
                         Page::Text(TextPage::new("Manage familiar addresses".to_string()))
                     }
+                    MainMenuItem::Networks => {
+                        Page::Text(TextPage::new("Manage networks and tokens".to_string()))
+                    }
                     MainMenuItem::WalletConnect => {
                         let mut preview_page = main_menu_item
                             .get_page()

@@ -1,5 +1,14 @@
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
+use super::SharedState;
+use crate::tui::app::pages::network::NetworkPage;
+use crate::tui::app::pages::network_create::NetworkCreatePage;
+use crate::tui::app::pages::token::TokenPage;
+use crate::tui::app::pages::token_create::TokenCreatePage;
+use crate::tui::{
+    events::Event,
+    traits::{Component, HandleResult},
+};
 use account::AccountPage;
 use account_create::AccountCreatePage;
 use account_import::AccountImportPage;
@@ -18,13 +27,6 @@ use text::TextPage;
 use trade::TradePage;
 use walletconnect::WalletConnectPage;
 
-use crate::tui::{
-    events::Event,
-    traits::{Component, HandleResult},
-};
-
-use super::SharedState;
-
 pub mod account;
 pub mod account_create;
 pub mod account_import;
@@ -37,11 +39,16 @@ pub mod complete_setup;
 pub mod config;
 pub mod dev_key_capture;
 pub mod main_menu;
+pub mod network_create;
 pub mod send_message;
 pub mod sign_message;
 pub mod text;
 pub mod trade;
 pub mod walletconnect;
+
+pub mod network;
+pub mod token;
+pub mod token_create;
 
 #[allow(clippy::large_enum_variant)]
 pub enum Page {
@@ -55,6 +62,11 @@ pub enum Page {
     AddressBook(AddressBookPage),
     AddressBookCreate(AddressBookCreatePage),
     AddressBookDisplay(AddressBookDisplayPage),
+
+    Network(NetworkPage),
+    NetworkCreate(NetworkCreatePage),
+    Token(TokenPage),
+    TokenCreate(TokenCreatePage),
 
     Assets(AssetsPage),
     AssetTransfer(AssetTransferPage),
@@ -109,6 +121,11 @@ impl Component for Page {
             Page::AccountCreate(page) => page.set_focus(focus),
             Page::AccountImport(page) => page.set_focus(focus),
 
+            Page::Network(page) => page.set_focus(focus),
+            Page::NetworkCreate(page) => page.set_focus(focus),
+            Page::Token(page) => page.set_focus(focus),
+            Page::TokenCreate(page) => page.set_focus(focus),
+
             Page::Assets(page) => page.set_focus(focus),
             Page::AssetTransfer(page) => page.set_focus(focus),
 
@@ -133,6 +150,11 @@ impl Component for Page {
             Page::AddressBook(page) => page.exit_threads().await,
             Page::AddressBookCreate(page) => page.exit_threads().await,
             Page::AddressBookDisplay(page) => page.exit_threads().await,
+
+            Page::Network(page) => page.exit_threads().await,
+            Page::NetworkCreate(page) => page.exit_threads().await,
+            Page::Token(page) => page.exit_threads().await,
+            Page::TokenCreate(page) => page.exit_threads().await,
 
             Page::Account(page) => page.exit_threads().await,
             Page::AccountCreate(page) => page.exit_threads().await,
@@ -162,6 +184,11 @@ impl Component for Page {
             Page::AddressBook(page) => page.reload(ss),
             Page::AddressBookCreate(page) => page.reload(ss),
             Page::AddressBookDisplay(page) => page.reload(ss),
+
+            Page::Network(page) => page.reload(ss),
+            Page::NetworkCreate(page) => page.reload(ss),
+            Page::Token(page) => page.reload(ss),
+            Page::TokenCreate(page) => page.reload(ss),
 
             Page::Account(page) => page.reload(ss),
             Page::AccountCreate(page) => page.reload(ss),
@@ -199,6 +226,11 @@ impl Component for Page {
             Page::AddressBookCreate(page) => page.handle_event(event, area, tr, sd, ss),
             Page::AddressBookDisplay(page) => page.handle_event(event, area, tr, sd, ss),
 
+            Page::Network(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::NetworkCreate(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::Token(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::TokenCreate(page) => page.handle_event(event, area, tr, sd, ss),
+
             Page::Account(page) => page.handle_event(event, area, tr, sd, ss),
             Page::AccountCreate(page) => page.handle_event(event, area, tr, sd, ss),
             Page::AccountImport(page) => page.handle_event(event, area, tr, sd, ss),
@@ -235,6 +267,11 @@ impl Component for Page {
             Page::AddressBook(page) => page.render_component(area, buf, shared_state),
             Page::AddressBookCreate(page) => page.render_component(area, buf, shared_state),
             Page::AddressBookDisplay(page) => page.render_component(area, buf, shared_state),
+
+            Page::Network(page) => page.render_component(area, buf, shared_state),
+            Page::NetworkCreate(page) => page.render_component(area, buf, shared_state),
+            Page::Token(page) => page.render_component(area, buf, shared_state),
+            Page::TokenCreate(page) => page.render_component(area, buf, shared_state),
 
             Page::Account(page) => page.render_component(area, buf, shared_state),
             Page::AccountCreate(page) => page.render_component(area, buf, shared_state),
