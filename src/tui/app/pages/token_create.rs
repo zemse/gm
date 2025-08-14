@@ -150,32 +150,36 @@ impl Component for TokenCreatePage {
             )?;
             handle_result.merge(r);
         }
-        self.form.handle_event(event, |label, form| {
-            if label == FormItem::SaveButton {
-                let token = Self::token(form);
-                if self.network.tokens.get(self.token_index).is_some() {
-                    self.network.tokens[self.token_index] = token;
-                } else {
-                    self.network.tokens.push(token);
+        self.form.handle_event(
+            event,
+            |_, _| Ok(()),
+            |label, form| {
+                if label == FormItem::SaveButton {
+                    let token = Self::token(form);
+                    if self.network.tokens.get(self.token_index).is_some() {
+                        self.network.tokens[self.token_index] = token;
+                    } else {
+                        self.network.tokens.push(token);
+                    }
+
+                    let mut config = NetworkStore::load()?;
+                    config.networks[self.network_index] = self.network.clone();
+                    config.save()?;
+
+                    handle_result.page_pops = 1;
+                    handle_result.page_inserts.push(Page::Token(TokenPage::new(
+                        self.network_index,
+                        self.network.clone(),
+                    )?));
+                    handle_result.reload = true;
+                }
+                if label == FormItem::RemoveButton {
+                    self.remove_popup.open();
                 }
 
-                let mut config = NetworkStore::load()?;
-                config.networks[self.network_index] = self.network.clone();
-                config.save()?;
-
-                handle_result.page_pops = 1;
-                handle_result.page_inserts.push(Page::Token(TokenPage::new(
-                    self.network_index,
-                    self.network.clone(),
-                )?));
-                handle_result.reload = true;
-            }
-            if label == FormItem::RemoveButton {
-                self.remove_popup.open();
-            }
-
-            Ok(())
-        })?;
+                Ok(())
+            },
+        )?;
         Ok(handle_result)
     }
     fn render_component(&self, area: Rect, buf: &mut Buffer, s: &SharedState) -> Rect

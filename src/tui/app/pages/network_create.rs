@@ -261,43 +261,48 @@ impl Component for NetworkCreatePage {
                 || Ok(()),
             )?;
         }
-        self.form.handle_event(event, |label, form| {
-            match label {
-                FormItem::SaveButton => {
-                    if form.get_text(FormItem::Name).is_empty() {
-                        let error = form.get_text_mut(FormItem::ErrorText);
-                        *error = "Please enter name, you cannot leave it empty".to_string();
-                    } else if form.get_text(FormItem::ChainId).is_empty() {
-                        let error = form.get_text_mut(FormItem::ErrorText);
-                        *error = "Please enter chain id, you cannot leave it empty".to_string();
-                    } else {
-                        let mut config = NetworkStore::load()?;
-                        if config.networks.get(self.network_index).is_some() {
-                            config.networks[self.network_index] = Self::network(form, &self.tokens);
+        self.form.handle_event(
+            event,
+            |_, _| Ok(()),
+            |label, form| {
+                match label {
+                    FormItem::SaveButton => {
+                        if form.get_text(FormItem::Name).is_empty() {
+                            let error = form.get_text_mut(FormItem::ErrorText);
+                            *error = "Please enter name, you cannot leave it empty".to_string();
+                        } else if form.get_text(FormItem::ChainId).is_empty() {
+                            let error = form.get_text_mut(FormItem::ErrorText);
+                            *error = "Please enter chain id, you cannot leave it empty".to_string();
                         } else {
-                            config.networks.push(Self::network(form, &self.tokens));
+                            let mut config = NetworkStore::load()?;
+                            if config.networks.get(self.network_index).is_some() {
+                                config.networks[self.network_index] =
+                                    Self::network(form, &self.tokens);
+                            } else {
+                                config.networks.push(Self::network(form, &self.tokens));
+                            }
+                            let _ = config.save();
+                            handle_result.page_pops = 1;
+                            handle_result.reload = true;
                         }
-                        let _ = config.save();
+                    }
+                    FormItem::TokensButton => {
+                        let network = Self::network(form, &self.tokens);
                         handle_result.page_pops = 1;
+                        handle_result
+                            .page_inserts
+                            .push(Page::Token(TokenPage::new(self.network_index, network)?));
                         handle_result.reload = true;
                     }
+                    FormItem::RemoveButton => {
+                        self.remove_popup.open();
+                    }
+                    _ => {}
                 }
-                FormItem::TokensButton => {
-                    let network = Self::network(form, &self.tokens);
-                    handle_result.page_pops = 1;
-                    handle_result
-                        .page_inserts
-                        .push(Page::Token(TokenPage::new(self.network_index, network)?));
-                    handle_result.reload = true;
-                }
-                FormItem::RemoveButton => {
-                    self.remove_popup.open();
-                }
-                _ => {}
-            }
 
-            Ok(())
-        })?;
+                Ok(())
+            },
+        )?;
 
         Ok(handle_result)
     }
