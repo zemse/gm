@@ -57,3 +57,4 @@ data3 = "0.2.0"
 walletconnect-sdk = "0.2.0"
 helios-ethereum = { git = "https://github.com/a16z/helios", package = "helios-ethereum", rev = "97aed6e0" }
 eyre = "*"
+textwrap = "0.16.2"

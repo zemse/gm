@@ -24,44 +24,63 @@ impl<T: Display> Widget for Select<'_, T> {
         Self: Sized,
     {
         let capacity = area.height as usize;
-        let page_number = self.cursor.current / capacity;
-        let idx = self.cursor.current % capacity;
         let horizontal_layout = Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]);
         let [list_area, scroll_area] = horizontal_layout.areas(area);
 
-        let render_item = |(i, member): (_, &T)| {
-            let content = Text::from(
-                textwrap::wrap(
-                    &format!("{member}"),
-                    if capacity < self.list.len() {
-                        list_area.width as usize
-                    } else {
-                        area.width as usize
-                    },
-                )
-                .iter()
-                .map(|s| Line::from(s.clone().into_owned()))
-                .collect::<Vec<_>>(),
+        let mut list_height = 0;
+        let mut temp_rows = 0;
+        let mut start_index = 0;
+        let mut prev_start_index = 0;
+        let mut end_index = self.list.len() - 1;
+        let mut found = false;
+        let render_item = |(i, member): (usize, &T)| {
+            let text = &format!("{member}");
+            let wrapped_text = textwrap::wrap(
+                text,
+                if capacity < self.list.len() {
+                    list_area.width as usize
+                } else {
+                    area.width as usize
+                },
             );
-            let style = if idx == i && self.focus {
+            list_height += wrapped_text.len();
+            if !found {
+                temp_rows += wrapped_text.len();
+            }
+
+            if temp_rows > capacity {
+                temp_rows = wrapped_text.len();
+                let prev_index: usize = i.saturating_sub(1);
+                if self.cursor.current <= prev_index && self.cursor.current >= start_index {
+                    end_index = prev_index;
+                    prev_start_index = start_index;
+                    found = true;
+                } else {
+                    start_index = i;
+                }
+            }
+            let content = Text::from(
+                wrapped_text
+                    .iter()
+                    .map(|s| Line::from(s.clone().into_owned()))
+                    .collect::<Vec<_>>(),
+            );
+            let style = if self.cursor.current == i && self.focus {
                 self.focus_style
             } else {
                 Style::default()
             };
             ListItem::new(content).style(style)
         };
+        let render_items = self
+            .list
+            .iter()
+            .enumerate()
+            .map(render_item)
+            .collect::<Vec<ListItem>>();
+        let display_items = render_items[start_index..=end_index].to_vec();
 
-        if capacity < self.list.len() {
-            let display_items = self
-                .list
-                .chunks(capacity)
-                .nth(page_number)
-                .unwrap()
-                .iter()
-                .enumerate()
-                .map(render_item)
-                .collect::<Vec<ListItem>>();
-
+        if capacity < list_height {
             List::new(display_items).render(list_area, buf);
             CustomScrollBar {
                 cursor: self.cursor.current,
@@ -69,12 +88,6 @@ impl<T: Display> Widget for Select<'_, T> {
             }
             .render(scroll_area, buf);
         } else {
-            let display_items = self
-                .list
-                .iter()
-                .enumerate()
-                .map(render_item)
-                .collect::<Vec<ListItem>>();
             List::new(display_items).render(area, buf);
         }
     }
