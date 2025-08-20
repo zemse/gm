@@ -12,8 +12,16 @@ impl Widget for CustomScrollBar {
         Self: Sized,
     {
         let capacity = area.height as usize;
-        let num_pages = if self.paginate {self.total.div_ceil(capacity)} else {self.total};
-        let current_page = if self.paginate {self.cursor / capacity} else {self.cursor};
+        let num_pages = if self.paginate {
+            self.total.div_ceil(capacity)
+        } else {
+            self.total
+        };
+        let current_page = if self.paginate {
+            self.cursor / capacity
+        } else {
+            self.cursor
+        };
 
         let top = (0..current_page)
             .map(|i| get_page_height(i, capacity, num_pages))

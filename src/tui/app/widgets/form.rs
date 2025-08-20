@@ -543,7 +543,7 @@ impl<E: IntoEnumIterator + FormItemIndex + TryInto<FormWidget, Error = crate::Er
             CustomScrollBar {
                 cursor: scroll_cursor as usize,
                 total: form_height as usize,
-                paginate: true
+                paginate: true,
             }
             .render(scroll_area, buf);
         }

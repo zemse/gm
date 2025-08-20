@@ -41,7 +41,7 @@ impl<T: Display> Widget for Select<'_, T> {
             let text = &format!("{member}");
             let wrapped_text = textwrap::wrap(
                 text,
-                if capacity < list_height    {
+                if capacity < list_height {
                     list_area.width as usize - 1
                 } else {
                     area.width as usize - 1
@@ -65,7 +65,6 @@ impl<T: Display> Widget for Select<'_, T> {
                     current_page += 1;
                     start_index = i;
                 }
-
             }
             if temp_rows_2 > capacity {
                 temp_rows_2 = wrapped_text.len();
@@ -91,13 +90,18 @@ impl<T: Display> Widget for Select<'_, T> {
             .map(render_item)
             .collect::<Vec<ListItem>>();
         let display_items = render_items[start_index..=end_index].to_vec();
-        buf.set_string(0,0, format!("tp: {total_pages}, cp: {current_page}       "), Style::default());
+        buf.set_string(
+            0,
+            0,
+            format!("tp: {total_pages}, cp: {current_page}       "),
+            Style::default(),
+        );
         if capacity < list_height {
             List::new(display_items).render(list_area, buf);
             CustomScrollBar {
                 cursor: current_page,
                 total: total_pages,
-                paginate: false
+                paginate: false,
             }
             .render(scroll_area, buf);
         } else {
