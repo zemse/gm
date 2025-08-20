@@ -29,24 +29,29 @@ impl<T: Display> Widget for Select<'_, T> {
 
         let mut list_height = 0;
         let mut temp_rows = 0;
+        let mut temp_rows_2 = 0;
         let mut start_index = 0;
         let mut prev_start_index = 0;
         let mut end_index = self.list.len() - 1;
         let mut found = false;
+
+        let mut current_page = 0;
+        let mut total_pages = 1;
         let render_item = |(i, member): (usize, &T)| {
             let text = &format!("{member}");
             let wrapped_text = textwrap::wrap(
                 text,
-                if capacity < self.list.len() {
-                    list_area.width as usize
+                if capacity < list_height    {
+                    list_area.width as usize - 1
                 } else {
-                    area.width as usize
+                    area.width as usize - 1
                 },
             );
             list_height += wrapped_text.len();
             if !found {
                 temp_rows += wrapped_text.len();
             }
+            temp_rows_2 += wrapped_text.len();
 
             if temp_rows > capacity {
                 temp_rows = wrapped_text.len();
@@ -54,10 +59,17 @@ impl<T: Display> Widget for Select<'_, T> {
                 if self.cursor.current <= prev_index && self.cursor.current >= start_index {
                     end_index = prev_index;
                     prev_start_index = start_index;
+
                     found = true;
                 } else {
+                    current_page += 1;
                     start_index = i;
                 }
+
+            }
+            if temp_rows_2 > capacity {
+                temp_rows_2 = wrapped_text.len();
+                total_pages += 1;
             }
             let content = Text::from(
                 wrapped_text
@@ -79,12 +91,13 @@ impl<T: Display> Widget for Select<'_, T> {
             .map(render_item)
             .collect::<Vec<ListItem>>();
         let display_items = render_items[start_index..=end_index].to_vec();
-
+        buf.set_string(0,0, format!("tp: {total_pages}, cp: {current_page}       "), Style::default());
         if capacity < list_height {
             List::new(display_items).render(list_area, buf);
             CustomScrollBar {
-                cursor: self.cursor.current,
-                total: self.list.len(),
+                cursor: current_page,
+                total: total_pages,
+                paginate: false
             }
             .render(scroll_area, buf);
         } else {
