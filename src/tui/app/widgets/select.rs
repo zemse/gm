@@ -90,12 +90,7 @@ impl<T: Display> Widget for Select<'_, T> {
             .map(render_item)
             .collect::<Vec<ListItem>>();
         let display_items = render_items[start_index..=end_index].to_vec();
-        buf.set_string(
-            0,
-            0,
-            format!("tp: {total_pages}, cp: {current_page}       "),
-            Style::default(),
-        );
+
         if capacity < list_height {
             List::new(display_items).render(list_area, buf);
             CustomScrollBar {
