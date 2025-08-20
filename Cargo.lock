@@ -3025,8 +3025,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "gm_cli"
-version = "0.1.0"
+name = "gm-tui"
+version = "0.0.1"
 dependencies = [
  "alloy",
  "chrono",

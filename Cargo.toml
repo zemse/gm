@@ -1,11 +1,16 @@
 [package]
-name = "gm_cli"
-version = "0.1.0"
+name = "gm-tui"
+version = "0.0.1"
 edition = "2021"
+description = "TUI-based Ethereum wallet"
+license = "MIT"
+repository = "https://github.com/zemse/gm"
+keywords = ["crypto", "blockchain", "ethereum", "tui", "wallet"]
+include = ["src/**", "Cargo.toml", "README.md", "LICENSE*"]
 
 [lib]
-name = "gm_lib"  # This sets the library name (can be different from the package name)
-path = "src/lib.rs"  # The default is src/lib.rs, but you can change it if needed
+name = "gm_lib"
+path = "src/lib.rs"
 
 [[bin]]
 name = "gm"
@@ -56,4 +61,4 @@ serde_path_to_error = "0.1.17"
 data3 = "0.2.0"
 walletconnect-sdk = "0.2.0"
 helios-ethereum = { package = "zemse-helios-ethereum", version = "0.9" }
-eyre = "*"
+eyre = "0.6"
