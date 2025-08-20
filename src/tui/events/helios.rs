@@ -53,7 +53,7 @@ pub async fn helios_thread(
         .with_file_db()
         .build()?;
 
-    eth_client.wait_synced().await;
+    eth_client.wait_synced().await?;
 
     loop {
         let _ = run(transmitter, &asset_manager, &eth_client).await;

@@ -55,5 +55,5 @@ url = "2.5.4"
 serde_path_to_error = "0.1.17"
 data3 = "0.2.0"
 walletconnect-sdk = "0.2.0"
-helios-ethereum = { git = "https://github.com/a16z/helios", package = "helios-ethereum", rev = "97aed6e0" }
+helios-ethereum = { package = "zemse-helios-ethereum", version = "0.9" }
 eyre = "*"

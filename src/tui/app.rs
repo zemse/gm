@@ -409,6 +409,9 @@ impl App {
                     .map_err(|err| format!("poison error - please restart gm - {err}"))?
                     .update_light_client_verification(account, network, token_address, status);
             }
+            Event::HeliosError(error) => {
+                self.fatal_error_popup.set_text(error);
+            }
 
             Event::RecentAddressesUpdate(addresses) => {
                 self.shared_state.recent_addresses = Some(addresses);
