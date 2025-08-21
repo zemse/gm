@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use super::scroll_bar::CustomScrollBar;
 use crate::utils::cursor::Cursor;
 use ratatui::text::Text;
 use ratatui::{
@@ -8,8 +9,7 @@ use ratatui::{
     text::Line,
     widgets::{List, ListItem, Widget},
 };
-
-use super::scroll_bar::CustomScrollBar;
+use textwrap::{Options, WrapAlgorithm};
 
 pub struct Select<'a, T: Display> {
     pub focus: bool,
@@ -41,11 +41,12 @@ impl<T: Display> Widget for Select<'_, T> {
             let text = &format!("{member}");
             let wrapped_text = textwrap::wrap(
                 text,
-                if capacity < list_height {
-                    list_area.width as usize - 1
+                Options::new(if capacity < list_height {
+                    list_area.width as usize
                 } else {
-                    area.width as usize - 1
-                },
+                    area.width as usize
+                })
+                .wrap_algorithm(WrapAlgorithm::FirstFit),
             );
             list_height += wrapped_text.len();
             if !found {
