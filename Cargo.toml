@@ -62,3 +62,4 @@ data3 = "0.2.0"
 walletconnect-sdk = "0.2.0"
 helios-ethereum = { package = "zemse-helios-ethereum", version = "0.9" }
 eyre = "0.6"
+textwrap = "0.16.2"
