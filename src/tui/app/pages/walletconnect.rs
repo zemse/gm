@@ -1,4 +1,5 @@
 use std::{
+    str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::{self, Sender},
@@ -33,6 +34,7 @@ use crate::{
                 form::{Form, FormItemIndex, FormWidget},
                 select::Select,
                 sign_popup::SignPopup,
+                sign_typed_data_popup::SignTypedDataPopup,
                 tx_popup::TxPopup,
             },
             SharedState,
@@ -160,6 +162,7 @@ pub struct WalletConnectPage {
     exit_popup: ConfirmPopup,
     tx_popup: TxPopup,
     sign_popup: SignPopup,
+    sign_typed_data_popup: SignTypedDataPopup,
     watch_thread: Option<JoinHandle<()>>,
     send_thread: Option<JoinHandle<()>>,
     tr_2: Option<Sender<WcEvent>>,
@@ -168,26 +171,25 @@ pub struct WalletConnectPage {
 impl WalletConnectPage {
     pub fn new() -> crate::Result<Self> {
         Ok(Self {
-                form: Form::init(|_| Ok(()))?,
-                session_requests: vec![],
-                cursor: Cursor::default(),
-                status: WalletConnectStatus::Idle,
-                confirm_popup: ConfirmPopup::new("WalletConnect", String::new(), "Approve", "Reject"),
-                exit_popup: ConfirmPopup::new(
-                    "Warning",
-                    "The WalletConnect session will be ended if you go back. You can also press ESC to go back. If you want to continue session you can choose to wait."
-                        .to_string(),
-                    "Wait",
-                    "End",
-                ),
-                tx_popup: TxPopup::default(),
-                sign_popup: SignPopup::default(
-
-                ),
-                watch_thread: None,
-                send_thread: None,
-                tr_2: None,
-            })
+            form: Form::init(|_| Ok(()))?,
+            session_requests: vec![],
+            cursor: Cursor::default(),
+            status: WalletConnectStatus::Idle,
+            confirm_popup: ConfirmPopup::new("WalletConnect", String::new(), "Approve", "Reject"),
+            exit_popup: ConfirmPopup::new(
+                "Warning",
+                "The WalletConnect session will be ended if you go back. You can also press ESC to go back. If you want to continue session you can choose to wait."
+                    .to_string(),
+                "Wait",
+                "End",
+            ),
+            tx_popup: TxPopup::default(),
+            sign_popup: SignPopup::default(),
+            sign_typed_data_popup: SignTypedDataPopup::default(),
+            watch_thread: None,
+            send_thread: None,
+            tr_2: None,
+        })
     }
 
     fn open_request_at_cursor(&mut self) -> crate::Result<()> {
@@ -235,6 +237,17 @@ impl WalletConnectPage {
                 self.sign_popup.set_text(message);
                 self.sign_popup.open();
             }
+            SessionRequestData::EthSignTypedDataV4 {
+                account: _,
+                typed_data,
+            } => {
+                let mut typed_data = typed_data.clone();
+                if let Some(str) = &typed_data.as_str() {
+                    typed_data = Value::from_str(str)?;
+                }
+                self.sign_typed_data_popup.set_typed_data(typed_data)?;
+                self.sign_typed_data_popup.open();
+            }
         }
 
         Ok(())
@@ -278,7 +291,8 @@ impl Component for WalletConnectPage {
         let any_popup_open_before = self.confirm_popup.is_open()
             || self.exit_popup.is_open()
             || self.tx_popup.is_open()
-            || self.sign_popup.is_open();
+            || self.sign_popup.is_open()
+            || self.sign_typed_data_popup.is_open();
 
         // First handle the WalletConnect specific events regardless of what's there on the UI
         match event {
@@ -511,6 +525,35 @@ impl Component for WalletConnectPage {
                 || Ok(()),
             )?;
             handle_result.merge(r);
+        } else if self.sign_typed_data_popup.is_open() {
+            let r = self.sign_typed_data_popup.handle_event(
+                (event, area, tr, ss),
+                |signature| {
+                    let (req, tr_2) = get_req_tr_2()?;
+                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                        WcData::SessionRequestResponse(Value::String(hex::encode_prefixed(
+                            signature.as_bytes(),
+                        ))),
+                        None,
+                    ))))?;
+                    remove_current_request = true;
+                    Ok(())
+                },
+                || {
+                    let (req, tr_2) = get_req_tr_2()?;
+                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                        WcData::Error {
+                            message: "User denied msg signing".to_string(),
+                            code: 5000,
+                        },
+                        Some(IrnTag::SessionRequestResponse),
+                    ))))?;
+                    remove_current_request_2 = true;
+                    Ok(())
+                },
+                || Ok(()),
+            )?;
+            handle_result.merge(r);
         } else if self.exit_popup.is_open() {
             let r = self.exit_popup.handle_event(
                 event,
@@ -674,6 +717,8 @@ impl Component for WalletConnectPage {
             .render(area, buf, &shared_state.theme.popup());
         self.tx_popup.render(area, buf, &shared_state.theme.popup());
         self.sign_popup
+            .render(area, buf, &shared_state.theme.popup());
+        self.sign_typed_data_popup
             .render(area, buf, &shared_state.theme.popup());
         self.exit_popup
             .render(area, buf, &shared_state.theme.popup());

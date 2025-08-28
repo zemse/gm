@@ -15,6 +15,7 @@ pub mod scroll_bar;
 pub mod select;
 pub mod sidebar;
 pub mod sign_popup;
+pub mod sign_typed_data_popup;
 pub mod text_popup;
 pub mod text_scroll;
 pub mod title;

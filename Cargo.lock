@@ -7070,9 +7070,9 @@ dependencies = [
 
 [[package]]
 name = "walletconnect-sdk"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a470c024bba54dca21f115cd971d941ce3ca15e9fc47edb99c5527d60bb232aa"
+checksum = "aec1daeaeae19d3becd6f0e057f428ba5db0ea68b782c15c6b90edc0f3f5519f"
 dependencies = [
  "aes-gcm",
  "alloy",

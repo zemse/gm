@@ -1,6 +1,7 @@
 pub mod account;
 pub mod assets;
 pub mod cursor;
+pub mod eip712;
 pub mod erc20;
 pub mod text;
 
