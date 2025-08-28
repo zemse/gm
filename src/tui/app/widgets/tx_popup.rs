@@ -8,6 +8,7 @@ use std::{
 
 use alloy::{
     consensus::{SignableTransaction, TxEnvelope, TxType},
+    hex,
     network::TxSignerSync,
     primitives::{Address, Bytes, FixedBytes},
     providers::Provider,
@@ -21,6 +22,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     widgets::{Block, Widget},
 };
+use serde_json::Value;
 use tokio::task::JoinHandle;
 
 use crate::{
@@ -267,7 +269,7 @@ impl TxPopup {
                     code: _,
                     data,
                 } => {
-                    format!("RPC Error: {}\nData: {:?}", message, data)
+                    format!("RPC Error: {} Data: {:?}", message, data)
                         .render(button_area.margin_top(1), buf);
                 }
                 TxStatus::Signing => {
@@ -327,7 +329,13 @@ pub fn send_tx_thread(
                 SendTxResult::JsonRpcError(error_payload) => TxStatus::JsonRpcError {
                     message: error_payload.message.to_string(),
                     code: error_payload.code,
-                    data: error_payload.data.and_then(|data| data.get().parse().ok()),
+                    data: error_payload.data.and_then(|data| {
+                        serde_json::from_str::<Value>(data.get())
+                            .ok()
+                            .and_then(|v| v.as_str().map(|s| s.to_string()))
+                            .and_then(|s| hex::decode(s).ok())
+                            .map(Bytes::from)
+                    }),
                 },
             })),
             Err(err) => tr.send(Event::TxError(err.fmt_err("TxSubmitError"))),

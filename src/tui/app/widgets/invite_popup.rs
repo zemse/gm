@@ -12,7 +12,6 @@ use tokio::task::JoinHandle;
 
 use crate::{
     error::FmtError,
-    gm_log,
     tui::{
         app::{widgets::popup::Popup, SharedState},
         traits::{CustomRender, HandleResult},
@@ -59,7 +58,6 @@ pub fn start_check_thread(
                 .text()
                 .await?;
 
-            gm_log!("result {result:?}");
             let validity = match result.as_str() {
                 "claimed" => InviteCodeValidity::Claimed,
                 "valid" => InviteCodeValidity::Valid,
