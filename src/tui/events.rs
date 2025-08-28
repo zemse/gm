@@ -70,6 +70,7 @@ pub enum Event {
 
     InviteCodeValidity(InviteCodeValidity),
     InviteCodeClaimStatus(InviteCodeClaimStatus),
+    InviteError(String),
 }
 
 impl Event {

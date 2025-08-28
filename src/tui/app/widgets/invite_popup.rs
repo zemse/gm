@@ -1,17 +1,23 @@
-use std::{sync::mpsc, time::Duration};
+use std::sync::mpsc;
 
+use alloy::primitives::Address;
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
     widgets::{Block, Widget},
 };
+use serde_json::json;
 use tokio::task::JoinHandle;
 
-use crate::tui::{
-    app::{widgets::popup::Popup, SharedState},
-    traits::{CustomRender, HandleResult},
-    Event,
+use crate::{
+    error::FmtError,
+    gm_log,
+    tui::{
+        app::{widgets::popup::Popup, SharedState},
+        traits::{CustomRender, HandleResult},
+        Event,
+    },
 };
 
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -32,6 +38,8 @@ pub enum InviteCodeClaimStatus {
     Failed(String),
 }
 
+const BASE_URL: &str = "https://invites.gm-tui.com/";
+
 pub fn start_check_thread(
     invite_code: &str,
     tr: &mpsc::Sender<Event>,
@@ -39,30 +47,70 @@ pub fn start_check_thread(
     let tr = tr.clone();
     let invite_code = invite_code.to_string();
     Ok(tokio::spawn(async move {
-        // TODO make api call to backend to check invite code validity
-        let _ = invite_code;
-        let result = InviteCodeValidity::Valid;
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        let res: Result<(), crate::Error> = async {
+            let client = reqwest::Client::new();
 
-        let _ = tr.send(Event::InviteCodeValidity(result));
+            let result = client
+                .get(format!("{BASE_URL}/check"))
+                .query(&json!({"invite_code": invite_code}))
+                .send()
+                .await?
+                .error_for_status()?
+                .text()
+                .await?;
+
+            gm_log!("result {result:?}");
+            let validity = match result.as_str() {
+                "claimed" => InviteCodeValidity::Claimed,
+                "valid" => InviteCodeValidity::Valid,
+                _ => InviteCodeValidity::Invalid,
+            };
+
+            let _ = tr.send(Event::InviteCodeValidity(validity));
+            Ok(())
+        }
+        .await;
+
+        if let Err(e) = res {
+            let _ = tr.send(Event::InviteError(e.fmt_err("InviteCheckError")));
+        }
     }))
 }
 
 pub fn start_claim_thread(
     invite_code: &str,
+    claim_address: Address,
     tr: &mpsc::Sender<Event>,
 ) -> crate::Result<JoinHandle<()>> {
     let tr = tr.clone();
     let invite_code = invite_code.to_string();
     Ok(tokio::spawn(async move {
-        let _ = tr.send(Event::InviteCodeClaimStatus(
-            InviteCodeClaimStatus::Claiming,
-        ));
-        // TODO make api call to backend to claim invite code
-        let _ = invite_code;
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        let res: crate::Result<()> = async {
+            let _ = tr.send(Event::InviteCodeClaimStatus(
+                InviteCodeClaimStatus::Claiming,
+            ));
+            let reqw = reqwest::Client::new();
+            let out = reqw
+                .post(format!("{BASE_URL}/claim"))
+                .json(&json!({"invite_code": invite_code, "address": claim_address}))
+                .send()
+                .await?
+                .error_for_status()?
+                .text()
+                .await?;
+            if out.len() > 10 {
+                let _ = tr.send(Event::InviteCodeClaimStatus(InviteCodeClaimStatus::Success));
+                let _ = tr.send(Event::InviteCodeClaimStatus(InviteCodeClaimStatus::Failed(
+                    "failed".to_string(),
+                )));
+            }
+            Ok(())
+        }
+        .await;
 
-        let _ = tr.send(Event::InviteCodeClaimStatus(InviteCodeClaimStatus::Success));
+        if let Err(e) = res {
+            let _ = tr.send(Event::InviteError(e.fmt_err("InviteCheckError")));
+        }
     }))
 }
 
@@ -108,6 +156,7 @@ impl InvitePopup {
         &mut self,
         event: &Event,
         tr: &mpsc::Sender<Event>,
+        ss: &SharedState,
     ) -> crate::Result<HandleResult> {
         let mut result = HandleResult::default();
 
@@ -127,7 +176,11 @@ impl InvitePopup {
                                 && self.claim_status == InviteCodeClaimStatus::Idle
                             {
                                 if let Some(invite_code) = self.invite_code.as_ref() {
-                                    let claim_thread = start_claim_thread(invite_code, tr)?;
+                                    let claim_thread = start_claim_thread(
+                                        invite_code,
+                                        ss.try_current_account()?,
+                                        tr,
+                                    )?;
                                     self.claim_thread = Some(claim_thread);
                                 }
                             }

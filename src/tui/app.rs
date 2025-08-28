@@ -140,15 +140,15 @@ impl App {
     }
 
     pub fn cli_args(&mut self, args: Vec<String>) -> crate::Result<()> {
-        if args.len() == 1 {
-            // TODO support for wallet connect URI
-            if args[0].ends_with("invite") {
-                self.invite_popup.set_invite_code(&args[0]);
+        // TODO support for wallet connect URI
+        if args.len() == 2 {
+            if args[0] == "its" {
+                self.invite_popup.set_invite_code(&args[1]);
                 self.invite_popup.open();
             }
-        } else if args.len() > 1 {
+        } else if !args.is_empty() {
             self.fatal_error_popup.set_text(format!(
-                "Too many arguments provided to gm on the cli: {args:?}. Expected 0 or 1.",
+                "Could not recognise action for the arguments passed on the cli: {args:?}",
             ));
         }
 
@@ -309,7 +309,8 @@ impl App {
         let result = if self.fatal_error_popup.is_shown() {
             self.fatal_error_popup.handle_event(&event, area)
         } else if self.invite_popup.is_open() {
-            self.invite_popup.handle_event(&event, tr)
+            self.invite_popup
+                .handle_event(&event, tr, &self.shared_state)
         } else if self.context.last().is_some() {
             let page = self.context.last_mut().unwrap();
             page.handle_event(&event, body_area.block_inner(), tr, sd, &self.shared_state)
@@ -433,6 +434,9 @@ impl App {
                 self.fatal_error_popup.set_text(error);
             }
 
+            Event::InviteError(error) => {
+                self.fatal_error_popup.set_text(error);
+            }
             _ => {}
         };
 
