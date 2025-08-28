@@ -350,6 +350,7 @@ impl Component for WalletConnectPage {
         let mut go_back = false;
         let mut remove_current_request = false;
         let mut remove_current_request_2 = false;
+        let mut remove_current_request_3 = false;
 
         // Handle based on what's active on the UI
         if self.confirm_popup.is_open() {
@@ -481,16 +482,31 @@ impl Component for WalletConnectPage {
                     Ok(())
                 },
                 |_| Ok(()),
+                |message, code, data| {
+                    let (req, tr_2) = get_req_tr_2()?;
+                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                        WcData::Error {
+                            message,
+                            code,
+                            data,
+                        },
+                        Some(IrnTag::SessionRequestResponse),
+                    ))))?;
+                    remove_current_request_2 = true;
+
+                    Ok(())
+                },
                 || {
                     let (req, tr_2) = get_req_tr_2()?;
                     tr_2.send(WcEvent::Message(Box::new(req.create_response(
                         WcData::Error {
                             message: "User denied tx signing".to_string(),
                             code: 5000,
+                            data: None,
                         },
                         Some(IrnTag::SessionRequestResponse),
                     ))))?;
-                    remove_current_request_2 = true;
+                    remove_current_request_3 = true;
                     Ok(())
                 },
                 || Ok(()),
@@ -516,6 +532,7 @@ impl Component for WalletConnectPage {
                         WcData::Error {
                             message: "User denied msg signing".to_string(),
                             code: 5000,
+                            data: None,
                         },
                         Some(IrnTag::SessionRequestResponse),
                     ))))?;
@@ -545,6 +562,7 @@ impl Component for WalletConnectPage {
                         WcData::Error {
                             message: "User denied msg signing".to_string(),
                             code: 5000,
+                            data: None,
                         },
                         Some(IrnTag::SessionRequestResponse),
                     ))))?;
@@ -632,7 +650,7 @@ impl Component for WalletConnectPage {
             }
         }
 
-        if remove_current_request || remove_current_request_2 {
+        if remove_current_request || remove_current_request_2 || remove_current_request_3 {
             self.session_requests.remove(self.cursor.current);
         }
 

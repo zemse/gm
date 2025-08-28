@@ -132,6 +132,7 @@ impl Component for SendMessagePage {
                 (event, area, tr, sd, ss),
                 |_| Ok(()),
                 |_| Ok(()),
+                |_, _, _| Ok(()),
                 || Ok(()),
                 || Ok(()),
             )?;

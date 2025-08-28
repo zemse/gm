@@ -142,6 +142,7 @@ impl Component for AssetTransferPage {
                 (event, area, tr, sd, ss),
                 |_| Ok(()),
                 |_| Ok(()),
+                |_, _, _| Ok(()),
                 || Ok(()),
                 || {
                     if is_confirmed {

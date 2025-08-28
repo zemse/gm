@@ -12,7 +12,8 @@ use alloy::{
     primitives::{Address, Bytes, FixedBytes},
     providers::Provider,
     rlp::{self, BytesMut, Encodable},
-    rpc::types::TransactionRequest,
+    rpc::{json_rpc::ErrorPayload, types::TransactionRequest},
+    transports::RpcError,
 };
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
@@ -37,11 +38,16 @@ use crate::{
     utils::account::AccountManager,
 };
 
-#[derive(Copy, Clone, Default, Debug, PartialEq)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub enum TxStatus {
     #[default]
     NotSent,
     Signing,
+    JsonRpcError {
+        message: String,
+        code: i64,
+        data: Option<Bytes>,
+    },
     Pending(FixedBytes<32>),
     Confirmed(FixedBytes<32>),
     Failed(FixedBytes<32>),
@@ -81,10 +87,14 @@ impl TxPopup {
     }
 
     pub fn set_tx_req(&mut self, network: Network, tx_req: TransactionRequest) {
-        self.text.text = fmt_tx_request(&network, &tx_req);
         self.network = network;
         self.tx_req = tx_req;
+        self.update_tx_req();
         self.reset();
+    }
+
+    fn update_tx_req(&mut self) {
+        self.text.text = fmt_tx_request(&self.network, &self.tx_req);
     }
 
     pub fn is_not_sent(&self) -> bool {
@@ -107,7 +117,7 @@ impl TxPopup {
         }
     }
 
-    pub fn handle_event<F1, F2, F3, F4>(
+    pub fn handle_event<F1, F2, F3, F4, F5>(
         &mut self,
         (event, area, tr, sd, ss): (
             &crate::tui::Event,
@@ -118,14 +128,16 @@ impl TxPopup {
         ),
         mut on_tx_submit: F1,
         mut on_tx_confirm: F2,
-        mut on_cancel: F3,
-        mut on_esc: F4,
+        mut on_rpc_error: F3,
+        mut on_cancel: F4,
+        mut on_esc: F5,
     ) -> crate::Result<HandleResult>
     where
         F1: FnMut(FixedBytes<32>) -> crate::Result<()>,
         F2: FnMut(FixedBytes<32>) -> crate::Result<()>,
-        F3: FnMut() -> crate::Result<()>,
+        F3: FnMut(String, i64, Option<Bytes>) -> crate::Result<()>,
         F4: FnMut() -> crate::Result<()>,
+        F5: FnMut() -> crate::Result<()>,
     {
         let mut result = HandleResult::default();
 
@@ -137,7 +149,7 @@ impl TxPopup {
         match event {
             Event::Input(key_event) => {
                 if key_event.kind == KeyEventKind::Press {
-                    match self.status {
+                    match &self.status {
                         TxStatus::NotSent => match key_event.code {
                             KeyCode::Left => {
                                 self.button_cursor = false;
@@ -167,6 +179,7 @@ impl TxPopup {
                             _ => {}
                         },
                         TxStatus::Signing
+                        | TxStatus::JsonRpcError { .. }
                         | TxStatus::Pending(_)
                         | TxStatus::Confirmed(_)
                         | TxStatus::Failed(_) =>
@@ -184,9 +197,14 @@ impl TxPopup {
                 }
             }
             Event::TxUpdate(status) => {
-                self.status = *status;
+                self.status = status.clone();
 
                 match status {
+                    TxStatus::JsonRpcError {
+                        message,
+                        code,
+                        data,
+                    } => on_rpc_error(message.clone(), *code, data.clone())?,
                     TxStatus::Pending(tx_hash) => {
                         on_tx_submit(*tx_hash)?;
 
@@ -230,7 +248,7 @@ impl TxPopup {
                 Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
                     .areas(button_area);
 
-            match self.status {
+            match &self.status {
                 TxStatus::NotSent => {
                     Button {
                         focus: !self.button_cursor,
@@ -244,7 +262,14 @@ impl TxPopup {
                     }
                     .render(right_area, buf, &theme);
                 }
-
+                TxStatus::JsonRpcError {
+                    message,
+                    code: _,
+                    data,
+                } => {
+                    format!("RPC Error: {}\nData: {:?}", message, data)
+                        .render(button_area.margin_top(1), buf);
+                }
                 TxStatus::Signing => {
                     "Signing and sending transaction...".render(button_area.margin_top(1), buf);
                 }
@@ -278,6 +303,11 @@ fn fmt_tx_request(network: &Network, tx_req: &TransactionRequest) -> String {
     )
 }
 
+pub enum SendTxResult {
+    Submitted(FixedBytes<32>),
+    JsonRpcError(ErrorPayload),
+}
+
 pub fn send_tx_thread(
     tx_req: &TransactionRequest,
     network: &Network,
@@ -292,7 +322,14 @@ pub fn send_tx_thread(
     let tx_req = tx_req.clone();
     Ok(tokio::spawn(async move {
         let _ = match run(sender_account, network, tx_req, shutdown_signal).await {
-            Ok(hash) => tr.send(Event::TxUpdate(TxStatus::Pending(hash))),
+            Ok(send_result) => tr.send(Event::TxUpdate(match send_result {
+                SendTxResult::Submitted(hash) => TxStatus::Pending(hash),
+                SendTxResult::JsonRpcError(error_payload) => TxStatus::JsonRpcError {
+                    message: error_payload.message.to_string(),
+                    code: error_payload.code,
+                    data: error_payload.data.and_then(|data| data.get().parse().ok()),
+                },
+            })),
             Err(err) => tr.send(Event::TxError(err.fmt_err("TxSubmitError"))),
         };
 
@@ -301,7 +338,7 @@ pub fn send_tx_thread(
             network: Network,
             mut tx: TransactionRequest,
             shutdown_signal: Arc<AtomicBool>,
-        ) -> crate::Result<FixedBytes<32>> {
+        ) -> crate::Result<SendTxResult> {
             let provider = network.get_provider()?;
 
             let wallet = AccountManager::load_wallet(&sender_account)?;
@@ -313,14 +350,45 @@ pub fn send_tx_thread(
             let chain_id = provider.get_chain_id().await?;
             tx.chain_id = Some(chain_id);
 
+            tx.from = Some(sender_account);
+
             // Estimate gas fees
             let fee_estimation = provider.estimate_eip1559_fees().await?;
             tx.max_priority_fee_per_gas = Some(fee_estimation.max_priority_fee_per_gas);
             tx.max_fee_per_gas = Some(gm_stamp(fee_estimation.max_fee_per_gas));
 
-            tx.from = Some(sender_account);
-            tx.gas = Some(provider.estimate_gas(tx.clone()).await?);
-            tx.gas = tx.gas.map(|gas| gas * 110 / 100); // TODO allow to configure gas limit)
+            let estimate_result = provider.estimate_gas(tx.clone()).await;
+
+            // Handle an edge case where node errors with "insufficient funds" error during revert
+            let estimate_result = if estimate_result.is_err()
+                && format!("{:?}", &estimate_result).contains("insufficient funds")
+            {
+                // re-estimate wihout gas price fields
+                let mut tx_temp = tx.clone();
+                tx_temp.gas_price = None;
+                tx_temp.max_fee_per_gas = None;
+                tx_temp.max_priority_fee_per_gas = None;
+
+                provider.estimate_gas(tx_temp).await
+            } else {
+                estimate_result
+            };
+
+            // Bubble up error from estimation to client side
+            let Ok(estimate) = estimate_result else {
+                let err = estimate_result.err().unwrap();
+                return match err {
+                    RpcError::ErrorResp(payload) => Ok(SendTxResult::JsonRpcError(payload.clone())),
+                    _ => Err(crate::Error::from(err)),
+                };
+            };
+
+            let estimate_plus = estimate * 110 / 100; // TODO allow to configure gas limit)
+            if let Some(gas) = tx.gas {
+                tx.gas = Some(std::cmp::max(gas, estimate_plus));
+            } else {
+                tx.gas = Some(estimate_plus);
+            }
 
             tx.transaction_type = Some(2); // EIP-1559 transaction type
 
@@ -349,8 +417,13 @@ pub fn send_tx_thread(
             }
 
             // Submit transaction
-            let result = provider.send_raw_transaction(&out).await?;
-            Ok(*result.tx_hash())
+            match provider.send_raw_transaction(&out).await {
+                Ok(result) => Ok(SendTxResult::Submitted(*result.tx_hash())),
+                Err(send_err) => match &send_err {
+                    RpcError::ErrorResp(payload) => Ok(SendTxResult::JsonRpcError(payload.clone())),
+                    _ => Err(crate::Error::from(send_err)),
+                },
+            }
         }
     }))
 }
