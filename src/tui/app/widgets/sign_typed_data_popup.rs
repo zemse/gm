@@ -270,6 +270,7 @@ impl SignTypedDataPopup {
     }
 }
 
+// TODO there is a bug here that causes revert 0x815e1d64 from permit2, found while interacting with euler
 fn eip712_digest_from_json(typed_data: &Value) -> crate::Result<B256> {
     let (_msg_type, message_value, _domain_type, domain_value) = eip712_to_dyn(typed_data)?;
 
