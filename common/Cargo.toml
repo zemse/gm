@@ -1,0 +1,8 @@
+[package]
+name = "gm-common"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+alloy = { workspace = true }
+serde = { workspace = true }

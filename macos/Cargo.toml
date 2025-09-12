@@ -1,0 +1,12 @@
+[package]
+name = "gm-macos"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+core-foundation = "0.10"
+core-foundation-sys = "0.8.6"
+security-framework = "3.2"
+alloy = { workspace = true }
+thiserror = { workspace = true }
+gm-common = { path = "../common" }

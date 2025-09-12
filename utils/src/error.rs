@@ -1,0 +1,99 @@
+use std::path::PathBuf;
+
+use alloy::primitives::Address;
+use serde_json::Value;
+
+pub type Result<T> = std::result::Result<T, UtilsError>;
+
+#[derive(Debug, thiserror::Error)]
+pub enum UtilsError {
+    #[error(transparent)]
+    MacosError(#[from] gm_macos::Error),
+
+    // TODO improve errors from account module
+    #[error(transparent)]
+    FromHexError(#[from] alloy::hex::FromHexError),
+
+    // TODO improve errors from account module
+    #[error(transparent)]
+    EcdsaError(#[from] alloy::signers::k256::ecdsa::Error),
+
+    #[error("Failed to create mnemonic. (Error: {0:?})")]
+    MnemonicGenerationFailed(coins_bip39::MnemonicError),
+
+    #[error("Failed to create signer from mnemonic. (Error: {0:?})")]
+    MnemonicSignerFailed(alloy::signers::local::LocalSignerError),
+
+    #[error("Secret not found for account {0}.")]
+    SecretNotFound(alloy::primitives::Address),
+
+    #[error(transparent)]
+    ReqwestError(#[from] reqwest::Error),
+
+    #[error("Failed to parse Alchemy response: {0}.")]
+    AlchemyResponse(&'static str),
+
+    #[error(transparent)]
+    ParseFloatError(#[from] std::num::ParseFloatError),
+
+    #[error("Failed to parse JSON value: {0:?}. (Error: {1:?})")]
+    SerdeJsonValueParseFailed(Value, serde_json::Error),
+
+    #[error("Network not found: {0}.")]
+    NetworkNotFound(String),
+
+    #[error("Name already exists in address book: {0}.")]
+    AddressBookNameExists(String),
+
+    #[error("Address already exists in address book: {0}.")]
+    AddressBookAddressExists(Address),
+
+    #[error("Current account is not loaded/selected.")]
+    CurrentAccountNotSet,
+
+    #[error("Alchemy API key not set in config, please set it.")]
+    AlchemyApiKeyNotSet,
+
+    #[error("Failed to get base directories.")]
+    BaseDirsFailed,
+
+    #[error("Failed to create directory: {0:?}. (Error: {1:?})")]
+    CreateDirAllFailed(PathBuf, std::io::Error),
+
+    #[error("Failed to read the file: {0}. (Error: {1:?})")]
+    FileReadFailed(PathBuf, std::io::Error),
+
+    #[error("Failed to write to the file: {0}. (Error: {1:?})")]
+    FileWriteFailed(PathBuf, std::io::Error),
+
+    #[error("Parsing the toml file failed: {0}. (Error: {1:?})")]
+    TomlParsingFailed(PathBuf, toml::de::Error),
+
+    #[error("Formatting to toml format failed: {0}. (Error: {1:?})")]
+    TomlFormattingFailed(String, toml::ser::Error),
+
+    #[error("Parsing the yaml file failed: {0}. (Error: {1:?})")]
+    YamlParsingFailed(PathBuf, serde_yaml::Error),
+
+    #[error("Formatting to yaml format failed: {0}. (Error: {1:?})")]
+    YamlFormattingFailed(String, serde_yaml::Error),
+
+    // TODO improve errors from eip712 module
+    #[error("EIP712 Error: {0}.")]
+    EIP712(&'static str),
+
+    #[error("EIP712 Error: {0}.")]
+    EIP712String(String),
+
+    #[error(transparent)]
+    AlloySolTypes(#[from] alloy::sol_types::Error),
+
+    #[error("Rpc URL not found for network {network} with chain id {chain_id}. Please add it in the networks.")]
+    RpcUrlNotFound { network: String, chain_id: u32 },
+
+    #[error("Failed to parse URL: {0}. (Error: {1:?})")]
+    UrlParsingFailed(String, url::ParseError),
+
+    #[error(transparent)]
+    SerdePathToError(#[from] serde_path_to_error::Error<serde_json::Error>),
+}

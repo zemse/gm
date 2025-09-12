@@ -1,0 +1,13 @@
+[package]
+name = "gm-bin"
+version = "0.0.1"
+edition = "2021"
+
+[[bin]]
+name = "gm"
+path = "src/main.rs"
+
+[dependencies]
+gm-tui = { path = "../tui"}
+gm-utils = { path = "../utils" }
+tokio = { workspace = true }

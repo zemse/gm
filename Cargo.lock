@@ -153,7 +153,7 @@ dependencies = [
  "secp256k1",
  "serde",
  "serde_with",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -190,7 +190,7 @@ dependencies = [
  "futures",
  "futures-util",
  "serde_json",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -232,7 +232,7 @@ dependencies = [
  "alloy-rlp",
  "crc",
  "serde",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -256,7 +256,7 @@ dependencies = [
  "alloy-rlp",
  "k256",
  "serde",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -338,7 +338,7 @@ dependencies = [
  "http 1.3.1",
  "serde",
  "serde_json",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
  "tracing",
 ]
 
@@ -365,7 +365,7 @@ dependencies = [
  "futures-utils-wasm",
  "serde",
  "serde_json",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -448,7 +448,7 @@ dependencies = [
  "reqwest 0.12.22",
  "serde",
  "serde_json",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
  "tokio",
  "tracing",
  "url",
@@ -579,7 +579,7 @@ dependencies = [
  "ethereum_ssz_derive",
  "serde",
  "serde_with",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
  "tree_hash",
  "tree_hash_derive",
 ]
@@ -632,7 +632,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -646,7 +646,7 @@ dependencies = [
  "alloy-serde 1.0.24",
  "serde",
  "serde_json",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -695,7 +695,7 @@ dependencies = [
  "either",
  "elliptic-curve",
  "k256",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -713,7 +713,7 @@ dependencies = [
  "coins-bip39",
  "k256",
  "rand 0.8.5",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -805,7 +805,7 @@ dependencies = [
  "parking_lot 0.12.4",
  "serde",
  "serde_json",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
  "tokio",
  "tower 0.5.2",
  "tracing",
@@ -3025,44 +3025,88 @@ dependencies = [
 ]
 
 [[package]]
+name = "gm-bin"
+version = "0.0.1"
+dependencies = [
+ "gm-tui",
+ "gm-utils",
+ "tokio",
+]
+
+[[package]]
+name = "gm-common"
+version = "0.0.1"
+dependencies = [
+ "alloy",
+ "serde",
+]
+
+[[package]]
+name = "gm-macos"
+version = "0.0.1"
+dependencies = [
+ "alloy",
+ "core-foundation 0.10.1",
+ "core-foundation-sys",
+ "gm-common",
+ "security-framework 3.4.0",
+ "thiserror 2.0.16",
+]
+
+[[package]]
 name = "gm-tui"
 version = "0.0.1"
 dependencies = [
  "alloy",
  "chrono",
  "clap",
- "coins-bip32",
- "coins-bip39",
- "core-foundation 0.10.1",
- "core-foundation-sys",
  "crossterm 0.29.0",
  "data3",
- "directories",
  "eyre",
  "figlet-rs",
+ "gm-common",
+ "gm-macos",
+ "gm-utils",
  "humantime",
  "indicatif",
  "inquire",
  "qrcode 0.12.0",
- "rand 0.8.5",
  "ratatui",
+ "reqwest 0.11.27",
+ "serde",
+ "serde_json",
+ "strum 0.26.3",
+ "strum_macros 0.26.4",
+ "textwrap",
+ "thiserror 2.0.16",
+ "tokio",
+ "tui-qrcode",
+ "url",
+ "walletconnect-sdk",
+ "zemse-helios-ethereum",
+]
+
+[[package]]
+name = "gm-utils"
+version = "0.0.1"
+dependencies = [
+ "alloy",
+ "coins-bip32",
+ "coins-bip39",
+ "directories",
+ "gm-common",
+ "gm-macos",
+ "rand 0.8.5",
  "rayon",
  "reqwest 0.11.27",
- "security-framework 3.3.0",
  "serde",
  "serde_json",
  "serde_path_to_error",
  "serde_plain",
  "serde_yaml",
- "strum 0.26.3",
- "strum_macros 0.26.4",
- "textwrap",
- "tokio",
+ "thiserror 2.0.16",
  "toml",
- "tui-qrcode",
  "url",
- "walletconnect-sdk",
- "zemse-helios-ethereum",
 ]
 
 [[package]]
@@ -4657,7 +4701,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1db05f56d34358a8b1066f67cbb203ee3e7ed2ba674a6263a1d5ec6db2204323"
 dependencies = [
  "memchr",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
  "ucd-trie",
 ]
 
@@ -5064,9 +5108,9 @@ dependencies = [
 
 [[package]]
 name = "rayon"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b418a60154510ca1a002a752ca9714984e21e4241e804d32555251faf8b78ffa"
+checksum = "368f01d005bf8fd9b1206fb6fa653e6c4a81ceb1466406b81792d87c5677a58f"
 dependencies = [
  "either",
  "rayon-core",
@@ -5074,9 +5118,9 @@ dependencies = [
 
 [[package]]
 name = "rayon-core"
-version = "1.12.1"
+version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
+checksum = "22e18b0f0062d30d4230b2e85ff77fdfe4326feb054b9783a3460d8435c8ab91"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
@@ -5842,9 +5886,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework"
-version = "3.3.0"
+version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80fb1d92c5028aa318b4b8bd7302a5bfcf48be96a37fc6fc790f806b0004ee0c"
+checksum = "60b369d18893388b345804dc0007963c99b7d665ae71d275812d828c6f089640"
 dependencies = [
  "bitflags 2.9.1",
  "core-foundation 0.10.1",
@@ -5855,9 +5899,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework-sys"
-version = "2.14.0"
+version = "2.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49db231d56a190491cb4aeda9527f1ad45345af50b0851622a7adb8c03b01c32"
+checksum = "cc1f0cbffaac4852523ce30d8bd3c5cdc873501d96ff467ca09b6767bb8cd5c0"
 dependencies = [
  "core-foundation-sys",
  "libc",
@@ -6454,11 +6498,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.14"
+version = "2.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b0949c3a6c842cbde3f1686d6eea5a010516deb7085f79db747562d4102f41e"
+checksum = "3467d614147380f2e4e374161426ff399c91084acd2363eaf549172b3d5e60c0"
 dependencies = [
- "thiserror-impl 2.0.14",
+ "thiserror-impl 2.0.16",
 ]
 
 [[package]]
@@ -6474,9 +6518,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.14"
+version = "2.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc5b44b4ab9c2fdd0e0512e6bece8388e214c0749f5862b114cc5b7a25daf227"
+checksum = "6c5e1be1c48b9172ee610da68fd9cd2770e7a4056cb3fc98710ee6906f0c7960"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6899,7 +6943,7 @@ dependencies = [
  "rustls 0.23.31",
  "rustls-pki-types",
  "sha1",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
  "utf-8",
 ]
 
@@ -7656,7 +7700,7 @@ dependencies = [
  "pharos",
  "rustc_version 0.4.1",
  "send_wrapper 0.6.0",
- "thiserror 2.0.14",
+ "thiserror 2.0.16",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

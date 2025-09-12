@@ -1,0 +1,30 @@
+[package]
+name = "gm-utils"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+coins-bip32 = "0.12.0"
+coins-bip39 = "0.12.0"
+rayon = "1.8"
+rand = "0.8"
+url = "2.5.4"
+serde_path_to_error = "0.1.17"
+
+alloy = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+reqwest = { workspace = true }
+# tokio = { workspace = true }
+
+
+# file system
+serde_json = { workspace = true }
+serde_plain = "1.0.2"
+toml = "0.8"
+serde_yaml = "0.9.34"
+directories = "5.0"
+
+gm-common = { path = "../common" }
+[target.'cfg(target_os = "macos")'.dependencies]
+gm-macos = { path = "../macos" }

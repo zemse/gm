@@ -1,0 +1,24 @@
+use alloy::primitives::Address;
+
+pub type Result<T> = std::result::Result<T, MacosError>;
+
+// TODO improve errors
+#[derive(Debug, thiserror::Error)]
+pub enum MacosError {
+    // #[error("Error from Apple Security Framework {0:?}")]
+    // Apple(security_framework::base::Error),
+    #[error("Not able to find the account {0} in your keychain. (Error: {1:?})")]
+    AccountNotFoundInKeychain(Address, security_framework::base::Error),
+
+    #[error("Failed to store account {0} in your keychain. (Error: {1:?})")]
+    StoringAccountInKeychainFailed(Address, security_framework::base::Error),
+
+    #[error("Failed to parse string from keychain secret for account {0}. (Error: {1:?})")]
+    ParsingStringFromKeychainSecretFailed(Address, std::string::FromUtf8Error),
+
+    #[error("Not able to parse address for the keychain item {0}. (Error: {1:?})")]
+    ParsingAddressFromKeychainFailed(String, alloy::hex::FromHexError),
+
+    #[error("Private key for account {0} is invalid. (Error: {1:?})")]
+    PrivateKeyInvalid(Address, alloy::signers::k256::ecdsa::Error),
+}

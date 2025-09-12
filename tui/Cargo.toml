@@ -1,0 +1,48 @@
+[package]
+name = "gm-tui"
+version = "0.0.1"
+edition = "2021"
+description = "TUI-based Ethereum wallet"
+license = "MIT"
+repository = "https://github.com/zemse/gm"
+keywords = ["crypto", "blockchain", "ethereum", "tui", "wallet"]
+include = ["src/**", "Cargo.toml", "README.md", "LICENSE*"]
+
+[dependencies]
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+gm-common = { path = "../common" }
+gm-utils = { path = "../utils" }
+gm-macos = { path = "../macos" }
+
+# CLI
+clap = { version = "4.0", features = ["derive"] }
+figlet-rs = "0.1"
+inquire = "0.7"
+strum = "0.26"
+strum_macros = "0.26"
+tui-qrcode = "0.1.1"
+qrcode = "0.12"
+indicatif = "0.17"
+
+# Ethereum
+alloy = { workspace = true }
+
+
+#tui
+crossterm = "0.29.0"
+ratatui = "0.29.0"
+
+# misc
+tokio = { workspace = true }
+
+humantime = "2.2.0"
+chrono = "0.4.41"
+url = "2.5.4"
+data3 = "0.2.0"
+walletconnect-sdk = "0.2.2"
+helios-ethereum = { package = "zemse-helios-ethereum", version = "0.9" }
+eyre = "0.6"
+textwrap = "0.16.2"
+reqwest = { workspace = true }
