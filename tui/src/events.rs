@@ -4,19 +4,18 @@ use alloy::{
     primitives::Address,
     signers::{k256::ecdsa::SigningKey, Signature},
 };
+use gm_ratatui_extra::candle_chart::{Candle, Interval};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use walletconnect_sdk::wc_message::WcMessage;
 
-use crate::app::widgets::{
-    invite_popup::{InviteCodeClaimStatus, InviteCodeValidity},
-    tx_popup::TxStatus,
-};
 use gm_utils::assets::{Asset, LightClientVerification, TokenAddress};
 
 use reqwest::Error as ReqwestError;
 
-use super::app::{
-    pages::walletconnect::WalletConnectStatus,
-    widgets::candle_chart::{Candle, Interval},
+use crate::pages::{
+    invite_popup::{InviteCodeClaimStatus, InviteCodeValidity},
+    tx_popup::TxStatus,
+    walletconnect::WalletConnectStatus,
 };
 
 pub mod assets;
@@ -27,7 +26,7 @@ pub mod recent_addresses;
 
 #[derive(Debug)]
 pub enum Event {
-    Input(crossterm::event::KeyEvent),
+    Input(KeyEvent),
 
     AccountChange(Address),
     ConfigUpdate,
@@ -81,39 +80,47 @@ impl Event {
     }
 
     pub fn is_space_or_enter_pressed(&self) -> bool {
-        self.is_char_pressed(Some(' ')) || self.is_key_pressed(crossterm::event::KeyCode::Enter)
+        self.is_char_pressed(Some(' ')) || self.is_key_pressed(KeyCode::Enter)
     }
 
     pub fn is_char_pressed(&self, char: Option<char>) -> bool {
         if let Some(ch) = char {
             matches!(
                 self,
-                Event::Input(crossterm::event::KeyEvent {
-                    kind: crossterm::event::KeyEventKind::Press,
-                    code: crossterm::event::KeyCode::Char(c),
+                Event::Input(KeyEvent {
+                    kind: KeyEventKind::Press,
+                    code: KeyCode::Char(c),
                     ..
                 }) if *c == ch
             )
         } else {
             matches!(
                 self,
-                Event::Input(crossterm::event::KeyEvent {
-                    kind: crossterm::event::KeyEventKind::Press,
+                Event::Input(KeyEvent {
+                    kind: KeyEventKind::Press,
                     ..
                 })
             )
         }
     }
 
-    pub fn is_key_pressed(&self, key: crossterm::event::KeyCode) -> bool {
+    pub fn is_key_pressed(&self, key: KeyCode) -> bool {
         matches!(
             self,
-            Event::Input(crossterm::event::KeyEvent {
-                kind: crossterm::event::KeyEventKind::Press,
+            Event::Input(KeyEvent {
+                kind: KeyEventKind::Press,
                 code,
-                modifiers: crossterm::event::KeyModifiers::NONE,
+                modifiers: KeyModifiers::NONE,
                 ..
             }) if *code == key
         )
+    }
+
+    pub fn key_event(&self) -> Option<&KeyEvent> {
+        if let Event::Input(key_event) = self {
+            Some(key_event)
+        } else {
+            None
+        }
     }
 }

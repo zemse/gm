@@ -1,61 +1,22 @@
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
+use gm_ratatui_extra::{act::Act, thematize::Thematize};
 use ratatui::widgets::{Block, Widget};
 
-use super::{
-    app::{pages::Page, SharedState},
-    events::Event,
-};
+use crate::app::SharedState;
 
-pub trait BorderedWidget {
-    fn render_with_block(
-        self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
-        block: Block<'_>,
-    ) where
-        Self: Sized;
-}
+use super::{events::Event, pages::Page};
 
-pub trait WidgetHeight {
-    fn height_used(&self, area: ratatui::prelude::Rect) -> u16;
-}
-
-pub trait CustomRender<Args = ()> {
-    #[allow(dead_code)]
-    fn render(
-        &self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
-        args: Args,
-    ) -> ratatui::prelude::Rect;
-}
-
-pub trait RectUtil {
-    fn consume_height(self, height: u16) -> crate::Result<ratatui::prelude::Rect>;
-
-    fn change_height(self, height: u16) -> ratatui::prelude::Rect;
-
-    fn margin_h(self, m: u16) -> ratatui::prelude::Rect;
-
-    fn margin_top(self, m: u16) -> ratatui::prelude::Rect;
-
-    fn margin_down(self, m: u16) -> ratatui::prelude::Rect;
-
-    fn expand_vertical(self, m: u16) -> ratatui::prelude::Rect;
-
-    fn block_inner(self) -> ratatui::prelude::Rect;
-}
-
+// TODO change the name of this struct and trait, something like trait PostHandleEvent
 #[derive(Default)]
-pub struct HandleResult {
+pub struct Actions {
     // Number of pages to go back, usually 1.
     pub page_pops: usize,
     // Page to insert into the context stack.
     pub page_inserts: Vec<Page>,
     // Number of [ESC] key presses to ignore. This is to enable the current page
     // wants to handle the [ESC] key.
-    pub esc_ignores: usize,
+    pub ignore_esc: bool,
     // Regenerate the data for the current page, this is used when we expect
     // that the external state is updated and we need to reflect that in the UI.
     pub reload: bool,
@@ -63,13 +24,17 @@ pub struct HandleResult {
     pub refresh_assets: bool,
 }
 
-impl HandleResult {
-    pub fn merge(&mut self, other: HandleResult) {
+impl Act for Actions {
+    fn merge(&mut self, other: Actions) {
         self.page_pops += other.page_pops;
         self.page_inserts.extend(other.page_inserts);
-        self.esc_ignores += other.esc_ignores;
+        self.ignore_esc |= other.ignore_esc;
         self.reload |= other.reload;
         self.refresh_assets |= other.refresh_assets;
+    }
+
+    fn ignore_esc(&mut self) {
+        self.ignore_esc = true;
     }
 }
 
@@ -94,7 +59,7 @@ pub trait Component {
         transmitter: &mpsc::Sender<Event>,
         shutdown_signal: &Arc<AtomicBool>,
         shared_state: &SharedState,
-    ) -> crate::Result<HandleResult>;
+    ) -> crate::Result<Actions>;
 
     // Renders the component into the given area and returns the area that was
     // actually used.
@@ -119,8 +84,8 @@ pub trait Component {
     {
         let inner_area = block.inner(area);
         block
-            .style(&shared_state.theme)
-            .border_type((&shared_state.theme).into())
+            .style(shared_state.theme.block())
+            .border_type(shared_state.theme.border_type())
             .render(area, buf);
         self.render_component(inner_area, buf, shared_state);
         area

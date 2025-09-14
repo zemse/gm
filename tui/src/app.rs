@@ -4,41 +4,42 @@ use std::{
     sync::{atomic::AtomicBool, mpsc, Arc, RwLock, RwLockWriteGuard},
 };
 
+use crate::pages::{
+    config::ConfigPage,
+    dev_key_capture::DevKeyCapturePage,
+    footer::Footer,
+    invite_popup::InvitePopup,
+    main_menu::{MainMenuItem, MainMenuPage},
+    text::TextPage,
+    title::Title,
+    trade::TradePage,
+    Page,
+};
 use alloy::primitives::Address;
-use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
+use gm_ratatui_extra::{
+    extensions::RectExt, form::Form, text_popup::TextPopup, thematize::Thematize,
+};
 use gm_utils::{
     assets::{Asset, AssetManager},
     disk::{Config, DiskInterface},
 };
-use pages::{
-    config::ConfigPage,
-    dev_key_capture::DevKeyCapturePage,
-    main_menu::{MainMenuItem, MainMenuPage},
-    text::TextPage,
-    trade::TradePage,
-    Page,
-};
+use ratatui::crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
     widgets::{Block, Widget},
     DefaultTerminal,
 };
-use widgets::{footer::Footer, form::Form, text_popup::TextPopup, title::Title};
 
 use super::{
     events::{self, Event},
-    traits::{Component, HandleResult, RectUtil},
+    traits::{Actions, Component},
 };
 use crate::{
-    app::widgets::invite_popup::InvitePopup,
     error::FmtError,
     events::helios::helios_thread,
     theme::{Theme, ThemeName},
 };
-
-pub mod pages;
-pub mod widgets;
 
 // TODO update focus to have title bar, footer
 #[allow(dead_code)]
@@ -54,7 +55,7 @@ pub struct SharedState {
     pub recent_addresses: Option<Vec<Address>>,
     pub testnet_mode: bool,
     pub developer_mode: bool,
-    current_account: Option<Address>,
+    pub current_account: Option<Address>,
     pub alchemy_api_key_available: bool,
     pub eth_price: Option<String>,
     pub theme: Theme,
@@ -267,17 +268,7 @@ impl App {
         Ok(())
     }
 
-    async fn process_result(
-        &mut self,
-        result: crate::Result<HandleResult>,
-    ) -> crate::Result<usize> {
-        let result = match result {
-            Ok(res) => res,
-            Err(error) => {
-                self.fatal_error_popup.set_text(format!("{error:#?}"));
-                return Err(error);
-            }
-        };
+    async fn process_result(&mut self, result: Actions) -> crate::Result<bool> {
         for _ in 0..result.page_pops {
             self.context.pop();
         }
@@ -294,7 +285,7 @@ impl App {
             }
         }
         self.context.extend(result.page_inserts);
-        Ok(result.esc_ignores)
+        Ok(result.ignore_esc)
     }
 
     pub async fn handle_event(
@@ -307,15 +298,16 @@ impl App {
         let [_, body_area, _] = self.get_areas(area);
 
         let result = if self.fatal_error_popup.is_shown() {
-            self.fatal_error_popup.handle_event(&event, area)
+            self.fatal_error_popup
+                .handle_event::<Actions>(event.key_event(), area)
         } else if self.invite_popup.is_open() {
             self.invite_popup
-                .handle_event(&event, tr, &self.shared_state)
+                .handle_event(&event, tr, &self.shared_state)?
         } else if self.context.last().is_some() {
             let page = self.context.last_mut().unwrap();
-            page.handle_event(&event, body_area.block_inner(), tr, sd, &self.shared_state)
+            page.handle_event(&event, body_area.block_inner(), tr, sd, &self.shared_state)?
         } else {
-            Ok(HandleResult::default())
+            Actions::default()
         };
 
         let esc_ignores = self.process_result(result).await?;
@@ -348,7 +340,7 @@ impl App {
                         KeyCode::Esc => {
                             if self.fatal_error_popup.is_shown() {
                                 self.fatal_error_popup.clear();
-                            } else if esc_ignores == 0 {
+                            } else if !esc_ignores {
                                 let page = self.context.pop();
                                 if let Some(mut page) = page {
                                     page.exit_threads().await;

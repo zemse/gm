@@ -1,0 +1,18 @@
+[package]
+name = "gm-ratatui-extra"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+alloy = { workspace = true }
+tokio = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+thiserror = { workspace = true }
+
+gm-utils = { path = "../utils" }
+
+chrono = "0.4.41"
+textwrap = "0.16.2"

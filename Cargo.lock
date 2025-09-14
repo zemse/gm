@@ -3054,11 +3054,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "gm-tui"
+name = "gm-ratatui-extra"
 version = "0.0.1"
 dependencies = [
  "alloy",
  "chrono",
+ "crossterm 0.29.0",
+ "gm-utils",
+ "ratatui",
+ "strum 0.26.3",
+ "strum_macros 0.26.4",
+ "textwrap",
+ "thiserror 2.0.16",
+ "tokio",
+]
+
+[[package]]
+name = "gm-tui"
+version = "0.0.1"
+dependencies = [
+ "alloy",
  "clap",
  "crossterm 0.29.0",
  "data3",
@@ -3066,6 +3081,7 @@ dependencies = [
  "figlet-rs",
  "gm-common",
  "gm-macos",
+ "gm-ratatui-extra",
  "gm-utils",
  "humantime",
  "indicatif",
@@ -3077,7 +3093,6 @@ dependencies = [
  "serde_json",
  "strum 0.26.3",
  "strum_macros 0.26.4",
- "textwrap",
  "thiserror 2.0.16",
  "tokio",
  "tui-qrcode",

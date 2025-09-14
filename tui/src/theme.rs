@@ -1,3 +1,4 @@
+use gm_ratatui_extra::thematize::Thematize;
 use ratatui::prelude::Color;
 use ratatui::style::Modifier;
 use ratatui::style::Style;
@@ -55,36 +56,22 @@ pub struct Theme {
     pub border_type: BorderType,
 }
 
-impl From<&Theme> for Style {
-    fn from(theme: &Theme) -> Self {
-        let mut style = Style::default();
-        if let Some(text_color) = theme.text {
-            style = style.fg(text_color);
-        }
-        if let Some(bg_color) = theme.bg {
-            style = style.bg(bg_color);
-        }
-        if theme.reversed {
-            style = style.add_modifier(Modifier::REVERSED);
-        } else {
-            style = style.remove_modifier(Modifier::REVERSED);
-        }
-        style
-    }
-}
+// impl From<&Theme> for Style {
+//     fn from(theme: &Theme) -> Self {}
+// }
 
-impl From<&mut Theme> for Style {
-    fn from(theme: &mut Theme) -> Self {
-        let theme = &*theme;
-        theme.into()
-    }
-}
+// impl From<&mut Theme> for Style {
+//     fn from(theme: &mut Theme) -> Self {
+//         let theme = &*theme;
+//         theme.into()
+//     }
+// }
 
-impl From<&Theme> for BorderType {
-    fn from(val: &Theme) -> Self {
-        val.border_type
-    }
-}
+// impl From<&Theme> for BorderType {
+//     fn from(val: &Theme) -> Self {
+//         val.border_type
+//     }
+// }
 
 impl Theme {
     pub fn new(theme_name: ThemeName) -> Theme {
@@ -131,8 +118,10 @@ impl Theme {
             },
         }
     }
+}
 
-    pub fn button_focused(&self) -> Style {
+impl Thematize for Theme {
+    fn button_focused(&self) -> Style {
         if self.reversed {
             Style::default()
                 .add_modifier(Modifier::BOLD)
@@ -142,7 +131,27 @@ impl Theme {
         }
     }
 
-    pub fn select(&self) -> Style {
+    fn border_type(&self) -> BorderType {
+        self.border_type
+    }
+
+    fn block(&self) -> Style {
+        let mut style = Style::default();
+        if let Some(text_color) = self.text {
+            style = style.fg(text_color);
+        }
+        if let Some(bg_color) = self.bg {
+            style = style.bg(bg_color);
+        }
+        if self.reversed {
+            style = style.add_modifier(Modifier::REVERSED);
+        } else {
+            style = style.remove_modifier(Modifier::REVERSED);
+        }
+        style
+    }
+
+    fn select_focused(&self) -> Style {
         if let Some(select_focus) = self.select_focus {
             Style::default()
                 .bg(select_focus)
@@ -152,19 +161,19 @@ impl Theme {
         }
     }
 
-    pub fn select_popup(&self) -> Style {
-        if let Some(select_focus) = self.select_focus {
-            Style::default()
-                .bg(select_focus)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default()
-                .add_modifier(Modifier::BOLD)
-                .remove_modifier(Modifier::REVERSED)
-        }
-    }
+    // fn select_popup(&self) -> Style {
+    //     if let Some(select_focus) = self.select_focus {
+    //         Style::default()
+    //             .bg(select_focus)
+    //             .add_modifier(Modifier::BOLD)
+    //     } else {
+    //         Style::default()
+    //             .add_modifier(Modifier::BOLD)
+    //             .remove_modifier(Modifier::REVERSED)
+    //     }
+    // }
 
-    pub fn popup(&self) -> Theme {
+    fn popup(&self) -> Theme {
         Theme {
             bg: self.popup_bg,
             reversed: self.popup_reversed,
@@ -172,7 +181,7 @@ impl Theme {
         }
     }
 
-    pub fn error_popup(&self) -> Theme {
+    fn error_popup(&self) -> Theme {
         let s = self.popup();
         Theme {
             bg: s.error_popup_bg,

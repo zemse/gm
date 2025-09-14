@@ -5,8 +5,9 @@ mod events;
 #[macro_use]
 mod traits;
 pub mod app;
-mod impls;
+mod pages;
 mod theme;
+mod widgets;
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},

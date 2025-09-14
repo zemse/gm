@@ -9,6 +9,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     MacosError(#[from] gm_macos::Error),
     UtilsError(#[from] gm_utils::Error),
+    RatatuiExtraError(#[from] gm_ratatui_extra::Error),
 
     CurrentAccountNotSet,
     AlchemyApiKeyNotSet,
@@ -30,7 +31,7 @@ pub enum Error {
     SerdeJsonWithString(Box<serde_json::Error>, Box<String>),
     MpscRecvError(Box<std::sync::mpsc::RecvError>),
     MpscSendError(Box<std::sync::mpsc::SendError<crate::Event>>),
-    MpscSendError2(Box<std::sync::mpsc::SendError<crate::app::pages::walletconnect::WcEvent>>),
+    MpscSendError2(Box<std::sync::mpsc::SendError<crate::pages::walletconnect::WcEvent>>),
     AlloyLocalSignerError(Box<alloy::signers::local::LocalSignerError>),
     FromUtf8Error(Box<std::string::FromUtf8Error>),
     RpcError(Box<alloy::transports::RpcError<alloy::transports::TransportErrorKind>>),
@@ -156,8 +157,8 @@ impl From<std::sync::mpsc::SendError<crate::Event>> for Error {
     }
 }
 
-impl From<std::sync::mpsc::SendError<crate::app::pages::walletconnect::WcEvent>> for Error {
-    fn from(e: std::sync::mpsc::SendError<crate::app::pages::walletconnect::WcEvent>) -> Self {
+impl From<std::sync::mpsc::SendError<crate::pages::walletconnect::WcEvent>> for Error {
+    fn from(e: std::sync::mpsc::SendError<crate::pages::walletconnect::WcEvent>) -> Self {
         Error::MpscSendError2(Box::new(e))
     }
 }

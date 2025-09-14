@@ -6,13 +6,13 @@ use std::{
     thread,
 };
 
-use crossterm::event::KeyCode;
+use ratatui::crossterm::event::KeyCode;
 
 pub fn watch_input_events(tx: mpsc::Sender<super::Event>, shutdown_signal: Arc<AtomicBool>) {
     while !shutdown_signal.load(Ordering::Relaxed) {
         #[allow(clippy::single_match)]
-        match crossterm::event::read().unwrap() {
-            crossterm::event::Event::Key(key_event) => {
+        match ratatui::crossterm::event::read().unwrap() {
+            ratatui::crossterm::event::Event::Key(key_event) => {
                 // Send result back to main thread. If main thread has already
                 // shutdown, then we will get error. Since our event is not
                 // critical, we do not store it to disk.
