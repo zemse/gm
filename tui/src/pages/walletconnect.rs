@@ -189,28 +189,19 @@ impl WalletConnectPage {
     }
 
     fn open_request_at_cursor(&mut self) -> crate::Result<()> {
-        let req =
-            self.session_requests
-                .get(self.cursor.current)
-                .ok_or(crate::Error::InternalError(format!(
-                    "Session request not found at index {}, num requests: {}",
-                    self.cursor.current,
-                    self.session_requests.len()
-                )))?;
+        let req = self.session_requests.get(self.cursor.current).ok_or(
+            crate::Error::SessionRequestNotFound(self.cursor.current, self.session_requests.len()),
+        )?;
         let req = req
             .data
             .as_session_request()
-            .ok_or(crate::Error::InternalErrorStr(
-                "not a session request, cant happen",
-            ))?;
+            .ok_or(crate::Error::NotSessionRequest)?;
         let chain_id = req
             .chain_id
             .strip_prefix("eip155:")
-            .ok_or(crate::Error::InternalError(format!(
-                "chain_id should start with `eip155:`, found {}",
-                req.chain_id
-            )))?
-            .parse::<u32>()?;
+            .ok_or_else(|| crate::Error::ChainIdStripEip155Failed(req.chain_id.clone()))?
+            .parse::<u32>()
+            .map_err(|_| crate::Error::ChainIdParseFailed(req.chain_id.clone()))?;
         match &req.request.params {
             SessionRequestData::EthSendTransaction(tx_req) => {
                 let network = NetworkStore::from_chain_id(chain_id)?;
@@ -309,19 +300,16 @@ impl Component for WalletConnectPage {
                         }
                     }
                     // TODO handle session delete
-                    _ => {
-                        return Err(crate::Error::InternalError(format!(
-                            "wc method unhandled in TUI: {msg:?}",
-                        )))
-                    }
+                    _ => return Err(crate::Error::MethodUnhandled(msg.clone())),
                 };
             }
             Event::WalletConnectStatus(status) => {
                 self.status = status.clone();
                 if let Some((_, proposal)) = status.proposal() {
-                    let proposal = proposal.data.as_session_propose().ok_or(
-                        crate::Error::InternalErrorStr("Not proposal, should not happen"),
-                    )?;
+                    let proposal = proposal
+                        .data
+                        .as_session_propose()
+                        .ok_or(crate::Error::ProposalNotFound)?;
 
                     let text = self.confirm_popup.text_mut();
                     *text = format_proposal(proposal);
@@ -335,11 +323,16 @@ impl Component for WalletConnectPage {
         }
 
         let get_req_tr_2 = || -> crate::Result<_> {
-            let req = self
-                .session_requests
-                .get(self.cursor.current)
-                .ok_or("session request not found")?;
-            let tr_2 = self.tr_2.as_ref().ok_or("no tr_2")?;
+            let req = self.session_requests.get(self.cursor.current).ok_or(
+                crate::Error::SessionRequestNotFound(
+                    self.cursor.current,
+                    self.session_requests.len(),
+                ),
+            )?;
+            let tr_2 = self
+                .tr_2
+                .as_ref()
+                .ok_or(crate::Error::Transmitter2NotCreated)?;
             Ok((req, tr_2))
         };
 
@@ -357,9 +350,7 @@ impl Component for WalletConnectPage {
                     let pairing = self
                         .status
                         .proposal()
-                        .ok_or(crate::Error::InternalErrorStr(
-                            "proposal not found, cant happen",
-                        ))?
+                        .ok_or(crate::Error::ProposalNotFound)?
                         .0
                         .clone();
 

@@ -90,21 +90,20 @@ impl Component for AddressBookDisplayPage {
                         let mut address_book = AddressBook::load()?;
 
                         let address = form.get_text(FormItem::Address);
-                        let result =
-                            address
-                                .parse()
-                                .map_err(crate::Error::from)
-                                .and_then(|address| {
-                                    address_book
-                                        .update(
-                                            self.id,
-                                            AddressBookEntry {
-                                                name: name.clone(),
-                                                address,
-                                            },
-                                        )
-                                        .map_err(crate::Error::from)
-                                });
+                        let result = address
+                            .parse()
+                            .map_err(|_| crate::Error::InvalidAddress(address.clone()))
+                            .and_then(|address| {
+                                address_book
+                                    .update(
+                                        self.id,
+                                        AddressBookEntry {
+                                            name: name.clone(),
+                                            address,
+                                        },
+                                    )
+                                    .map_err(crate::Error::from)
+                            });
                         if let Err(e) = result {
                             let error = form.get_text_mut(FormItem::ErrorText);
                             *error = format!("{e:?}");

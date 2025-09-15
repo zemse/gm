@@ -178,14 +178,6 @@ impl Display for Asset {
     }
 }
 
-#[allow(dead_code)]
-fn has_token(networks: &NetworkStore, token_address: &TokenAddress) -> bool {
-    match token_address {
-        TokenAddress::Native => false,
-        TokenAddress::Contract(address) => networks.has_token(address),
-    }
-}
-
 pub async fn get_all_assets() -> crate::Result<(Address, Vec<Asset>)> {
     let config = Config::load()?;
     let wallet_address = config.try_current_account()?;

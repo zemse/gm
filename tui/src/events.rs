@@ -8,9 +8,10 @@ use gm_ratatui_extra::candle_chart::{Candle, Interval};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use walletconnect_sdk::wc_message::WcMessage;
 
-use gm_utils::assets::{Asset, LightClientVerification, TokenAddress};
-
-use reqwest::Error as ReqwestError;
+use gm_utils::{
+    assets::{Asset, LightClientVerification, TokenAddress},
+    error::UtilsError,
+};
 
 use crate::pages::{
     invite_popup::{InviteCodeClaimStatus, InviteCodeValidity},
@@ -32,7 +33,7 @@ pub enum Event {
     ConfigUpdate,
 
     EthPriceUpdate(String),
-    EthPriceError(ReqwestError),
+    EthPriceError(UtilsError),
 
     HashRateResult(f64),
     HashRateError(String),
@@ -45,7 +46,7 @@ pub enum Event {
     RecentAddressesUpdateError(crate::Error),
 
     CandlesUpdate(Vec<Candle>, Interval),
-    CandlesUpdateError(ReqwestError),
+    CandlesUpdateError(UtilsError),
 
     TxUpdate(TxStatus),
     TxError(String),

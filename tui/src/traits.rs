@@ -39,7 +39,6 @@ impl Act for Actions {
 }
 
 pub trait Component {
-    // TODO rename to `reload` or `refresh_component`
     fn reload(&mut self, _shared_state: &SharedState) -> crate::Result<()> {
         Ok(())
     }

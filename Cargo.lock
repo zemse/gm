@@ -3088,7 +3088,6 @@ dependencies = [
  "inquire",
  "qrcode 0.12.0",
  "ratatui",
- "reqwest 0.11.27",
  "serde",
  "serde_json",
  "strum 0.26.3",

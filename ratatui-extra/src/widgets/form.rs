@@ -141,8 +141,6 @@ impl<
         E: From<crate::error::RatatuiExtraError>,
     > Form<T, E>
 {
-    // TODO remove the cursor parameter, and guess it as the first item that is
-    // not heading or static text or similar
     pub fn init<F>(set_values_closure: F) -> Result<Self, E>
     where
         F: FnOnce(&mut Self) -> Result<(), E>,

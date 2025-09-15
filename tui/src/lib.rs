@@ -1,12 +1,11 @@
 pub mod error;
 pub use error::{Error, Result};
 
-mod events;
-#[macro_use]
-mod traits;
 pub mod app;
+mod events;
 mod pages;
 mod theme;
+mod traits;
 mod widgets;
 
 use std::sync::{
@@ -30,7 +29,7 @@ pub async fn run(args: Vec<String>) -> crate::Result<()> {
 
     while !app.exit {
         // render the view based on the controller state
-        let area = app.draw(&mut terminal)?;
+        let area = app.draw(&mut terminal).map_err(crate::Error::Draw)?;
 
         // make any changes to Controller state
         let result = app
@@ -42,7 +41,7 @@ pub async fn run(args: Vec<String>) -> crate::Result<()> {
     }
 
     // final render before exiting
-    app.draw(&mut terminal)?;
+    app.draw(&mut terminal).map_err(crate::Error::Draw)?;
 
     // signal all the threads to exit
     shutdown.store(true, Ordering::Relaxed);

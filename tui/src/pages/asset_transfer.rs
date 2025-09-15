@@ -121,7 +121,7 @@ impl Component for AssetTransferPage {
             result.merge(self.address_book_popup.handle_event(
                 event.key_event(),
                 |entry| -> crate::Result<()> {
-                    *self.form.get_text_mut(FormItem::To) = entry.address_unwrap().to_string();
+                    *self.form.get_text_mut(FormItem::To) = entry.address()?.to_string();
                     self.form.advance_cursor();
                     Ok(())
                 },
@@ -182,22 +182,29 @@ impl Component for AssetTransferPage {
                     |label, form| {
                         if label == FormItem::TransferButton {
                             let to = form.get_text(FormItem::To);
-                            let asset = self
-                                .asset
-                                .as_ref()
-                                .ok_or(crate::Error::InternalErrorStr("No asset selected"))?;
+                            let asset =
+                                self.asset.as_ref().ok_or(crate::Error::AssetNotSelected)?;
                             let amount = parse_units(
                                 form.get_text(FormItem::Amount),
                                 asset.r#type.decimals,
                             )?;
 
+                            // TODO change erc20 logic here
                             let (to, calldata, value) = match asset.r#type.token_address {
-                                TokenAddress::Native => {
-                                    (to.parse()?, Bytes::new(), amount.get_absolute())
-                                }
+                                TokenAddress::Native => (
+                                    to.parse()
+                                        .map_err(|_| crate::Error::InvalidAddress(to.clone()))?,
+                                    Bytes::new(),
+                                    amount.get_absolute(),
+                                ),
                                 TokenAddress::Contract(address) => (
                                     address,
-                                    erc20::encode_transfer(to.parse()?, amount.get_absolute()),
+                                    erc20::encode_transfer(
+                                        to.parse().map_err(|_| {
+                                            crate::Error::InvalidAddress(to.clone())
+                                        })?,
+                                        amount.get_absolute(),
+                                    ),
                                     U256::ZERO,
                                 ),
                             };

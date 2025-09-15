@@ -41,14 +41,6 @@ use crate::{
     theme::{Theme, ThemeName},
 };
 
-// TODO update focus to have title bar, footer
-#[allow(dead_code)]
-#[derive(Debug, PartialEq)]
-pub enum Focus {
-    Main,
-    Sidebar,
-}
-
 pub struct SharedState {
     pub online: Option<bool>,
     pub asset_manager: Arc<RwLock<AssetManager>>,
@@ -70,16 +62,15 @@ impl SharedState {
         Ok(self
             .asset_manager
             .read()
-            .map_err(|e| format!("poison error - please restart gm - {e}"))?
+            .map_err(|_| crate::Error::Poisoned("assets_read".to_string()))?
             .get_assets(&current_account)
             .cloned())
     }
 
     pub fn assets_mut(&mut self) -> crate::Result<RwLockWriteGuard<'_, AssetManager>> {
-        Ok(self
-            .asset_manager
+        self.asset_manager
             .write()
-            .map_err(|e| format!("poison error - please restart gm - {e}"))?)
+            .map_err(|_| crate::Error::Poisoned("assets_mut".to_string()))
     }
 
     pub fn try_current_account(&self) -> crate::Result<Address> {
@@ -373,8 +364,7 @@ impl App {
                     // ETH Price is the main API for understanding if we are connected to internet
                     self.set_offline().await;
                 } else {
-                    self.fatal_error_popup
-                        .set_text(error.fmt_err("EthPriceError"));
+                    self.fatal_error_popup.set_text(format!("{error}"));
                 }
             }
 
@@ -399,7 +389,7 @@ impl App {
                 self.shared_state
                     .asset_manager
                     .write()
-                    .map_err(|err| format!("poison error - please restart gm - {err}"))?
+                    .map_err(|_| crate::Error::Poisoned("HeliosUpdate".to_string()))?
                     .update_light_client_verification(account, network, token_address, status);
             }
             Event::HeliosError(error) => {
@@ -415,8 +405,7 @@ impl App {
 
             // Candles API
             Event::CandlesUpdateError(error) => {
-                self.fatal_error_popup
-                    .set_text(error.fmt_err("CandlesUpdateError"));
+                self.fatal_error_popup.set_text(format!("{error}"));
             }
 
             // Transaction API
@@ -437,13 +426,6 @@ impl App {
 
     fn current_page(&self) -> Option<&Page> {
         self.context.last()
-    }
-
-    // TODO using this triggers rust borrow checks, as we are not able to do
-    // immutable borrows once self is borrowed mutably
-    #[allow(dead_code)]
-    fn current_page_mut(&mut self) -> Option<&mut Page> {
-        self.context.last_mut()
     }
 
     fn get_areas(&self, area: Rect) -> [Rect; 3] {

@@ -31,9 +31,7 @@ impl std::str::FromStr for ThemeName {
             "MonochromeModern" => Ok(Self::MonochromeModern),
             "Dark" => Ok(Self::Dark),
             "DarkModern" => Ok(Self::DarkModern),
-            _ => Err(crate::Error::InternalError(format!(
-                "Unknown theme name: {theme_name}"
-            ))),
+            _ => Err(crate::Error::UnknownTheme(theme_name.to_string())),
         }
     }
 }

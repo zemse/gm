@@ -160,21 +160,21 @@ fn start_api_thread(
         let url =
             format!("https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval={interval}");
         loop {
-            match reqwest::get(&url).await {
-                Ok(response) => match response.json::<Vec<BinanceKline>>().await {
-                    Ok(parsed) => {
-                        let candles: Vec<Candle> =
-                            parsed.into_iter().map(|kline| kline.into()).collect();
-                        let _ = tr.send(Event::CandlesUpdate(candles, interval));
-                    }
-                    Err(e) => {
-                        let _ = tr.send(Event::CandlesUpdateError(e));
-                    }
-                },
-                Err(e) => {
-                    let _ = tr.send(Event::CandlesUpdateError(e));
+            match gm_utils::Reqwest::get(&url)
+                .expect("url invalid")
+                .receive_json::<Vec<BinanceKline>>()
+                .await
+            {
+                Ok(parsed) => {
+                    let candles: Vec<Candle> =
+                        parsed.into_iter().map(|kline| kline.into()).collect();
+                    let _ = tr.send(Event::CandlesUpdate(candles, interval));
+                }
+                Err(err) => {
+                    let _ = tr.send(Event::CandlesUpdateError(err));
                 }
             }
+
             tokio::time::sleep(query_duration.unwrap_or(Duration::from_secs(5))).await;
         }
     })

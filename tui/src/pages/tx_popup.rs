@@ -399,11 +399,9 @@ pub fn send_tx_thread(
             let mut tx = tx
                 .transaction_type(TxType::Eip1559.into())
                 .build_typed_tx()
-                .map_err(|tx| {
-                    crate::Error::InternalError(format!("Tx type not specified: {tx:?}"))
-                })?
+                .map_err(|tx| crate::Error::TxTypeNotSpecified(Box::new(tx)))?
                 .eip1559()
-                .ok_or(crate::Error::InternalErrorStr("Not 1559"))?
+                .ok_or(crate::Error::TxTypeIsNotEip1559)?
                 .clone();
 
             // Sign transaction

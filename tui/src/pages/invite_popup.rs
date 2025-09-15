@@ -42,15 +42,9 @@ pub fn start_check_thread(
     let invite_code = invite_code.to_string();
     Ok(tokio::spawn(async move {
         let res: Result<(), crate::Error> = async {
-            let client = reqwest::Client::new();
-
-            let result = client
-                .get(format!("{BASE_URL}/check"))
+            let result = gm_utils::Reqwest::get(format!("{BASE_URL}/check"))?
                 .query(&json!({"invite_code": invite_code}))
-                .send()
-                .await?
-                .error_for_status()?
-                .text()
+                .receive_text()
                 .await?;
 
             let validity = match result.as_str() {
@@ -82,15 +76,12 @@ pub fn start_claim_thread(
             let _ = tr.send(Event::InviteCodeClaimStatus(
                 InviteCodeClaimStatus::Claiming,
             ));
-            let reqw = reqwest::Client::new();
-            let out = reqw
-                .post(format!("{BASE_URL}/claim"))
-                .json(&json!({"invite_code": invite_code, "address": claim_address}))
-                .send()
-                .await?
-                .error_for_status()?
-                .text()
+
+            let out = gm_utils::Reqwest::post(format!("{BASE_URL}/claim"))?
+                .json_body(&json!({"invite_code": invite_code, "address": claim_address}))
+                .receive_text()
                 .await?;
+
             if out.len() > 10 {
                 let _ = tr.send(Event::InviteCodeClaimStatus(InviteCodeClaimStatus::Success));
                 let _ = tr.send(Event::InviteCodeClaimStatus(InviteCodeClaimStatus::Failed(

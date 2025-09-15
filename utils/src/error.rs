@@ -2,6 +2,9 @@ use std::path::PathBuf;
 
 use alloy::primitives::Address;
 use serde_json::Value;
+use url::Url;
+
+use crate::reqwest::{ReqwestErrorContext, ReqwestInnerError, ReqwestStage};
 
 pub type Result<T> = std::result::Result<T, UtilsError>;
 
@@ -96,4 +99,29 @@ pub enum UtilsError {
 
     #[error(transparent)]
     SerdePathToError(#[from] serde_path_to_error::Error<serde_json::Error>),
+
+    #[error("Please check your internet connection, the URL seems to be unreachable: {0}")]
+    Internet(Url),
+
+    #[error("Request failed at stage {stage:?}: Context='{context:?}', Error='{inner:?}'")]
+    ReqwestFailed {
+        stage: ReqwestStage,
+        context: Box<ReqwestErrorContext>,
+        inner: ReqwestInnerError,
+    },
+
+    #[error("Reqwest builder missing error context, this is a bug please report it.")]
+    ReqwestErrorContextMissing,
+
+    #[error("Invalid URL: {0}")]
+    InvalidUrl(String),
+}
+
+impl UtilsError {
+    pub fn is_connect(&self) -> bool {
+        match self {
+            Self::ReqwestFailed { inner, .. } => inner.is_connect(),
+            _ => false,
+        }
+    }
 }

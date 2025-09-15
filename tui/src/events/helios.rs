@@ -67,11 +67,11 @@ async fn run(
     let owner = Config::current_account()?.ok_or(Error::CurrentAccountNotSet)?;
     let assets = asset_manager
         .read()
-        .map_err(|err| format!("{err}"))
+        .map_err(|_| crate::Error::Poisoned("helios->run".to_string()))
         .and_then(|am| {
             am.get_assets(&owner)
                 .cloned()
-                .ok_or("no assets".to_string())
+                .ok_or(crate::Error::AssetsNotFound(owner))
         })?;
 
     for asset in assets {

@@ -99,22 +99,18 @@ impl SignTypedDataPopup {
 
     pub fn set_typed_data(&mut self, v: Value) -> crate::Result<()> {
         if v.get("types").is_none() {
-            return Err(crate::Error::InternalErrorStr("typed-data missing `types`"));
+            return Err(crate::Error::TypedDataMissingField("types".to_string()));
         }
         if v.get("domain").is_none() {
-            return Err(crate::Error::InternalErrorStr(
-                "typed-data missing `domain`",
-            ));
+            return Err(crate::Error::TypedDataMissingField("domain".to_string()));
         }
         if v.get("primaryType").is_none() {
-            return Err(crate::Error::InternalErrorStr(
-                "typed-data missing `primaryType`",
+            return Err(crate::Error::TypedDataMissingField(
+                "primaryType".to_string(),
             ));
         }
         if v.get("message").is_none() {
-            return Err(crate::Error::InternalErrorStr(
-                "typed-data missing `message`",
-            ));
+            return Err(crate::Error::TypedDataMissingField("message".to_string()));
         }
 
         self.display.text = match serde_json::to_string_pretty(&v) {

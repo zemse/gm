@@ -88,7 +88,7 @@ impl AddressBookMenuItem {
                     .filter(|address| {
                         !entries
                             .iter()
-                            .any(|entry| Some(address) == entry.address().as_ref())
+                            .any(|entry| Some(address) == entry.address().ok().as_ref())
                     })
                     .map(AddressBookMenuItem::RecentlyInteracted)
                     .collect::<Vec<AddressBookMenuItem>>(),
@@ -98,27 +98,27 @@ impl AddressBookMenuItem {
         Ok(entries)
     }
 
-    pub fn address(&self) -> Option<Address> {
+    pub fn address(&self) -> crate::Result<Address> {
         match self {
-            AddressBookMenuItem::Create => None,
-            AddressBookMenuItem::View(entry) => Some(entry.address),
-            AddressBookMenuItem::UnnamedOwned(address) => Some(*address),
-            AddressBookMenuItem::RecentlyInteracted(address) => Some(*address),
+            AddressBookMenuItem::Create => Err(crate::Error::AddressBookEntryIsInvalid),
+            AddressBookMenuItem::View(entry) => Ok(entry.address),
+            AddressBookMenuItem::UnnamedOwned(address) => Ok(*address),
+            AddressBookMenuItem::RecentlyInteracted(address) => Ok(*address),
         }
     }
 
-    // TODO remove
-    // Must only be used if you are sure that the list will not contain Create
-    pub fn address_unwrap(&self) -> Address {
-        match self {
-            AddressBookMenuItem::Create => {
-                unreachable!("AddressBookMenuItem::Create entry must not be present")
-            }
-            AddressBookMenuItem::View(entry) => entry.address,
-            AddressBookMenuItem::UnnamedOwned(address) => *address,
-            AddressBookMenuItem::RecentlyInteracted(address) => *address,
-        }
-    }
+    // // TODO remove
+    // // Must only be used if you are sure that the list will not contain Create
+    // pub fn address_unwrap(&self) -> Address {
+    //     match self {
+    //         AddressBookMenuItem::Create => {
+    //             unreachable!("AddressBookMenuItem::Create entry must not be present")
+    //         }
+    //         AddressBookMenuItem::View(entry) => entry.address,
+    //         AddressBookMenuItem::UnnamedOwned(address) => *address,
+    //         AddressBookMenuItem::RecentlyInteracted(address) => *address,
+    //     }
+    // }
 }
 
 pub struct AddressBookPage {
@@ -192,7 +192,10 @@ impl Component for AddressBookPage {
                         AddressBookMenuItem::View(entry) => {
                             let (id, entry) = AddressBook::load()?
                                 .find(&None, &Some(entry.address), &Some(&entry.name))?
-                                .ok_or(crate::Error::AddressBook("entry not found"))?;
+                                .ok_or(crate::Error::AddressBookEntryNotFound(
+                                    entry.address,
+                                    entry.name.clone(),
+                                ))?;
                             Page::AddressBookDisplay(AddressBookDisplayPage::new(
                                 id,
                                 entry.name,

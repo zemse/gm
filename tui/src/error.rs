@@ -1,56 +1,141 @@
-use std::fmt::Display;
-
-use alloy::primitives::Address;
+use alloy::{primitives::Address, rpc::types::TransactionRequest};
 use serde_json::Value;
+use walletconnect_sdk::wc_message::WcMessage;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error(transparent)]
     MacosError(#[from] gm_macos::Error),
+    #[error(transparent)]
     UtilsError(#[from] gm_utils::Error),
+    #[error(transparent)]
     RatatuiExtraError(#[from] gm_ratatui_extra::Error),
 
+    #[error("No current account is set. Please create a new account or load existing.")]
     CurrentAccountNotSet,
+
+    #[error("Alchemy API key is not set. Please set it in the config file.")]
     AlchemyApiKeyNotSet,
-    DiskError(String),
+
+    #[error("Network with name '{0}' not found in your config file.")]
     NetworkNotFound(String),
-    AddressBook(&'static str),
+
+    #[error("AddressBook error: {0}.")]
+    AddressBookEntryNotFound(Address, String),
+
+    #[error("Address book entry is invalid.")]
+    AddressBookEntryIsInvalid,
+
+    #[error("Address book entry with name '{0}' already exists.")]
     SecretNotFound(Address),
-    InternalError(String),
-    InternalErrorStr(&'static str),
+
+    #[error("Address '{0}' is not a valid Ethereum address.")]
+    InvalidAddress(String),
+
+    #[error("Asset is not selected.")]
+    AssetNotSelected,
+
+    #[error("Assets not found for owner {0}.")]
+    AssetsNotFound(Address),
+
+    #[error("Value for '{0}' cannot be empty.")]
+    CannotBeEmpty(String),
+
+    #[error("EIP-712 Typed Data is missing field: {0}.")]
+    TypedDataMissingField(String),
+
+    #[error("Transaction type is not specified in the request: {0:?}.")]
+    TxTypeNotSpecified(Box<TransactionRequest>),
+
+    #[error("Transaction type is not EIP-1559.")]
+    TxTypeIsNotEip1559,
+
+    #[error("WalletConnect Session request not found at index {0}, num requests: {1}.")]
+    SessionRequestNotFound(usize, usize),
+
+    #[error("Not a WalletConnect session request.")]
+    NotSessionRequest,
+
+    #[error("Chain ID '{0}' is not a valid EIP-155 chain ID.")]
+    ChainIdStripEip155Failed(String),
+
+    #[error("Chain ID '{0}' is not a valid u32.")]
+    ChainIdParseFailed(String),
+
+    #[error("Method is not handled. Request: {0:?}")]
+    MethodUnhandled(Box<WcMessage>),
+
+    #[error("Not a proposal, please report this bug.")]
+    ProposalNotFound,
+
+    #[error("Transmitter 2 channel not created.")]
+    Transmitter2NotCreated,
+
+    #[error("Poisoned lock, please restart gm.")]
+    Poisoned(String),
+
+    #[error("Draw failed: {0}")]
+    Draw(std::io::Error),
+
+    #[error("Unknown Theme: {0}")]
+    UnknownTheme(String),
+
+    #[error(transparent)]
     ParseIntError(Box<std::num::ParseIntError>),
+    #[error(transparent)]
     ParseFloatError(Box<std::num::ParseFloatError>),
+    #[error(transparent)]
     IoError(Box<std::io::Error>),
+    #[error(transparent)]
     FromHexError(Box<alloy::hex::FromHexError>),
-    InquireError(Box<inquire::InquireError>),
+    #[error("Alloy Ecdsa: {0}")]
     AlloyEcdsaError(Box<alloy::signers::k256::ecdsa::Error>),
-    ReqwestError(Box<reqwest::Error>),
+    #[error("Serde Json Error: {0}")]
     SerdeJson(Box<serde_json::Error>),
+    #[error("Serde Json Error with Value: {0}, {1}")]
     SerdeJsonWithValue(Box<serde_json::Error>, Box<Value>),
+    #[error("Serde Json Error with String: {0}, {1}")]
     SerdeJsonWithString(Box<serde_json::Error>, Box<String>),
+    #[error("Mpsc Recv Error: {0}")]
     MpscRecvError(Box<std::sync::mpsc::RecvError>),
+    #[error("Mpsc Send Error: {0}")]
     MpscSendError(Box<std::sync::mpsc::SendError<crate::Event>>),
+    #[error("Mpsc Send Error 2: {0}")]
     MpscSendError2(Box<std::sync::mpsc::SendError<crate::pages::walletconnect::WcEvent>>),
+    #[error("Alloy Local Signer Error: {0}")]
     AlloyLocalSignerError(Box<alloy::signers::local::LocalSignerError>),
+    #[error("FromUtf8 Error: {0}")]
     FromUtf8Error(Box<std::string::FromUtf8Error>),
+    #[error("Rpc Error: {0}")]
     RpcError(Box<alloy::transports::RpcError<alloy::transports::TransportErrorKind>>),
+    #[error("Units Error: {0}")]
     UnitsError(Box<alloy::primitives::utils::UnitsError>),
+    #[error("Alloy Signer Error: {0}")]
     AlloySignerError(Box<alloy::signers::Error>),
+    #[error("Pending Transaction Error: {0}")]
     AlloyPendingTransactionError(Box<alloy::providers::PendingTransactionError>),
+    #[error("RLP Error: {0}")]
     AlloyRlpError(Box<alloy::rlp::Error>),
+    #[error("Sol Types Error: {0}")]
     AlloySolTypesError(alloy::sol_types::Error),
+    #[error("Internal error: {0}")]
     Abort(&'static str),
+    #[error("Internal error: {0}")]
     UrlParseError(Box<url::ParseError>),
+    #[error("Reqwest error: {0:?}")]
     Data3Error(Box<data3::error::Error>),
+    #[error("Reqwest error: {0:?}")]
     WalletConnectError(walletconnect_sdk::Error),
-    EyreError(Box<eyre::Report>), // TODO Helios should expose this
+    #[error("Eyre error: {0}")]
+    EyreError(Box<eyre::Report>),
 }
 
 impl Error {
     pub fn is_connect_reqwest(&self) -> bool {
         match self {
-            Self::ReqwestError(error) => error.is_connect(),
+            Self::UtilsError(error) => error.is_connect(),
             _ => false,
         }
     }
@@ -66,78 +151,59 @@ impl FmtError for Error {
     }
 }
 
-impl FmtError for reqwest::Error {
-    fn fmt_err(&self, id: &str) -> String {
-        if self.is_connect() {
-            format!("Please check your internet connection - {id}: {self:?}")
-        } else {
-            format!("{id}: {self:?}")
-        }
-    }
-}
+// impl From<&str> for Error {
+//     fn from(e: &str) -> Self {
+//         Error::InternalError(e.to_string())
+//     }
+// }
 
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::AddressBook(s) => write!(f, "Error from AddressBook: {s}"),
-            _ => write!(f, "{self:?}"),
-        }
-    }
-}
+// impl From<String> for Error {
+//     fn from(e: String) -> Self {
+//         Error::InternalError(e)
+//     }
+// }
 
-impl From<&str> for Error {
-    fn from(e: &str) -> Self {
-        Error::InternalError(e.to_string())
-    }
-}
+// impl From<std::num::ParseIntError> for Error {
+//     fn from(e: std::num::ParseIntError) -> Self {
+//         Error::ParseIntError(Box::new(e))
+//     }
+// }
 
-impl From<String> for Error {
-    fn from(e: String) -> Self {
-        Error::InternalError(e)
-    }
-}
+// impl From<std::num::ParseFloatError> for Error {
+//     fn from(e: std::num::ParseFloatError) -> Self {
+//         Error::ParseFloatError(Box::new(e))
+//     }
+// }
 
-impl From<std::num::ParseIntError> for Error {
-    fn from(e: std::num::ParseIntError) -> Self {
-        Error::ParseIntError(Box::new(e))
-    }
-}
+// impl From<alloy::hex::FromHexError> for Error {
+//     fn from(e: alloy::hex::FromHexError) -> Self {
+//         Error::FromHexError(Box::new(e))
+//     }
+// }
 
-impl From<std::num::ParseFloatError> for Error {
-    fn from(e: std::num::ParseFloatError) -> Self {
-        Error::ParseFloatError(Box::new(e))
-    }
-}
+// impl From<std::io::Error> for Error {
+//     fn from(e: std::io::Error) -> Self {
+//         Error::IoError(Box::new(e))
+//     }
+// }
 
-impl From<alloy::hex::FromHexError> for Error {
-    fn from(e: alloy::hex::FromHexError) -> Self {
-        Error::FromHexError(Box::new(e))
-    }
-}
+// impl From<inquire::InquireError> for Error {
+//     fn from(e: inquire::InquireError) -> Self {
+//         Error::InquireError(Box::new(e))
+//     }
+// }
 
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Error::IoError(Box::new(e))
-    }
-}
+// impl From<alloy::signers::k256::ecdsa::Error> for Error {
+//     fn from(e: alloy::signers::k256::ecdsa::Error) -> Self {
+//         Error::AlloyEcdsaError(Box::new(e))
+//     }
+// }
 
-impl From<inquire::InquireError> for Error {
-    fn from(e: inquire::InquireError) -> Self {
-        Error::InquireError(Box::new(e))
-    }
-}
-
-impl From<alloy::signers::k256::ecdsa::Error> for Error {
-    fn from(e: alloy::signers::k256::ecdsa::Error) -> Self {
-        Error::AlloyEcdsaError(Box::new(e))
-    }
-}
-
-impl From<reqwest::Error> for Error {
-    fn from(e: reqwest::Error) -> Self {
-        Error::ReqwestError(Box::new(e))
-    }
-}
+// impl From<reqwest::Error> for Error {
+//     fn from(e: reqwest::Error) -> Self {
+//         Error::ReqwestError(Box::new(e))
+//     }
+// }
 
 impl From<serde_json::Error> for Error {
     fn from(e: serde_json::Error) -> Self {

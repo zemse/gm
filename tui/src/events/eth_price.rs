@@ -46,16 +46,16 @@ fn format_decimal_string(input: String) -> String {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct BinanceResponse {
-    #[allow(dead_code)]
-    symbol: String,
     price: String,
 }
 
-async fn query_eth_price() -> Result<String, reqwest::Error> {
+async fn query_eth_price() -> Result<String, gm_utils::Error> {
     let url = "https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT";
-    let response = reqwest::get(url).await?;
-    let json = response.json::<BinanceResponse>().await?;
-    Ok(json.price)
+    gm_utils::Reqwest::get(url)
+        .expect("url invalid")
+        .receive_json::<BinanceResponse>()
+        .await
+        .map(|resp| resp.price)
 }

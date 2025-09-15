@@ -119,7 +119,7 @@ impl Component for SendMessagePage {
                 event.key_event(),
                 |entry| -> crate::Result<()> {
                     let to_address = self.form.get_text_mut(FormItem::To);
-                    *to_address = entry.address_unwrap().to_string();
+                    *to_address = entry.address()?.to_string();
                     self.form.advance_cursor();
                     Ok(())
                 },
@@ -170,16 +170,19 @@ impl Component for SendMessagePage {
                             let message = form.get_text(FormItem::Message);
                             let network_name = form.get_text(FormItem::Network);
                             if message.is_empty() {
-                                return Err("Message cannot be empty".into());
+                                return Err(crate::Error::CannotBeEmpty("Message".to_string()));
                             }
 
                             self.tx_popup.set_tx_req(
                                 NetworkStore::from_name(network_name)?,
-                                TransactionRequest::default().to(to.parse()?).input(
-                                    TransactionInput::from(Bytes::from(
+                                TransactionRequest::default()
+                                    .to(to
+                                        .parse()
+                                        // TODO we could make a custom trait with parse_address for this
+                                        .map_err(|_| crate::Error::InvalidAddress(to.clone()))?)
+                                    .input(TransactionInput::from(Bytes::from(
                                         message.to_owned().into_bytes(),
-                                    )),
-                                ),
+                                    ))),
                             );
                             self.tx_popup.open();
                         }
