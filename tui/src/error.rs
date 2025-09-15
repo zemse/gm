@@ -79,6 +79,9 @@ pub enum Error {
     #[error("Unknown Theme: {0}")]
     UnknownTheme(String),
 
+    #[error("Failed to generated EIP-712 typed hash. (Error: {0:?})")]
+    Eip712Error(alloy::dyn_abi::Error),
+
     #[error(transparent)]
     ParseIntError(Box<std::num::ParseIntError>),
     #[error(transparent)]

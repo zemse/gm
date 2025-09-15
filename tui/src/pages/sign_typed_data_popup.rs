@@ -1,7 +1,8 @@
 use std::sync::mpsc;
 
 use alloy::{
-    primitives::{keccak256, Address, B256},
+    dyn_abi::TypedData,
+    primitives::{Address, B256},
     signers::{Signature, Signer},
 };
 
@@ -23,7 +24,7 @@ use serde_json::Value;
 use tokio::task::JoinHandle;
 
 use crate::{app::SharedState, error::FmtError, theme::Theme, traits::Actions, Event};
-use gm_utils::{account::AccountManager, eip712::eip712_to_dyn};
+use gm_utils::{account::AccountManager, serde::SerdeResponseParse};
 
 fn spawn_sign_thread(
     digest: B256,
@@ -161,7 +162,11 @@ impl SignTypedDataPopup {
                             }
                             KeyCode::Enter => {
                                 if self.button_cursor {
-                                    let digest = eip712_digest_from_json(&self.typed_data_json)?;
+                                    let typed_data = (&self.typed_data_json)
+                                        .serde_parse_custom::<TypedData>()?;
+                                    let digest = typed_data
+                                        .eip712_signing_hash()
+                                        .map_err(crate::Error::Eip712Error)?;
                                     self.status = SignStatus::Signing;
                                     self.sign_thread = Some(spawn_sign_thread(digest, tr, ss)?);
                                 } else {
@@ -263,15 +268,15 @@ impl SignTypedDataPopup {
 }
 
 // TODO there is a bug here that causes revert 0x815e1d64 from permit2, found while interacting with euler
-fn eip712_digest_from_json(typed_data: &Value) -> crate::Result<B256> {
-    let (_msg_type, message_value, _domain_type, domain_value) = eip712_to_dyn(typed_data)?;
+// fn eip712_digest_from_json(typed_data: &Value) -> crate::Result<B256> {
+//     let (_msg_type, message_value, _domain_type, domain_value) = eip712_to_dyn(typed_data)?;
 
-    let encoded_domain = domain_value.abi_encode();
-    let encoded_message = message_value.abi_encode();
+//     let encoded_domain = domain_value.abi_encode();
+//     let encoded_message = message_value.abi_encode();
 
-    let domain_separator = keccak256(&encoded_domain);
-    let message_hash = keccak256(&encoded_message);
-    let eip712_hash = keccak256([&[0x19, 0x01], &domain_separator[..], &message_hash[..]].concat());
+//     let domain_separator = keccak256(&encoded_domain);
+//     let message_hash = keccak256(&encoded_message);
+//     let eip712_hash = keccak256([&[0x19, 0x01], &domain_separator[..], &message_hash[..]].concat());
 
-    Ok(eip712_hash)
-}
+//     Ok(eip712_hash)
+// }

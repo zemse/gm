@@ -3,7 +3,7 @@ resolver = "2"
 members = ["bin", "common", "macos", "ratatui-extra", "tui", "utils"]
 
 [workspace.dependencies]
-alloy = { version = "1", features = ["full", "rlp", "signer-mnemonic"] }
+alloy = { version = "1", features = ["full", "rlp", "signer-mnemonic", "eip712"] }
 thiserror = "2.0.16"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

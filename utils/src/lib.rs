@@ -5,7 +5,6 @@ pub mod alloy;
 pub mod assets;
 pub mod config;
 pub mod disk_storage;
-pub mod eip712;
 pub mod erc20;
 pub mod error;
 pub mod inquire;

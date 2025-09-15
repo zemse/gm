@@ -3,7 +3,7 @@ use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 use url::Url;
 
-use crate::serde::{SerdePathError, SerdeResponseParse};
+use crate::serde::{SerdePathError, SerdeResponseParseAsync};
 
 #[derive(Debug)]
 pub enum ReqwestStage {
