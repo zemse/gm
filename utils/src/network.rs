@@ -1,12 +1,12 @@
 use std::{collections::HashMap, fmt::Display};
 
-use alloy::{primitives::Address, providers::ProviderBuilder};
+use alloy::{
+    primitives::Address,
+    providers::{Provider, ProviderBuilder},
+};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    disk::{Config, DiskInterface, FileFormat},
-    provider::Provider,
-};
+use crate::disk::{Config, DiskInterface, FileFormat};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Network {
@@ -70,7 +70,7 @@ impl Network {
             .map(|explorer_url| explorer_url.replace("{}", tx_hash))
     }
 
-    pub fn get_provider(&self) -> crate::Result<Provider> {
+    pub fn get_provider(&self) -> crate::Result<impl Provider> {
         let rpc_url = self.get_rpc()?;
 
         rpc_url

@@ -8,7 +8,6 @@ pub mod error;
 pub mod inquire;
 pub mod log;
 pub mod network;
-pub mod provider;
 pub mod reqwest;
 pub mod serde;
 pub mod text;
