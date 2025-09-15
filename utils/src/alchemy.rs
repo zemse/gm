@@ -3,7 +3,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::{disk::Config, serde::SerdeResponseParse, Error}; // for building the JSON body
+use crate::{config::Config, serde::SerdeResponseParse, Error}; // for building the JSON body
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokensByWalletEntry {

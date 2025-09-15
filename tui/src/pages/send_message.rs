@@ -9,8 +9,8 @@ use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::form::{Form, FormWidget};
 use gm_ratatui_extra::thematize::Thematize;
 use gm_ratatui_extra::widgets::form::FormItemIndex;
-use gm_utils::disk::DiskInterface;
-use gm_utils::network::NetworkStore;
+use gm_utils::disk_storage::DiskStorageInterface;
+use gm_utils::network::{Network, NetworkStore};
 
 use super::address_book::AddressBookMenuItem;
 use crate::Result;
@@ -159,7 +159,7 @@ impl Component for SendMessagePage {
             } else if self.form.is_focused(FormItem::Network) && event.is_space_or_enter_pressed() {
                 self.networks_popup.open();
                 self.networks_popup
-                    .set_items(Some(NetworkStore::load_networks(ss.testnet_mode)?));
+                    .set_items(Some(NetworkStore::load()?.filter(ss.testnet_mode)));
             } else {
                 let r = self.form.handle_event(
                     event.key_event(),
@@ -174,7 +174,7 @@ impl Component for SendMessagePage {
                             }
 
                             self.tx_popup.set_tx_req(
-                                NetworkStore::from_name(network_name)?,
+                                Network::from_name(network_name)?,
                                 TransactionRequest::default()
                                     .to(to
                                         .parse()

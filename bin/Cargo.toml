@@ -9,5 +9,4 @@ path = "src/main.rs"
 
 [dependencies]
 gm-tui = { path = "../tui"}
-gm-utils = { path = "../utils" }
 tokio = { workspace = true }

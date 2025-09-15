@@ -13,7 +13,7 @@ use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
 use gm_utils::assets::{Asset, TokenAddress};
 use gm_utils::erc20;
-use gm_utils::network::NetworkStore;
+use gm_utils::network::Network;
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use strum::{Display, EnumIter};
@@ -211,7 +211,7 @@ impl Component for AssetTransferPage {
 
                             if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
                                 self.tx_popup.set_tx_req(
-                                    NetworkStore::from_name(&asset.r#type.network)?,
+                                    Network::from_name(&asset.r#type.network)?,
                                     TransactionRequest::default()
                                         .to(to)
                                         .value(value)

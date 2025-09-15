@@ -2,6 +2,7 @@ use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::confirm_popup::ConfirmPopup;
 use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
 use gm_ratatui_extra::thematize::Thematize;
+use gm_utils::disk_storage::DiskStorageInterface;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::ops::Not;
@@ -14,7 +15,6 @@ use crate::pages::token::TokenPage;
 use crate::pages::Page;
 use crate::traits::{Actions, Component};
 use crate::Event;
-use gm_utils::disk::DiskInterface;
 use gm_utils::network::{Network, NetworkStore, Token};
 use strum::{Display, EnumIter};
 

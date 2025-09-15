@@ -39,7 +39,7 @@ use crate::{
     traits::{Actions, Component},
     Event,
 };
-use gm_utils::network::NetworkStore;
+use gm_utils::network::Network;
 
 fn format_proposal(params: &SessionProposeParams) -> String {
     let metadata = &params.proposer.metadata;
@@ -204,7 +204,7 @@ impl WalletConnectPage {
             .map_err(|_| crate::Error::ChainIdParseFailed(req.chain_id.clone()))?;
         match &req.request.params {
             SessionRequestData::EthSendTransaction(tx_req) => {
-                let network = NetworkStore::from_chain_id(chain_id)?;
+                let network = Network::from_chain_id(chain_id)?;
                 self.tx_popup.set_tx_req(
                     network,
                     TransactionRequest {

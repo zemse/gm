@@ -1,3 +1,6 @@
+use alloy::primitives::Address;
+use data3::{blockscout::BlockScout, network::Network};
+use gm_utils::config::Config;
 use std::{
     collections::HashSet,
     sync::{
@@ -7,11 +10,6 @@ use std::{
     },
     time::Duration,
 };
-
-use alloy::primitives::Address;
-
-use data3::{blockscout::BlockScout, network::Network};
-use gm_utils::disk::Config;
 
 use super::Event;
 
@@ -29,7 +27,7 @@ pub async fn watch_recent_addresses(transmitter: Sender<Event>, shutdown_signal:
             // Send result back to main thread. If main thread has already
             // shutdown, then we will get error. Since our event is not
             // critical, we do not store it to disk.
-            let result = get_recent_addresses().await;
+            let result = run_interval().await;
 
             let _ = match result {
                 Ok(Some(addresses)) => transmitter.send(Event::RecentAddressesUpdate(addresses)),
@@ -44,8 +42,8 @@ pub async fn watch_recent_addresses(transmitter: Sender<Event>, shutdown_signal:
     }
 }
 
-async fn get_recent_addresses() -> crate::Result<Option<Vec<Address>>> {
-    let Some(current_address) = Config::current_account()? else {
+async fn run_interval() -> crate::Result<Option<Vec<Address>>> {
+    let Ok(current_address) = Config::current_account() else {
         return Ok(None);
     };
 

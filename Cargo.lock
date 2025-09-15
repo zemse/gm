@@ -3029,7 +3029,6 @@ name = "gm-bin"
 version = "0.0.1"
 dependencies = [
  "gm-tui",
- "gm-utils",
  "tokio",
 ]
 

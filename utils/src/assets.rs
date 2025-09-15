@@ -3,9 +3,7 @@ use std::fmt::{Display, Formatter};
 use alloy::primitives::{map::HashMap, utils::format_units, Address, U256};
 
 use crate::{
-    alchemy::Alchemy,
-    disk::{Config, DiskInterface},
-    network::NetworkStore,
+    alchemy::Alchemy, config::Config, disk_storage::DiskStorageInterface, network::NetworkStore,
 };
 
 #[derive(Default)]
@@ -180,7 +178,7 @@ impl Display for Asset {
 
 pub async fn get_all_assets() -> crate::Result<(Address, Vec<Asset>)> {
     let config = Config::load()?;
-    let wallet_address = config.try_current_account()?;
+    let wallet_address = config.get_current_account()?;
 
     let mut networks = NetworkStore::load()?;
 

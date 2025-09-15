@@ -1,7 +1,7 @@
 use gm_ratatui_extra::cursor::Cursor;
 use gm_ratatui_extra::select::Select;
 use gm_ratatui_extra::thematize::Thematize;
-use gm_utils::disk::DiskInterface;
+use gm_utils::disk_storage::DiskStorageInterface;
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::layout::Rect;

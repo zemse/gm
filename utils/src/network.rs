@@ -6,7 +6,10 @@ use alloy::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::disk::{Config, DiskInterface, FileFormat};
+use crate::{
+    config::Config,
+    disk_storage::{DiskStorageInterface, FileFormat},
+};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Network {
@@ -41,6 +44,22 @@ impl Display for Network {
 }
 
 impl Network {
+    pub fn from_name(network_name: &str) -> crate::Result<Network> {
+        let network_store = NetworkStore::load()?;
+        network_store
+            .get_by_name(network_name)
+            .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))
+    }
+
+    pub fn from_chain_id(chain_id: u32) -> crate::Result<Network> {
+        let network_store = NetworkStore::load()?;
+        network_store
+            .get_by_chain_id(chain_id)
+            .ok_or(crate::Error::NetworkNotFound(format!(
+                "Chain ID {chain_id}",
+            )))
+    }
+
     pub fn get_rpc(&self) -> crate::Result<String> {
         if let Some(rpc_url) = &self.rpc_url {
             Ok(rpc_url.clone())
@@ -85,57 +104,40 @@ pub struct NetworkStore {
     pub networks: Vec<Network>,
 }
 
-impl DiskInterface for NetworkStore {
+impl DiskStorageInterface for NetworkStore {
     const FILE_NAME: &'static str = "networks";
     const FORMAT: FileFormat = FileFormat::YAML;
 }
 
 impl NetworkStore {
-    // TODO This function should be on Network
-    pub fn from_name(network_name: &str) -> crate::Result<Network> {
-        let network_store = NetworkStore::load()?;
-        network_store
-            .get_by_name(network_name)
-            .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))
-    }
-
-    // TODO This function should be on Network
-    pub fn from_chain_id(chain_id: u32) -> crate::Result<Network> {
-        let network_store = NetworkStore::load()?;
-        network_store
-            .get_by_chain_id(chain_id)
-            .ok_or(crate::Error::NetworkNotFound(format!(
-                "Chain ID {chain_id}",
-            )))
-    }
-
-    pub fn load_networks(testnet_mode: bool) -> crate::Result<Vec<Network>> {
-        Ok(NetworkStore::load()?
-            .networks
+    pub fn filter(self, testnet_mode: bool) -> Vec<Network> {
+        self.networks
             .into_iter()
             .filter(|n| n.is_testnet == testnet_mode)
-            .collect())
+            .collect()
     }
 
-    pub fn sort_config() -> crate::Result<Self> {
+    pub fn load_and_update() -> crate::Result<Self> {
         let mut networks = HashMap::<u32, Network>::new();
 
         let merge_tokens = |a: Vec<Token>, b: Vec<Token>| {
-            let mut tokens = HashMap::<Address, Token>::new();
-            for token in a.into_iter().chain(b) {
-                tokens.insert(token.contract_address, token);
-            }
-            let mut tokens = tokens.values().cloned().collect::<Vec<Token>>();
+            let mut tokens = {
+                let mut map = HashMap::<Address, Token>::new();
+                for token in a.into_iter().chain(b) {
+                    map.insert(token.contract_address, token);
+                }
+                map.values().cloned().collect::<Vec<Token>>()
+            };
             tokens.sort_by(|a, b| a.contract_address.cmp(&b.contract_address));
             tokens
         };
 
-        let mut insert = |entry: Network| {
-            let existing = networks.remove(&entry.chain_id);
+        let mut insert = |new_entry: Network| {
+            let existing = networks.remove(&new_entry.chain_id);
+            // merge props from entry into existing
             let entry = if let Some(existing) = existing {
-                // merge entries
                 let mut name_aliases = vec![];
-                for n in entry
+                for n in new_entry
                     .name_aliases
                     .iter()
                     .chain(existing.name_aliases.iter())
@@ -145,36 +147,36 @@ impl NetworkStore {
                     }
                 }
                 Network {
-                    name: entry.name,
-                    name_alchemy: entry.name_alchemy.or(existing.name_alchemy),
+                    name: new_entry.name,
+                    name_alchemy: new_entry.name_alchemy.or(existing.name_alchemy),
                     name_aliases,
-                    chain_id: entry.chain_id,
-                    symbol: entry.symbol.or(existing.symbol),
-                    native_decimals: entry.native_decimals.or(existing.native_decimals),
-                    price_ticker: entry.price_ticker.or(existing.price_ticker),
-                    rpc_url: entry.rpc_url.or(existing.rpc_url),
-                    rpc_alchemy: entry.rpc_alchemy.or(existing.rpc_alchemy),
-                    rpc_infura: entry.rpc_infura.or(existing.rpc_infura),
-                    explorer_url: entry.explorer_url.or(existing.explorer_url),
-                    is_testnet: entry.is_testnet,
-                    tokens: merge_tokens(entry.tokens, existing.tokens),
+                    chain_id: new_entry.chain_id,
+                    symbol: new_entry.symbol.or(existing.symbol),
+                    native_decimals: new_entry.native_decimals.or(existing.native_decimals),
+                    price_ticker: new_entry.price_ticker.or(existing.price_ticker),
+                    rpc_url: new_entry.rpc_url.or(existing.rpc_url),
+                    rpc_alchemy: new_entry.rpc_alchemy.or(existing.rpc_alchemy),
+                    rpc_infura: new_entry.rpc_infura.or(existing.rpc_infura),
+                    explorer_url: new_entry.explorer_url.or(existing.explorer_url),
+                    is_testnet: new_entry.is_testnet,
+                    tokens: merge_tokens(new_entry.tokens, existing.tokens),
                 }
             } else {
-                entry
+                new_entry
             };
 
             networks.insert(entry.chain_id, entry);
         };
 
+        // First place the default networks
         for network in default_networks() {
             insert(network);
         }
 
-        // load networks from disk and override defaults
-        // TODO too many .clone() used here, improve it
+        // Then place the user defined networks to override the defaults
         let store = NetworkStore::load()?;
-        for network in &store.networks {
-            insert(network.clone());
+        for network in store.networks {
+            insert(network);
         }
 
         // Sort by chain ID and keep testnets at the bottom
@@ -185,12 +187,9 @@ impl NetworkStore {
                 .then(a.is_testnet.cmp(&b.is_testnet))
         });
 
-        let store = NetworkStore {
-            networks: networks.clone(),
-        };
-
-        store.save()?;
-        Ok(store)
+        let store_updated = NetworkStore { networks };
+        store_updated.save()?;
+        Ok(store_updated)
     }
 
     pub fn get_by_name(&self, network_name: &str) -> Option<Network> {

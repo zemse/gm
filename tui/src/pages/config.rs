@@ -3,6 +3,7 @@ use std::{
     sync::{atomic::AtomicBool, mpsc, Arc},
 };
 
+use gm_utils::{config::Config, disk_storage::DiskStorageInterface};
 use ratatui::{buffer::Buffer, layout::Rect};
 use strum::{Display, EnumIter};
 
@@ -19,7 +20,6 @@ use gm_ratatui_extra::{
         form::{Form, FormItemIndex, FormWidget},
     },
 };
-use gm_utils::disk::{Config, DiskInterface};
 
 #[derive(Display, EnumIter, PartialEq)]
 pub enum FormItem {

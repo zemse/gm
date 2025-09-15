@@ -1,5 +1,6 @@
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
+use gm_utils::config::Config;
 use ratatui::{
     crossterm::event::{KeyCode, KeyEventKind},
     layout::Rect,
@@ -23,7 +24,6 @@ use gm_ratatui_extra::{
     thematize::Thematize,
     widgets::{cursor::Cursor, select::Select},
 };
-use gm_utils::disk::Config;
 
 #[derive(Display, EnumIter)]
 pub enum MainMenuItem {
@@ -92,7 +92,7 @@ impl MainMenuItem {
             all_options.remove(0);
         }
 
-        let current_account_exists = Config::current_account()?.is_some();
+        let current_account_exists = Config::current_account().is_ok();
         let mut options = vec![];
 
         for option in all_options {

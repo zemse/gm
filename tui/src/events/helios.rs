@@ -13,19 +13,19 @@ use helios_ethereum::{
     config::networks::Network as HeliosNetwork, EthereumClient, EthereumClientBuilder,
 };
 
-use crate::{Error, Event};
+use crate::Event;
 use gm_utils::{
     assets::{AssetManager, LightClientVerification, TokenAddress},
-    disk::Config,
+    config::Config,
     erc20,
-    network::NetworkStore,
+    network::Network,
 };
 
 pub async fn helios_thread(
     transmitter: &Sender<Event>,
     asset_manager: Arc<RwLock<AssetManager>>,
 ) -> crate::Result<()> {
-    let eth_network = NetworkStore::from_chain_id(1)?;
+    let eth_network = Network::from_chain_id(1)?;
 
     let eth_client = EthereumClientBuilder::new()
         // Set the network to mainnet
@@ -53,18 +53,18 @@ pub async fn helios_thread(
     eth_client.wait_synced().await?;
 
     loop {
-        let _ = run(transmitter, &asset_manager, &eth_client).await;
+        let _ = run_interval(transmitter, &asset_manager, &eth_client).await;
 
         tokio::time::sleep(Duration::from_secs(10)).await;
     }
 }
 
-async fn run(
+async fn run_interval(
     transmitter: &Sender<Event>,
     asset_manager: &Arc<RwLock<AssetManager>>,
     eth_client: &EthereumClient,
 ) -> crate::Result<()> {
-    let owner = Config::current_account()?.ok_or(Error::CurrentAccountNotSet)?;
+    let owner = Config::current_account()?;
     let assets = asset_manager
         .read()
         .map_err(|_| crate::Error::Poisoned("helios->run".to_string()))
@@ -77,7 +77,7 @@ async fn run(
     for asset in assets {
         let token_address = &asset.r#type.token_address;
         let expected_balance = asset.value;
-        let network = NetworkStore::from_name(&asset.r#type.network)?;
+        let network = Network::from_name(&asset.r#type.network)?;
 
         // TODO support other networks
         if network.chain_id != 1 {

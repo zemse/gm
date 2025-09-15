@@ -7,7 +7,10 @@ use gm_ratatui_extra::{
     act::Act,
     form::{Form, FormItemIndex, FormWidget},
 };
-use gm_utils::disk::{AddressBook, AddressBookEntry, DiskInterface};
+use gm_utils::{
+    address_book::{AddressBookEntry, AddressBookStore},
+    disk_storage::DiskStorageInterface,
+};
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 use strum::{Display, EnumIter};
 
@@ -85,7 +88,7 @@ impl Component for AddressBookCreatePage {
                         let error = form.get_text_mut(FormItem::ErrorText);
                         *error = "Please enter name, you cannot leave it empty".to_string();
                     } else {
-                        let mut address_book = AddressBook::load()?;
+                        let mut address_book = AddressBookStore::load()?;
 
                         let address = form.get_text(FormItem::Address);
 

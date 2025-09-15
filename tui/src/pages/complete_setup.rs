@@ -5,6 +5,7 @@ use gm_ratatui_extra::{
     extensions::RectExt,
     form::{Form, FormItemIndex, FormWidget},
 };
+use gm_utils::{config::Config, disk_storage::DiskStorageInterface};
 use ratatui::{buffer::Buffer, layout::Rect, style::Stylize, text::Line, widgets::Widget};
 use strum::{Display, EnumIter};
 
@@ -14,7 +15,6 @@ use crate::{
     events::Event,
     traits::{Actions, Component},
 };
-use gm_utils::disk::{Config, DiskInterface};
 
 #[derive(Display, PartialEq, EnumIter)]
 pub enum FormItem {

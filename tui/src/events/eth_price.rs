@@ -24,7 +24,7 @@ pub async fn watch_eth_price_change(transmitter: Sender<Event>, shutdown_signal:
             // Send result back to main thread. If main thread has already
             // shutdown, then we will get error. Since our event is not
             // critical, we do not store it to disk.
-            let _ = match query_eth_price().await {
+            let _ = match run_interval().await {
                 Ok(price) => {
                     let price = format_decimal_string(price);
                     transmitter.send(Event::EthPriceUpdate(price))
@@ -51,7 +51,7 @@ struct BinanceResponse {
     price: String,
 }
 
-async fn query_eth_price() -> Result<String, gm_utils::Error> {
+async fn run_interval() -> Result<String, gm_utils::Error> {
     let url = "https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT";
     gm_utils::Reqwest::get(url)
         .expect("url invalid")

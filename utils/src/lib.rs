@@ -1,7 +1,9 @@
 pub mod account;
+pub mod address_book;
 pub mod alchemy;
 pub mod assets;
-pub mod disk;
+pub mod config;
+pub mod disk_storage;
 pub mod eip712;
 pub mod erc20;
 pub mod error;

@@ -12,7 +12,8 @@ use alloy::primitives::Address;
 use gm_ratatui_extra::{cursor::Cursor, select::Select, thematize::Thematize};
 use gm_utils::{
     account::{AccountManager, AccountUtils},
-    disk::{Config, DiskInterface},
+    config::Config,
+    disk_storage::DiskStorageInterface,
 };
 use ratatui::{
     buffer::Buffer,

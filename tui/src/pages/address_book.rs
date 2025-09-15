@@ -17,7 +17,8 @@ use crate::{
 };
 use gm_utils::{
     account::{AccountManager, AccountUtils},
-    disk::{AddressBook, AddressBookEntry, DiskInterface},
+    address_book::{AddressBookEntry, AddressBookStore},
+    disk_storage::DiskStorageInterface,
 };
 
 use super::{
@@ -60,7 +61,7 @@ impl AddressBookMenuItem {
 
         // From address book
         entries.extend(
-            AddressBook::load()?
+            AddressBookStore::load()?
                 .list_owned()
                 .into_iter()
                 .map(AddressBookMenuItem::View)
@@ -190,7 +191,7 @@ impl Component for AddressBookPage {
                             AddressBookCreatePage::new(String::new(), String::new())?,
                         ),
                         AddressBookMenuItem::View(entry) => {
-                            let (id, entry) = AddressBook::load()?
+                            let (id, entry) = AddressBookStore::load()?
                                 .find(&None, &Some(entry.address), &Some(&entry.name))?
                                 .ok_or(crate::Error::AddressBookEntryNotFound(
                                     entry.address,

@@ -172,7 +172,7 @@ pub fn mine_wallet(
 }
 
 pub mod linux_insecure {
-    use crate::disk::{DiskInterface, FileFormat};
+    use crate::disk_storage::{DiskStorageInterface, FileFormat};
 
     use super::*;
 
@@ -204,7 +204,7 @@ pub mod linux_insecure {
         pub keys: Vec<(Address, Secret)>,
     }
 
-    impl DiskInterface for InsecurePrivateKeyStore {
+    impl DiskStorageInterface for InsecurePrivateKeyStore {
         const FILE_NAME: &'static str = "insecure_private_key_store";
         const FORMAT: FileFormat = FileFormat::TOML;
     }

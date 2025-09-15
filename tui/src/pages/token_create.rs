@@ -8,7 +8,7 @@ use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::confirm_popup::ConfirmPopup;
 use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
 use gm_ratatui_extra::thematize::Thematize;
-use gm_utils::disk::DiskInterface;
+use gm_utils::disk_storage::DiskStorageInterface;
 use gm_utils::network::{Network, NetworkStore, Token};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -137,9 +137,9 @@ impl Component for TokenCreatePage {
                 || -> crate::Result<()> {
                     if self.network.tokens.get(self.token_index).is_some() {
                         self.network.tokens.remove(self.token_index);
-                        let mut config = NetworkStore::load()?;
-                        config.networks[self.network_index] = self.network.clone();
-                        config.save()?;
+                        let mut store = NetworkStore::load()?;
+                        store.networks[self.network_index] = self.network.clone();
+                        store.save()?;
                     }
                     handle_result.page_pops = 1;
                     handle_result.page_inserts.push(Page::Token(TokenPage::new(

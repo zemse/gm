@@ -21,7 +21,9 @@ use gm_ratatui_extra::{
 };
 use gm_utils::{
     assets::{Asset, AssetManager},
-    disk::{Config, DiskInterface},
+    config::Config,
+    disk_storage::DiskStorageInterface,
+    network::NetworkStore,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
@@ -99,6 +101,8 @@ pub struct App {
 
 impl App {
     pub fn new() -> crate::Result<Self> {
+        NetworkStore::load_and_update()?;
+
         let config = Config::load()?;
         let theme_name = ThemeName::from_str(&config.theme_name)?;
         let theme = Theme::new(theme_name);
@@ -271,7 +275,7 @@ impl App {
         }
         if result.refresh_assets {
             // TODO restart the assets thread to avoid the delay
-            if let Some(account) = Config::current_account()? {
+            if let Ok(account) = Config::current_account() {
                 self.shared_state.assets_mut()?.clear_data_for(account);
             }
         }
