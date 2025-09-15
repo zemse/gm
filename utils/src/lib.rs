@@ -1,6 +1,7 @@
 pub mod account;
 pub mod address_book;
 pub mod alchemy;
+pub mod alloy;
 pub mod assets;
 pub mod config;
 pub mod disk_storage;

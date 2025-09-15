@@ -31,9 +31,6 @@ pub enum Error {
     #[error("Address book entry with name '{0}' already exists.")]
     SecretNotFound(Address),
 
-    #[error("Address '{0}' is not a valid Ethereum address.")]
-    InvalidAddress(String),
-
     #[error("Asset is not selected.")]
     AssetNotSelected,
 

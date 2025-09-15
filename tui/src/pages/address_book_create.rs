@@ -9,6 +9,7 @@ use gm_ratatui_extra::{
 };
 use gm_utils::{
     address_book::{AddressBookEntry, AddressBookStore},
+    alloy::StringExt,
     disk_storage::DiskStorageInterface,
 };
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
@@ -92,17 +93,13 @@ impl Component for AddressBookCreatePage {
 
                         let address = form.get_text(FormItem::Address);
 
-                        let result = address
-                            .parse()
-                            .map_err(|_| crate::Error::InvalidAddress(address.clone()))
-                            .and_then(|address| {
-                                address_book
-                                    .add(AddressBookEntry {
-                                        name: name.clone(),
-                                        address,
-                                    })
-                                    .map_err(crate::Error::from)
-                            });
+                        let result = address.parse_as_address().and_then(|address| {
+                            address_book.add(AddressBookEntry {
+                                name: name.clone(),
+                                address,
+                            })
+                        });
+
                         if let Err(e) = result {
                             let error = form.get_text_mut(FormItem::ErrorText);
                             *error = format!("{e:?}");

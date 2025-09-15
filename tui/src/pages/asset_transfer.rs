@@ -11,6 +11,7 @@ use alloy::primitives::{Bytes, U256};
 use alloy::rpc::types::TransactionRequest;
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
+use gm_utils::alloy::StringExt;
 use gm_utils::assets::{Asset, TokenAddress};
 use gm_utils::erc20;
 use gm_utils::network::Network;
@@ -191,18 +192,13 @@ impl Component for AssetTransferPage {
 
                             // TODO change erc20 logic here
                             let (to, calldata, value) = match asset.r#type.token_address {
-                                TokenAddress::Native => (
-                                    to.parse()
-                                        .map_err(|_| crate::Error::InvalidAddress(to.clone()))?,
-                                    Bytes::new(),
-                                    amount.get_absolute(),
-                                ),
+                                TokenAddress::Native => {
+                                    (to.parse_as_address()?, Bytes::new(), amount.get_absolute())
+                                }
                                 TokenAddress::Contract(address) => (
                                     address,
                                     erc20::encode_transfer(
-                                        to.parse().map_err(|_| {
-                                            crate::Error::InvalidAddress(to.clone())
-                                        })?,
+                                        to.parse_as_address()?,
                                         amount.get_absolute(),
                                     ),
                                     U256::ZERO,

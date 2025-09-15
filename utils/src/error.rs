@@ -51,6 +51,12 @@ pub enum UtilsError {
     #[error("Address already exists in address book: {0}.")]
     AddressBookAddressExists(Address),
 
+    #[error("Address '{0}' is not a valid Ethereum address.")]
+    InvalidAddress(String),
+
+    #[error("String '{0}' is not a valid hex string.")]
+    InvalidHexString(String),
+
     #[error("Current account is not loaded/selected.")]
     CurrentAccountNotSet,
 
@@ -81,12 +87,20 @@ pub enum UtilsError {
     #[error("Formatting to yaml format failed: {0}. (Error: {1:?})")]
     YamlFormattingFailed(String, serde_yaml::Error),
 
-    // TODO improve errors from eip712 module
-    #[error("EIP712 Error: {0}.")]
-    EIP712(&'static str),
+    #[error("EIP712 Type Error: {field_name} must be {type_name}.")]
+    Eip712TypeError {
+        field_name: String,
+        type_name: String,
+    },
 
-    #[error("EIP712 Error: {0}.")]
-    EIP712String(String),
+    #[error("EIP712 Value Error: invalid value {value_repr} for type {type_name}.")]
+    Eip712ValueError {
+        value_repr: String,
+        type_name: String,
+    },
+
+    #[error("EIP712 Error: missing {property} in {location}.")]
+    Eip712Missing { property: String, location: String },
 
     #[error(transparent)]
     AlloySolTypes(#[from] alloy::sol_types::Error),

@@ -9,6 +9,7 @@ use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::form::{Form, FormWidget};
 use gm_ratatui_extra::thematize::Thematize;
 use gm_ratatui_extra::widgets::form::FormItemIndex;
+use gm_utils::alloy::StringExt;
 use gm_utils::disk_storage::DiskStorageInterface;
 use gm_utils::network::{Network, NetworkStore};
 
@@ -176,10 +177,7 @@ impl Component for SendMessagePage {
                             self.tx_popup.set_tx_req(
                                 Network::from_name(network_name)?,
                                 TransactionRequest::default()
-                                    .to(to
-                                        .parse()
-                                        // TODO we could make a custom trait with parse_address for this
-                                        .map_err(|_| crate::Error::InvalidAddress(to.clone()))?)
+                                    .to(to.parse_as_address()?)
                                     .input(TransactionInput::from(Bytes::from(
                                         message.to_owned().into_bytes(),
                                     ))),
