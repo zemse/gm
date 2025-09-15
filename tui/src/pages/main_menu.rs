@@ -120,7 +120,6 @@ impl MainMenuPage {
     }
 }
 
-// TODO I am trying to hide the dev key capture page
 impl MainMenuPage {
     pub fn new(developer_mode: bool) -> crate::Result<Self> {
         Ok(Self {

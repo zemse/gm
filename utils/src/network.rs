@@ -5,23 +5,26 @@ use alloy::{
     providers::{Provider, ProviderBuilder},
 };
 use serde::{Deserialize, Serialize};
+use serde_with::{formats::PreferMany, serde_as, OneOrMany};
 
 use crate::{
     config::Config,
     disk_storage::{DiskStorageInterface, FileFormat},
 };
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Network {
     pub name: String,
     pub name_alchemy: Option<String>,
     #[serde(default)]
+    #[serde_as(as = "OneOrMany<_, PreferMany>")]
     pub name_aliases: Vec<String>,
     pub chain_id: u32,
     pub symbol: Option<String>,
     pub native_decimals: Option<u8>,
     pub price_ticker: Option<String>,
-    pub rpc_url: Option<String>, // TODO this can rather be an array
+    pub rpc_url: Option<String>,
     pub rpc_alchemy: Option<String>,
     pub rpc_infura: Option<String>,
     pub explorer_url: Option<String>,
@@ -74,8 +77,6 @@ impl Network {
         } else if let Some(rpc_infura) = &self.rpc_infura {
             Ok(rpc_infura.clone())
         } else {
-            // TODO remove this panic and allow user to gracefully handle this situation like providing
-            // their own RPC URL or ALCHEMY_API_KEY
             Err(crate::Error::RpcUrlNotFound {
                 network: self.name.clone(),
                 chain_id: self.chain_id,

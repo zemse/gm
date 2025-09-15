@@ -3116,6 +3116,7 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_plain",
+ "serde_with",
  "serde_yaml",
  "thiserror 2.0.16",
  "toml",

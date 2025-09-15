@@ -125,7 +125,6 @@ fn start_api_thread(
 ) -> tokio::task::JoinHandle<()> {
     let tr = transmitter.clone();
     tokio::spawn(async move {
-        // TODO query from uniswap subgraph instead
         use serde::Deserialize;
         #[allow(dead_code)]
         #[derive(Debug, Deserialize)]

@@ -107,19 +107,6 @@ impl AddressBookMenuItem {
             AddressBookMenuItem::RecentlyInteracted(address) => Ok(*address),
         }
     }
-
-    // // TODO remove
-    // // Must only be used if you are sure that the list will not contain Create
-    // pub fn address_unwrap(&self) -> Address {
-    //     match self {
-    //         AddressBookMenuItem::Create => {
-    //             unreachable!("AddressBookMenuItem::Create entry must not be present")
-    //         }
-    //         AddressBookMenuItem::View(entry) => entry.address,
-    //         AddressBookMenuItem::UnnamedOwned(address) => *address,
-    //         AddressBookMenuItem::RecentlyInteracted(address) => *address,
-    //     }
-    // }
 }
 
 pub struct AddressBookPage {
