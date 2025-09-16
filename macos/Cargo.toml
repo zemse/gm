@@ -4,9 +4,20 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
+# previous ecosystem - 
 core-foundation = "0.10"
 core-foundation-sys = "0.8.6"
 security-framework = "3.2"
+
+# new objc2 ecosystem
+objc2 = "0.6.2"
+objc2-foundation = "0.3.1"
+objc2-security = "0.3.1"
+objc2-local-authentication = "0.3.1"
+block2 = "0.6.1"
+dispatch2 = "0.3.0"
+
+# other utils
 alloy = { workspace = true }
 thiserror = { workspace = true }
 gm-common = { path = "../common" }

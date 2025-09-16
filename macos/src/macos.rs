@@ -17,6 +17,8 @@ use security_framework::{
 };
 use std::collections::HashMap;
 
+use crate::auth::authenticate;
+
 fn keychain() -> SecKeychain {
     SecKeychain::default().expect("SecKeychain::default() - accessing default keychain failed")
 }
@@ -78,6 +80,8 @@ impl Macos {
     }
 
     pub fn get_secret(address: &Address) -> crate::Result<Secret> {
+        authenticate(&format!("export private key for {address:#}"))?;
+
         let mnemonic_signer = || {
             let mnemonic_service = format!("gm:mnemonic:{address}");
             keychain()

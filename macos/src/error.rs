@@ -18,4 +18,10 @@ pub enum MacosError {
 
     #[error("Private key for account {0} is invalid. (Error: {1:?})")]
     PrivateKeyInvalid(Address, alloy::signers::k256::ecdsa::Error),
+
+    #[error("Please add a password or setup TouchID on your mac.")]
+    AuthNotAvailable,
+
+    #[error("Auth failed")]
+    AuthFailed,
 }
