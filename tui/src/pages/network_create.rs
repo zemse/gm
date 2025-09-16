@@ -36,7 +36,7 @@ pub enum FormItem {
     TokensButton,
     SaveButton,
     RemoveButton,
-    ErrorText, //TODO: Add tokens
+    ErrorText,
 }
 impl FormItemIndex for FormItem {
     fn index(self) -> usize {

@@ -4,7 +4,7 @@ use ratatui::{layout::Rect, widgets::Widget};
 
 use crate::{
     app::SharedState,
-    traits::{Component, Actions},
+    traits::{Actions, Component},
     Event,
 };
 

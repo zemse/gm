@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::{
     app::SharedState,
-    traits::{Component, Actions},
+    traits::{Actions, Component},
     Event,
 };
 
