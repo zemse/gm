@@ -1,3 +1,5 @@
+use std::io;
+
 use alloy::{primitives::Address, rpc::types::TransactionRequest};
 use serde_json::Value;
 use walletconnect_sdk::wc_message::WcMessage;
@@ -81,6 +83,27 @@ pub enum Error {
 
     #[error("Failed to generated EIP-712 typed hash. (Error: {0:?})")]
     Eip712Error(alloy::dyn_abi::Error),
+
+    #[error("Spawn process failed. (Error: {0})")]
+    SpawnFailed(io::Error),
+
+    #[error("Failed to write to child stdin. (Error: {0})")]
+    StdinWriteFailed(io::Error),
+
+    #[error("Child stdout not available.")]
+    StdoutNotAvailable,
+
+    #[error("Failed to read from child stdout. (Error: {0})")]
+    StdoutReadFailed(String),
+
+    #[error("Child stderr not available.")]
+    StderrNotAvailable,
+
+    #[error("Failed to read from child stderr. (Error: {0})")]
+    StderrReadFailed(String),
+
+    #[error("Failed to wait for process exit. (Error: {0})")]
+    ProcessExitWaitFailed(String),
 
     #[error(transparent)]
     ParseIntError(Box<std::num::ParseIntError>),

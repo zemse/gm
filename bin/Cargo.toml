@@ -8,5 +8,8 @@ name = "gm"
 path = "src/main.rs"
 
 [dependencies]
+clap = { version = "4.0", features = ["derive", "env"] }
+anstyle = "1.0.11"
 gm-tui = { path = "../tui"}
 tokio = { workspace = true }
+walletconnect-sdk = { workspace = true }

@@ -19,17 +19,9 @@ gm-utils = { path = "../utils" }
 gm-macos = { path = "../macos" }
 gm-ratatui-extra = { path = "../ratatui-extra" }
 
-# CLI
-clap = { version = "4.0", features = ["derive"] }
-figlet-rs = "0.1"
-inquire = "0.7"
-tui-qrcode = "0.1.1"
-qrcode = "0.12"
-indicatif = "0.17"
-
 # Ethereum
 alloy = { workspace = true }
-
+walletconnect-sdk = { workspace = true }
 
 #tui
 crossterm = { workspace = true }
@@ -41,6 +33,5 @@ tokio = { workspace = true }
 humantime = "2.2.0"
 url = "2.5.4"
 data3 = "0.2.0"
-walletconnect-sdk = "0.2.2"
 helios-ethereum = { package = "zemse-helios-ethereum", version = "0.9" }
 eyre = "0.6"

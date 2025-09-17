@@ -14,7 +14,7 @@ use super::{
     send_message::SendMessagePage, sign_message::SignMessagePage, walletconnect::WalletConnectPage,
     Page,
 };
-use crate::pages::network::NetworkPage;
+use crate::pages::{network::NetworkPage, shell::ShellPage};
 use crate::{
     app::SharedState,
     events::Event,
@@ -25,7 +25,7 @@ use gm_ratatui_extra::{
     widgets::{cursor::Cursor, select::Select},
 };
 
-#[derive(Display, EnumIter)]
+#[derive(Display, EnumIter, PartialEq)]
 pub enum MainMenuItem {
     CompleteSetup,
     Portfolio,
@@ -36,6 +36,7 @@ pub enum MainMenuItem {
     SignMessage,
     SendMessage,
     DevKeyInput,
+    Shell,
     Config,
 }
 
@@ -51,6 +52,7 @@ impl MainMenuItem {
             MainMenuItem::SignMessage => Page::SignMessage(SignMessagePage::new()?),
             MainMenuItem::SendMessage => Page::SendMessage(SendMessagePage::new()?),
             MainMenuItem::DevKeyInput => Page::DevKeyCapture(DevKeyCapturePage::default()),
+            MainMenuItem::Shell => Page::Shell(ShellPage::default()),
             MainMenuItem::Config => Page::Config(ConfigPage::new()?),
         })
     }
@@ -63,6 +65,7 @@ impl MainMenuItem {
             | MainMenuItem::Accounts
             | MainMenuItem::WalletConnect
             | MainMenuItem::DevKeyInput
+            | MainMenuItem::Shell
             | MainMenuItem::Config => false,
 
             MainMenuItem::Portfolio | MainMenuItem::SignMessage | MainMenuItem::SendMessage => true,
@@ -79,6 +82,7 @@ impl MainMenuItem {
             | MainMenuItem::WalletConnect
             | MainMenuItem::SignMessage
             | MainMenuItem::SendMessage
+            | MainMenuItem::Shell
             | MainMenuItem::Config => false,
             MainMenuItem::DevKeyInput => true,
         }
@@ -113,19 +117,23 @@ pub struct MainMenuPage {
 }
 
 impl MainMenuPage {
-    pub fn get_focussed_item(&self) -> &MainMenuItem {
-        self.list
-            .get(self.cursor.current)
-            .expect("Invalid cursor position in MainMenuPage")
-    }
-}
-
-impl MainMenuPage {
     pub fn new(developer_mode: bool) -> crate::Result<Self> {
         Ok(Self {
             list: MainMenuItem::get_menu(developer_mode)?,
             cursor: Cursor::default(),
         })
+    }
+
+    pub fn get_focussed_item(&self) -> &MainMenuItem {
+        self.list
+            .get(self.cursor.current)
+            .expect("Invalid cursor position in MainMenuPage")
+    }
+
+    pub fn set_focussed_item(&mut self, item: MainMenuItem) {
+        if let Some((index, _)) = self.list.iter().enumerate().find(|(_, i)| **i == item) {
+            self.cursor.current = index;
+        }
     }
 }
 

@@ -21,8 +21,8 @@ use walletconnect::WalletConnectPage;
 use crate::{
     app::SharedState,
     pages::{
-        network::NetworkPage, network_create::NetworkCreatePage, token::TokenPage,
-        token_create::TokenCreatePage,
+        network::NetworkPage, network_create::NetworkCreatePage, shell::ShellPage,
+        token::TokenPage, token_create::TokenCreatePage,
     },
     traits::{Actions, Component},
     Event,
@@ -45,6 +45,7 @@ pub mod main_menu;
 pub mod network;
 pub mod network_create;
 pub mod send_message;
+pub mod shell;
 pub mod sign_message;
 pub mod sign_popup;
 pub mod sign_typed_data_popup;
@@ -87,6 +88,8 @@ pub enum Page {
 
     Text(TextPage),
     DevKeyCapture(DevKeyCapturePage),
+
+    Shell(ShellPage),
 }
 
 impl Page {
@@ -108,6 +111,13 @@ impl Page {
     pub fn main_menu_focused_item(&self) -> Option<&MainMenuItem> {
         match self {
             Page::MainMenu(page) => Some(page.get_focussed_item()),
+            _ => None,
+        }
+    }
+
+    pub fn as_main_menu_mut(&mut self) -> Option<&mut MainMenuPage> {
+        match self {
+            Page::MainMenu(page) => Some(page),
             _ => None,
         }
     }
@@ -145,6 +155,8 @@ impl Component for Page {
 
             Page::Text(page) => page.set_focus(focus),
             Page::DevKeyCapture(page) => page.set_focus(focus),
+
+            Page::Shell(page) => page.set_focus(focus),
         }
     }
 
@@ -179,6 +191,8 @@ impl Component for Page {
 
             Page::Text(page) => page.exit_threads().await,
             Page::DevKeyCapture(page) => page.exit_threads().await,
+
+            Page::Shell(page) => page.exit_threads().await,
         }
     }
 
@@ -213,6 +227,8 @@ impl Component for Page {
 
             Page::Text(page) => page.reload(ss),
             Page::DevKeyCapture(page) => page.reload(ss),
+
+            Page::Shell(page) => page.reload(ss),
         }
     }
 
@@ -254,6 +270,8 @@ impl Component for Page {
 
             Page::Text(page) => page.handle_event(event, area, tr, sd, ss),
             Page::DevKeyCapture(page) => page.handle_event(event, area, tr, sd, ss),
+
+            Page::Shell(page) => page.handle_event(event, area, tr, sd, ss),
         }
     }
 
@@ -296,6 +314,8 @@ impl Component for Page {
 
             Page::Text(page) => page.render_component(area, buf, shared_state),
             Page::DevKeyCapture(page) => page.render_component(area, buf, shared_state),
+
+            Page::Shell(page) => page.render_component(area, buf, shared_state),
         }
     }
 }

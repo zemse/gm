@@ -1,7 +1,10 @@
 use std::{
     io,
     str::FromStr,
-    sync::{atomic::AtomicBool, mpsc, Arc, RwLock, RwLockWriteGuard},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc, Arc, RwLock, RwLockWriteGuard,
+    },
 };
 
 use crate::pages::{
@@ -10,6 +13,7 @@ use crate::pages::{
     footer::Footer,
     invite_popup::InvitePopup,
     main_menu::{MainMenuItem, MainMenuPage},
+    shell::ShellPage,
     text::TextPage,
     title::Title,
     trade::TradePage,
@@ -82,21 +86,18 @@ impl SharedState {
 }
 
 pub struct App {
-    pub context: Vec<Page>,
-    pub preview_page: Option<Page>,
+    exit: bool,
+    context: Vec<Page>,
+    shared_state: SharedState,
 
-    pub exit: bool,
-    pub fatal_error_popup: TextPopup,
-
-    pub shared_state: SharedState,
-
+    fatal_error_popup: TextPopup,
     pub invite_popup: InvitePopup,
 
-    pub input_thread: Option<std::thread::JoinHandle<()>>,
-    pub eth_price_thread: Option<tokio::task::JoinHandle<()>>,
-    pub assets_thread: Option<tokio::task::JoinHandle<()>>,
-    pub recent_addresses_thread: Option<tokio::task::JoinHandle<()>>,
-    pub helios_thread: Option<tokio::task::JoinHandle<()>>,
+    input_thread: Option<std::thread::JoinHandle<()>>,
+    eth_price_thread: Option<tokio::task::JoinHandle<()>>,
+    assets_thread: Option<tokio::task::JoinHandle<()>>,
+    recent_addresses_thread: Option<tokio::task::JoinHandle<()>>,
+    helios_thread: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl App {
@@ -107,12 +108,8 @@ impl App {
         let theme_name = ThemeName::from_str(&config.theme_name)?;
         let theme = Theme::new(theme_name);
         Ok(Self {
-            context: vec![Page::MainMenu(MainMenuPage::new(config.developer_mode)?)],
-            preview_page: None,
-
             exit: false,
-            // fatal_error: None,
-            fatal_error_popup: TextPopup::new("Fatal Error"),
+            context: vec![Page::MainMenu(MainMenuPage::new(config.developer_mode)?)],
             shared_state: SharedState {
                 asset_manager: Arc::new(RwLock::new(AssetManager::default())),
                 recent_addresses: None,
@@ -125,6 +122,7 @@ impl App {
                 theme,
             },
 
+            fatal_error_popup: TextPopup::new("Fatal Error"),
             invite_popup: InvitePopup::default(),
 
             input_thread: None,
@@ -135,32 +133,52 @@ impl App {
         })
     }
 
-    pub fn cli_args(&mut self, args: Vec<String>) -> crate::Result<()> {
-        // TODO support for wallet connect URI
-        if args.len() == 2 {
-            if args[0] == "its" {
-                self.invite_popup.set_invite_code(&args[1]);
-                self.invite_popup.open();
+    pub async fn run(&mut self, pre_events: Option<Vec<Event>>) -> crate::Result<()> {
+        let (event_tr, event_rc) = mpsc::channel::<Event>();
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let mut terminal = ratatui::init();
+
+        self.init_threads(&event_tr, &shutdown);
+
+        if let Some(events) = pre_events {
+            let area = self.draw(&mut terminal).map_err(crate::Error::Draw)?;
+            for event in events {
+                self.handle_event(event, area, &event_tr, &shutdown)
+                    .await
+                    .unwrap_or_else(|e| {
+                        self.fatal_error_popup.set_text(e.to_string());
+                    })
             }
-        } else if !args.is_empty() {
-            self.fatal_error_popup.set_text(format!(
-                "Could not recognise action for the arguments passed on the cli: {args:?}",
-            ));
         }
+
+        while !self.exit {
+            let area = self.draw(&mut terminal).map_err(crate::Error::Draw)?;
+
+            self.handle_event(event_rc.recv()?, area, &event_tr, &shutdown)
+                .await
+                .unwrap_or_else(|e| self.fatal_error_popup.set_text(e.to_string()));
+        }
+
+        // final render before exiting
+        self.draw(&mut terminal).map_err(crate::Error::Draw)?;
+
+        // signal all the threads to exit
+        shutdown.store(true, Ordering::Relaxed);
+        self.exit_threads().await;
+
+        ratatui::restore();
 
         Ok(())
     }
-}
 
-impl App {
-    pub fn draw(&self, terminal: &mut DefaultTerminal) -> io::Result<Rect> {
+    fn draw(&self, terminal: &mut DefaultTerminal) -> io::Result<Rect> {
         let completed_frame = terminal.draw(|frame| {
             frame.render_widget(self, frame.area());
         })?;
         Ok(completed_frame.area)
     }
 
-    pub fn init_threads(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
+    fn init_threads(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
         let tr_input = tr.clone();
         let shutdown_signal = sd.clone();
         self.input_thread = Some(std::thread::spawn(move || {
@@ -247,7 +265,7 @@ impl App {
         }
     }
 
-    pub fn reload(&mut self) -> crate::Result<()> {
+    fn reload(&mut self) -> crate::Result<()> {
         let config = Config::load()?;
         self.shared_state.testnet_mode = config.testnet_mode;
         self.shared_state.alchemy_api_key_available = config.alchemy_api_key.is_some();
@@ -283,7 +301,7 @@ impl App {
         Ok(result.ignore_esc)
     }
 
-    pub async fn handle_event(
+    async fn handle_event(
         &mut self,
         event: super::events::Event,
         area: Rect,
@@ -428,10 +446,6 @@ impl App {
         Ok(())
     }
 
-    fn current_page(&self) -> Option<&Page> {
-        self.context.last()
-    }
-
     fn get_areas(&self, area: Rect) -> [Rect; 3] {
         let [title_area, body_area, footer_area] = Layout::vertical([
             Constraint::Length(1),
@@ -440,6 +454,18 @@ impl App {
         ])
         .areas(area);
         [title_area, body_area, footer_area]
+    }
+
+    pub fn current_page(&self) -> Option<&Page> {
+        self.context.last()
+    }
+
+    pub fn current_page_mut(&mut self) -> Option<&mut Page> {
+        self.context.last_mut()
+    }
+
+    pub fn insert_page(&mut self, page: Page) {
+        self.context.push(page);
     }
 }
 
@@ -524,6 +550,7 @@ impl Widget for &App {
                         Page::Text(TextPage::new("Send onchain message to someone".to_string()))
                     }
                     MainMenuItem::DevKeyInput => Page::DevKeyCapture(DevKeyCapturePage::default()),
+                    MainMenuItem::Shell => Page::Shell(ShellPage::default()),
                 };
 
                 dummy_page.render_component(right_area, buf, &self.shared_state);

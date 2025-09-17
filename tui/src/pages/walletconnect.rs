@@ -188,6 +188,11 @@ impl WalletConnectPage {
         })
     }
 
+    pub fn set_uri(&mut self, uri: &str) {
+        let input = self.form.get_text_mut(FormItem::UriInput);
+        *input = uri.to_string();
+    }
+
     fn open_request_at_cursor(&mut self) -> crate::Result<()> {
         let req = self.session_requests.get(self.cursor.current).ok_or(
             crate::Error::SessionRequestNotFound(self.cursor.current, self.session_requests.len()),

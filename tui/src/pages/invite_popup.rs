@@ -121,9 +121,9 @@ impl InvitePopup {
         self.open = false;
     }
 
-    pub fn set_invite_code(&mut self, text: &str) {
+    pub fn set_invite_code(&mut self, text: String) {
         self.reset();
-        self.invite_code = Some(text.to_string());
+        self.invite_code = Some(text);
     }
 
     fn reset(&mut self) {

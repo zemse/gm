@@ -42,6 +42,15 @@ impl TextScroll {
         }
     }
 
+    pub fn scroll_to_bottom(&mut self, width: usize, height: usize) {
+        let lines = self.lines(width).len();
+        if lines > height {
+            self.scroll_offset = lines - height;
+        } else {
+            self.scroll_offset = 0;
+        }
+    }
+
     pub fn get_visible_text(&self, area: Rect) -> (Vec<&str>, usize) {
         let lines: Vec<&str> = self.lines(area.width as usize);
         (
@@ -111,7 +120,7 @@ impl Widget for &TextScroll {
 
             CustomScrollBar {
                 cursor: self.scroll_offset,
-                total: total - area.height as usize,
+                total,
                 paginate: true,
             }
             .render(scroll_area, buf);

@@ -5,7 +5,7 @@ use alloy::{
     signers::{k256::ecdsa::SigningKey, Signature},
 };
 use gm_ratatui_extra::candle_chart::{Candle, Interval};
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 use walletconnect_sdk::wc_message::WcMessage;
 
 use gm_utils::{
@@ -15,6 +15,7 @@ use gm_utils::{
 
 use crate::pages::{
     invite_popup::{InviteCodeClaimStatus, InviteCodeValidity},
+    shell::ShellUpdate,
     tx_popup::TxStatus,
     walletconnect::WalletConnectStatus,
 };
@@ -69,9 +70,18 @@ pub enum Event {
     InviteCodeValidity(InviteCodeValidity),
     InviteCodeClaimStatus(InviteCodeClaimStatus),
     InviteError(String),
+
+    ShellUpdate(ShellUpdate),
 }
 
 impl Event {
+    pub const INPUT_KEY_ENTER: Event = Event::Input(KeyEvent {
+        code: KeyCode::Enter,
+        modifiers: KeyModifiers::NONE,
+        kind: KeyEventKind::Press,
+        state: KeyEventState::NONE,
+    });
+
     pub fn fmt(&self) -> String {
         format!("{self:?}")
     }
