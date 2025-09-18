@@ -127,11 +127,16 @@ impl Component for ShellPage {
 
                         if text_input.trim().is_empty() {
                             self.cmd_lines.push(ShellLine::UserInput(String::new()));
+                            self.display.text = self.full_text();
                             self.text_cursor = 0;
+                            self.display
+                                .scroll_to_bottom(area.width as usize, area.height as usize);
                         } else {
-                            let parts: Vec<&str> = text_input.split_whitespace().collect();
-                            let mut child = Command::new(parts[0])
-                                .args(&parts[1..])
+                            let mut child = Command::new("sh")
+                                .arg("-c")
+                                .arg(text_input)
+                                // .env("CLICOLOR", "1")
+                                // .env("CLICOLOR_FORCE", "1")
                                 .stdin(Stdio::piped())
                                 .stdout(Stdio::piped())
                                 .stderr(Stdio::piped())
@@ -215,40 +220,40 @@ impl Component for ShellPage {
                     }
                 }
             }
-            Event::ShellUpdate(update) => match update {
-                ShellUpdate::StdOut(stdout) => {
-                    self.cmd_lines.push(ShellLine::StdOut(stdout.clone()));
+            Event::ShellUpdate(update) => {
+                match update {
+                    ShellUpdate::StdOut(stdout) => {
+                        self.cmd_lines.push(ShellLine::StdOut(stdout.clone()));
+                    }
+                    ShellUpdate::StdOut_Error(error) => {
+                        return Err(crate::Error::StdoutReadFailed(format!("{error:?}")));
+                    }
+                    ShellUpdate::StdErr(stderr) => {
+                        self.cmd_lines.push(ShellLine::StdErr(stderr.clone()));
+                    }
+                    ShellUpdate::StdErr_Error(error) => {
+                        return Err(crate::Error::StderrReadFailed(format!("{error:?}")));
+                    }
+                    ShellUpdate::Wait(exit_status) => {
+                        self.exit_threads_sync();
+                        self.cmd_lines.push(ShellLine::StdOut(format!(
+                            "Process exited with {}",
+                            exit_status
+                        )));
+                        self.cmd_lines.push(ShellLine::UserInput(String::new()));
+                        self.text_cursor = 0;
+                    }
+                    ShellUpdate::Wait_Error(error) => {
+                        return Err(crate::Error::ProcessExitWaitFailed(format!("{error:?}")));
+                    }
                 }
-                ShellUpdate::StdOut_Error(error) => {
-                    return Err(crate::Error::StdoutReadFailed(format!("{error:?}")));
-                }
-                ShellUpdate::StdErr(stderr) => {
-                    self.cmd_lines.push(ShellLine::StdErr(stderr.clone()));
-                }
-                ShellUpdate::StdErr_Error(error) => {
-                    return Err(crate::Error::StderrReadFailed(format!("{error:?}")));
-                }
-                ShellUpdate::Wait(exit_status) => {
-                    self.cmd_lines.push(ShellLine::StdOut(format!(
-                        "Process exited with {}",
-                        exit_status
-                    )));
 
-                    self.cmd_lines.push(ShellLine::UserInput(String::new()));
-                    self.text_cursor = 0;
-
-                    self.exit_threads_sync();
-                }
-                ShellUpdate::Wait_Error(error) => {
-                    return Err(crate::Error::ProcessExitWaitFailed(format!("{error:?}")));
-                }
-            },
+                self.display.text = self.full_text();
+                self.display
+                    .scroll_to_bottom(area.width as usize, area.height as usize);
+            }
             _ => {}
         }
-
-        self.display.text = self.full_text();
-        self.display
-            .scroll_to_bottom(area.width as usize, area.height as usize);
 
         Ok(Actions::default())
     }
@@ -258,7 +263,6 @@ impl Component for ShellPage {
         Self: Sized,
     {
         self.display.render(area, buf);
-
         area
     }
 }

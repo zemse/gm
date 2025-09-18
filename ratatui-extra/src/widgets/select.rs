@@ -96,7 +96,7 @@ impl<T: Display> Widget for Select<'_, T> {
             List::new(display_items).render(list_area, buf);
             CustomScrollBar {
                 cursor: current_page,
-                total: total_pages,
+                total_items: total_pages,
                 paginate: false,
             }
             .render(scroll_area, buf);

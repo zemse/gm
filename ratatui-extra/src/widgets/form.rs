@@ -551,7 +551,7 @@ impl<
             // form is overflowing draw a scrollbar
             CustomScrollBar {
                 cursor: scroll_cursor as usize,
-                total: form_height as usize,
+                total_items: form_height as usize,
                 paginate: true,
             }
             .render(scroll_area, buf);

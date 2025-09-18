@@ -1,8 +1,9 @@
+use gm_utils::gm_log;
 use ratatui::{layout::Offset, widgets::Widget};
 
 pub struct CustomScrollBar {
     pub cursor: usize,
-    pub total: usize,
+    pub total_items: usize,
     pub paginate: bool,
 }
 
@@ -11,31 +12,42 @@ impl Widget for CustomScrollBar {
     where
         Self: Sized,
     {
-        let capacity = area.height as usize;
+        let max_height = area.height as usize;
         let num_pages = if self.paginate {
-            self.total.div_ceil(capacity)
+            self.total_items.div_ceil(max_height)
+        } else if self.total_items > max_height {
+            std::cmp::min(self.total_items - max_height + 1, max_height)
         } else {
-            self.total
+            1
         };
         let current_page = if self.paginate {
-            self.cursor / capacity
+            self.cursor / max_height
+        } else if self.total_items > max_height {
+            let scaled_cursor = self.cursor * num_pages / (self.total_items - max_height);
+            if scaled_cursor > 0 {
+                scaled_cursor - 1
+            } else {
+                0
+            }
         } else {
-            self.cursor
+            0
         };
 
         let top = (0..current_page)
-            .map(|i| get_page_height(i, capacity, num_pages))
+            .map(|i| get_page_height(i, max_height, num_pages))
             .sum::<usize>();
-        let middle = get_page_height(current_page, capacity, num_pages);
+        let middle = get_page_height(current_page, max_height, num_pages);
         let bottom = ((current_page + 1)..num_pages)
-            .map(|i| get_page_height(i, capacity, num_pages))
+            .map(|i| get_page_height(i, max_height, num_pages))
             .sum::<usize>();
         assert_eq!(
             top + middle + bottom,
-            capacity,
-            "self.total = {}, capacity = {}, current_page = {current_page}, num_pages = {num_pages}, top = {top}, middle = {middle}, bottom = {bottom}",
-            self.total, capacity
+            max_height,
+            "self.cursor = {}, self.total_items = {}, max_height = {}, current_page = {current_page}, num_pages = {num_pages}, top = {top}, middle = {middle}, bottom = {bottom}",
+            self.cursor, self.total_items, max_height
         );
+        gm_log!( "self.cursor = {}, self.total_items = {}, max_height = {}, current_page = {current_page}, num_pages = {num_pages}, top = {top}, middle = {middle}, bottom = {bottom}",
+          self.cursor,  self.total_items, max_height);
 
         let mut i = 0;
         for _ in 0..top {
@@ -53,9 +65,9 @@ impl Widget for CustomScrollBar {
     }
 }
 
-fn get_page_height(i: usize, capacity: usize, num_pages: usize) -> usize {
-    let base = capacity / num_pages;
-    if i < capacity % num_pages {
+fn get_page_height(i: usize, max_height: usize, num_pages: usize) -> usize {
+    let base = max_height / num_pages;
+    if i < max_height % num_pages {
         base + 1
     } else {
         base
@@ -68,24 +80,24 @@ mod test {
 
     #[test]
     fn test_get_page_height() {
-        for capacity in 10..100 {
+        for max_height in 10..100 {
             for num_pages in 1..15 {
                 let mut sum = 0;
                 for i in 0..num_pages {
-                    sum += get_page_height(i, capacity, num_pages);
+                    sum += get_page_height(i, max_height, num_pages);
                 }
 
-                if sum != capacity {
-                    println!("capacity: {capacity}, num_pages: {num_pages}");
+                if sum != max_height {
+                    println!("capacity: {max_height}, num_pages: {num_pages}");
                     for i in 0..num_pages {
-                        let h = get_page_height(i, capacity, num_pages);
+                        let h = get_page_height(i, max_height, num_pages);
                         println!("page {i}: {h}");
                     }
                 }
 
                 assert_eq!(
-                    sum, capacity,
-                    "capacity: {capacity}, num_pages: {num_pages}"
+                    sum, max_height,
+                    "capacity: {max_height}, num_pages: {num_pages}"
                 );
             }
         }

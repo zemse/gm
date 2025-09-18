@@ -120,8 +120,8 @@ impl Widget for &TextScroll {
 
             CustomScrollBar {
                 cursor: self.scroll_offset,
-                total,
-                paginate: true,
+                total_items: total,
+                paginate: false,
             }
             .render(scroll_area, buf);
         } else {

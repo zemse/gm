@@ -1,5 +1,5 @@
-use anstyle::{AnsiColor, Color, Style};
 use clap::{CommandFactory, Parser, Subcommand};
+use console::style;
 use walletconnect_sdk::utils::UriParameters;
 
 #[derive(Parser, Debug)]
@@ -44,15 +44,10 @@ impl Commands {
                     uri: Some(first.clone()),
                 }
             } else {
-                let red = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)));
-                let yellow = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow)));
                 eprintln!(
-                    "{}error:{} unrecognized subcommand {}'{}'{}\n",
-                    red.render(),
-                    red.render_reset(),
-                    yellow.render(),
-                    cmd.join(" "),
-                    yellow.render_reset()
+                    "{} unrecognized subcommand '{}'\n",
+                    style("error:").red(),
+                    style(cmd.join(" ")).yellow(),
                 );
                 Cli::command().print_help().unwrap();
                 std::process::exit(1);
