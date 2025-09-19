@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["bin", "common", "macos", "ratatui-extra", "tui", "utils"]
+members = ["bin", "common", "macos", "ratatui-extra", "rpc-proxy", "tui", "utils"]
 
 [workspace.dependencies]
 alloy = { version = "1", features = ["full", "rlp", "signer-mnemonic", "eip712"] }
@@ -14,3 +14,5 @@ crossterm = "0.29.0"
 strum = "0.26"
 strum_macros = "0.26"
 walletconnect-sdk = "0.2.2"
+url = "2.5.4"
+reqwest = { version = "0.11", features = ["json"] }

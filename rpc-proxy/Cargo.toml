@@ -1,0 +1,13 @@
+[package]
+name = "gm-rpc-proxy"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+url = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+reqwest = { workspace = true }
+axum = { version = "0.8.4", features = ["macros", "tokio"] }
