@@ -249,8 +249,6 @@ impl Component for AccountCreatePage {
             self.hash_rate_thread = Some(hash_rate_thread);
         }
 
-        result.ignore_esc();
-
         Ok(result)
     }
 
@@ -353,11 +351,12 @@ impl Component for AccountCreatePage {
                 Gauge::default()
                     // TODO rename theme.block to theme.style, or add method
                     .gauge_style(shared_state.theme.block())
-                    .percent(
+                    .percent(std::cmp::max(
+                        100,
                         (elapsed_time.as_secs() * 100)
                             .checked_div(est_time as u64)
                             .unwrap_or(100) as u16,
-                    )
+                    ))
                     .render(Rect::new(area.x, 16, area.width, 1), buf);
             }
         } else if let Some((addr, counter, duration)) = self.vanity_result {
