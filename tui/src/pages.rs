@@ -81,7 +81,7 @@ pub enum Page {
     Config(ConfigPage),
     SendMessage(SendMessagePage),
     SignMessage(SignMessagePage),
-    // Transaction(TransactionPage),
+
     WalletConnect(WalletConnectPage),
 
     Trade(TradePage),

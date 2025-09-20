@@ -3451,6 +3451,7 @@ dependencies = [
  "gm-common",
  "gm-macos",
  "gm-ratatui-extra",
+ "gm-rpc-proxy",
  "gm-utils",
  "humantime",
  "ratatui",

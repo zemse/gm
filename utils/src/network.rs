@@ -5,19 +5,21 @@ use alloy::{
     providers::{Provider, ProviderBuilder},
 };
 use serde::{Deserialize, Serialize};
-use serde_with::{formats::PreferMany, serde_as, OneOrMany};
+use serde_with::{formats::PreferMany, serde_as, skip_serializing_none, OneOrMany};
 
 use crate::{
     config::Config,
     disk_storage::{DiskStorageInterface, FileFormat},
 };
 
+#[skip_serializing_none]
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Network {
     pub name: String,
     pub name_alchemy: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[serde_as(as = "OneOrMany<_, PreferMany>")]
     pub name_aliases: Vec<String>,
     pub chain_id: u32,
@@ -28,8 +30,15 @@ pub struct Network {
     pub rpc_alchemy: Option<String>,
     pub rpc_infura: Option<String>,
     pub explorer_url: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
     pub is_testnet: bool,
+    pub rpc_port: Option<usize>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tokens: Vec<Token>,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -63,6 +72,7 @@ impl Network {
             )))
     }
 
+    // TODO make this return type as Url
     pub fn get_rpc(&self) -> crate::Result<String> {
         if let Some(rpc_url) = &self.rpc_url {
             Ok(rpc_url.clone())
@@ -160,6 +170,7 @@ impl NetworkStore {
                     rpc_infura: new_entry.rpc_infura.or(existing.rpc_infura),
                     explorer_url: new_entry.explorer_url.or(existing.explorer_url),
                     is_testnet: new_entry.is_testnet,
+                    rpc_port: new_entry.rpc_port.or(existing.rpc_port),
                     tokens: merge_tokens(new_entry.tokens, existing.tokens),
                 }
             } else {
@@ -302,6 +313,7 @@ fn default_networks() -> Vec<Network> {
             rpc_infura: None,
             explorer_url: None,
             is_testnet: false,
+            rpc_port: None,
             tokens: vec![
                 Token {
                     name: "Wrapped Ether".to_string(),
@@ -350,6 +362,7 @@ fn default_networks() -> Vec<Network> {
             rpc_infura: None,
             explorer_url: Some("https://arbiscan.io/tx/{}".to_string()),
             is_testnet: false,
+            rpc_port: None,
             tokens: vec![
                 Token {
                     name: "Wrapped Ether".to_string(),
@@ -406,6 +419,7 @@ fn default_networks() -> Vec<Network> {
             rpc_infura: None,
             explorer_url: None,
             is_testnet: false,
+            rpc_port: None,
             tokens: vec![],
         },
         Network {
@@ -421,6 +435,7 @@ fn default_networks() -> Vec<Network> {
             rpc_infura: None,
             explorer_url: None,
             is_testnet: false,
+            rpc_port: None,
             tokens: vec![
                 Token {
                     name: "Wrapped Ether".to_string(),
@@ -453,6 +468,7 @@ fn default_networks() -> Vec<Network> {
             rpc_infura: None,
             explorer_url: None,
             is_testnet: false,
+            rpc_port: None,
             tokens: vec![],
         },
         Network {
@@ -468,6 +484,7 @@ fn default_networks() -> Vec<Network> {
             rpc_infura: None,
             explorer_url: Some("https://sepolia.etherscan.io/tx/{}".to_string()),
             is_testnet: true,
+            rpc_port: None,
             tokens: vec![],
         },
     ]

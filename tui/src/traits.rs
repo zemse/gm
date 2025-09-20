@@ -51,6 +51,9 @@ pub trait Component {
 
     fn set_focus(&mut self, _focus: bool) {}
 
+    /// Handles an event and returns any actions to be performed.
+    /// This cannot be async to prevent TUI render from blocking.
+    /// `event` is mutable to allow taking ownership of inner data when needed.
     fn handle_event(
         &mut self,
         event: &Event,
@@ -60,8 +63,9 @@ pub trait Component {
         shared_state: &SharedState,
     ) -> crate::Result<Actions>;
 
-    // Renders the component into the given area and returns the area that was
-    // actually used.
+    /// Renders the component into the given area and returns the area that was
+    /// actually used.
+    // TODO do something about the return type here
     fn render_component(
         &self,
         area: ratatui::prelude::Rect,

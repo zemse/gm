@@ -19,7 +19,7 @@ pub enum OverrideResult {
 #[derive(Clone)]
 struct ServerState<F>
 where
-    F: Fn(JsonRpcRequest) -> OverrideResult + Clone + Send + Sync + 'static,
+    F: Fn(JsonRpcRequest) -> crate::Result<OverrideResult> + Clone + Send + Sync + 'static,
 {
     client: Client,
     fwd_to: Url,
@@ -36,12 +36,12 @@ where
 /// * `overrider` - Closure to handle custom request overrides.
 pub async fn serve<F>(
     port: usize,
-    secret: impl fmt::Display,
+    secret: &impl fmt::Display,
     fwd_to: Url,
     overrider: F,
 ) -> crate::Result<()>
 where
-    F: Fn(JsonRpcRequest) -> OverrideResult + Clone + Send + Sync + 'static,
+    F: Fn(JsonRpcRequest) -> crate::Result<OverrideResult> + Clone + Send + Sync + 'static,
 {
     let state = ServerState {
         client: Client::new(),
@@ -64,7 +64,7 @@ where
 
 async fn handler<F>(State(state): State<ServerState<F>>, Json(payload): Json<Value>) -> Json<Value>
 where
-    F: Fn(JsonRpcRequest) -> OverrideResult + Clone + Send + Sync + 'static,
+    F: Fn(JsonRpcRequest) -> crate::Result<OverrideResult> + Clone + Send + Sync + 'static,
 {
     match handle_batch_or_one(&state, payload).await {
         Ok(resp) => resp,
@@ -89,7 +89,7 @@ async fn handle_batch_or_one<F>(
     payload: Value,
 ) -> crate::Result<Json<Value>>
 where
-    F: Fn(JsonRpcRequest) -> OverrideResult + Clone + Send + Sync + 'static,
+    F: Fn(JsonRpcRequest) -> crate::Result<OverrideResult> + Clone + Send + Sync + 'static,
 {
     if payload.is_array() {
         let requests: Vec<JsonRpcRequest> =
@@ -115,9 +115,9 @@ async fn handle_one<F>(
     req: JsonRpcRequest,
 ) -> crate::Result<JsonRpcResponse<Value>>
 where
-    F: Fn(JsonRpcRequest) -> OverrideResult + Clone + Send + Sync + 'static,
+    F: Fn(JsonRpcRequest) -> crate::Result<OverrideResult> + Clone + Send + Sync + 'static,
 {
-    match (state.overrider)(req.clone()) {
+    match (state.overrider)(req.clone())? {
         OverrideResult::Sync(payload) => Ok(JsonRpcResponse {
             jsonrpc: TwoPointZero,
             payload,

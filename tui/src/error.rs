@@ -105,8 +105,26 @@ pub enum Error {
     #[error("Failed to wait for process exit. (Error: {0})")]
     ProcessExitWaitFailed(String),
 
+    #[error("RPC Proxy thread crashed for {1}. (Error: {0})")]
+    RpcProxyThreadCrashed(gm_rpc_proxy::Error, String),
+
+    #[error("RefCall Option value {0} is already taken")]
+    ValueAlreadyTaken(&'static str),
+
+    #[error("Shell environment variables are not set.")]
+    ShellEnvVarsNotSet,
+
     #[error(transparent)]
-    ParseIntError(Box<std::num::ParseIntError>),
+    ParseIntError(#[from] std::num::ParseIntError),
+
+    #[error("Tokio oneshot send failed")]
+    OneshotSendFailed,
+
+    #[error(
+        "The request asked to perform operation using address {asked}, however current working address is {current}."
+    )]
+    RequestAsksForDifferentAddress { asked: Address, current: Address },
+
     #[error(transparent)]
     ParseFloatError(Box<std::num::ParseFloatError>),
     #[error(transparent)]
@@ -173,60 +191,6 @@ impl FmtError for Error {
         }
     }
 }
-
-// impl From<&str> for Error {
-//     fn from(e: &str) -> Self {
-//         Error::InternalError(e.to_string())
-//     }
-// }
-
-// impl From<String> for Error {
-//     fn from(e: String) -> Self {
-//         Error::InternalError(e)
-//     }
-// }
-
-// impl From<std::num::ParseIntError> for Error {
-//     fn from(e: std::num::ParseIntError) -> Self {
-//         Error::ParseIntError(Box::new(e))
-//     }
-// }
-
-// impl From<std::num::ParseFloatError> for Error {
-//     fn from(e: std::num::ParseFloatError) -> Self {
-//         Error::ParseFloatError(Box::new(e))
-//     }
-// }
-
-// impl From<alloy::hex::FromHexError> for Error {
-//     fn from(e: alloy::hex::FromHexError) -> Self {
-//         Error::FromHexError(Box::new(e))
-//     }
-// }
-
-// impl From<std::io::Error> for Error {
-//     fn from(e: std::io::Error) -> Self {
-//         Error::IoError(Box::new(e))
-//     }
-// }
-
-// impl From<inquire::InquireError> for Error {
-//     fn from(e: inquire::InquireError) -> Self {
-//         Error::InquireError(Box::new(e))
-//     }
-// }
-
-// impl From<alloy::signers::k256::ecdsa::Error> for Error {
-//     fn from(e: alloy::signers::k256::ecdsa::Error) -> Self {
-//         Error::AlloyEcdsaError(Box::new(e))
-//     }
-// }
-
-// impl From<reqwest::Error> for Error {
-//     fn from(e: reqwest::Error) -> Self {
-//         Error::ReqwestError(Box::new(e))
-//     }
-// }
 
 impl From<serde_json::Error> for Error {
     fn from(e: serde_json::Error) -> Self {

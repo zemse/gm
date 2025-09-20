@@ -2,6 +2,12 @@ pub type Result<T> = std::result::Result<T, RpcProxyError>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RpcProxyError {
+    #[error("Request is missing params.")]
+    RequestMissingParams,
+
+    #[error("Request parsing failed. (Error: {0})")]
+    RequestParseFailedStr(&'static str),
+
     #[error("Request parsing failed. (Error: {0})")]
     RequestParseFailed(serde_json::Error),
 

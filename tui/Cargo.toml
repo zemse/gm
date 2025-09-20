@@ -18,6 +18,7 @@ gm-common = { path = "../common" }
 gm-utils = { path = "../utils" }
 gm-macos = { path = "../macos" }
 gm-ratatui-extra = { path = "../ratatui-extra" }
+gm-rpc-proxy = { path = "../rpc-proxy" }
 
 # Ethereum
 alloy = { workspace = true }

@@ -16,7 +16,7 @@ async fn main() {
     tokio::spawn(async move {
         gm_rpc_proxy::serve(
             3000,
-            "abcd",
+            &"abcd",
             "http://127.0.0.1:8545".parse().unwrap(),
             move |req| {
                 if req.method == "eth_blockNumber" {
@@ -29,10 +29,10 @@ async fn main() {
                     });
 
                     // Async response, server will wait for a message on oneshot_rv
-                    gm_rpc_proxy::OverrideResult::Async(oneshot_rv)
+                    Ok(gm_rpc_proxy::OverrideResult::Async(oneshot_rv))
                 } else {
                     // This will cause the request to be forwarded to underlying rpc
-                    gm_rpc_proxy::OverrideResult::NoOverride
+                    Ok(gm_rpc_proxy::OverrideResult::NoOverride)
                 }
             },
         )

@@ -201,7 +201,7 @@ impl TxPopup {
                     TxStatus::JsonRpcError {
                         message,
                         code,
-                        data,
+                        data, // TODO pass this as an error object
                     } => on_rpc_error(message.clone(), *code, data.clone())?,
                     TxStatus::Pending(tx_hash) => {
                         on_tx_submit(*tx_hash)?;

@@ -6,7 +6,7 @@ use serde::{
 };
 use serde_json::Value;
 
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Id {
     Number(u64),
@@ -15,7 +15,7 @@ pub enum Id {
     Null,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct TwoPointZero;
 
 impl Serialize for TwoPointZero {
@@ -94,6 +94,16 @@ pub struct ErrorObj {
     pub data: Option<Value>,
 }
 
+impl ErrorObj {
+    pub fn user_denied() -> Self {
+        ErrorObj {
+            code: -4001,
+            message: "User rejected the request.".to_string(),
+            data: None,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ResponsePayload<T> {
     #[serde(rename = "result")]
@@ -102,7 +112,7 @@ pub enum ResponsePayload<T> {
     Error(ErrorObj),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JsonRpcRequest {
     pub jsonrpc: TwoPointZero,
     pub method: String,

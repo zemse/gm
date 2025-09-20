@@ -1,15 +1,43 @@
+//! gm shell page
+//!
+//! This page provides a shell interface within the TUI application. It allows users to
+//! execute shell commands with certain environment variables set which can be utilised.
+//!
+//! For e.g. `gm run --export-private-key ts-node script.ts` would allow the user to run
+//! `ts-node script.ts` in the shell page and the environment variable `PRIVATE_KEY` will
+//! be set to the private key of the current account. This allows users to avoid placing
+//! secrets in .env files.
+//!
+//! Providing private key to a script can be dangerous. Hence, gm also exposes EIP-1193
+//! compatible providers and programs can make RPC calls to it to sign transactions, it
+//! would trigger sign box in the TUI application.
 use std::{
+    cell::RefCell,
+    collections::HashMap,
     io::{self, BufRead, BufReader, Write},
     process::{self, Command, Stdio},
     sync::{atomic::AtomicBool, mpsc::Sender, Arc},
     thread,
 };
 
-use gm_ratatui_extra::{input_box::InputBox, text_scroll::TextScroll};
+use alloy::{hex, primitives::Address, rpc::types::TransactionRequest};
+use gm_ratatui_extra::{act::Act, input_box::InputBox, text_scroll::TextScroll};
+use gm_rpc_proxy::{
+    error::RpcProxyError,
+    rpc_types::{ErrorObj, ResponsePayload},
+};
+use gm_utils::{disk_storage::DiskStorageInterface, network::NetworkStore};
 use ratatui::{buffer::Buffer, crossterm::event::KeyCode, layout::Rect, widgets::Widget};
+use serde_json::{json, Value};
+use tokio::sync::oneshot;
+use walletconnect_sdk::utils::random_bytes32;
 
 use crate::{
     app::SharedState,
+    pages::{
+        sign_popup::{SignPopup, SignPopupEvent},
+        tx_popup::TxPopup,
+    },
     traits::{Actions, Component},
     Event,
 };
@@ -18,6 +46,18 @@ enum ShellLine {
     UserInput(String),
     StdOut(String),
     StdErr(String),
+}
+
+#[derive(Debug)]
+pub struct UserRequest {
+    params: UserRequestParams,
+    reply_to: Option<oneshot::Sender<ResponsePayload<Value>>>,
+}
+
+#[derive(Debug)]
+pub enum UserRequestParams {
+    SendTransaction([Box<TransactionRequest>; 1]),
+    SignMessage((String, Address)),
 }
 
 #[derive(Debug)]
@@ -31,12 +71,21 @@ pub enum ShellUpdate {
 
     Wait(process::ExitStatus),
     Wait_Error(io::Error),
+
+    RpcProxyRequest(RefCell<Option<UserRequest>>),
+    RpcProxyThreadCrashed(RefCell<Option<(RpcProxyError, String)>>),
 }
 
 pub struct ShellPage {
     cmd_lines: Vec<ShellLine>,
     display: TextScroll,
     text_cursor: usize,
+    server_threads: Option<Vec<tokio::task::JoinHandle<()>>>,
+    env_vars: Option<HashMap<String, String>>,
+    requests: Vec<UserRequest>,
+    tx_popup: TxPopup,
+    sign_popup: SignPopup,
+
     stdin: Option<process::ChildStdin>,
     stdout_thread: Option<thread::JoinHandle<()>>,
     stderr_thread: Option<thread::JoinHandle<()>>,
@@ -52,6 +101,12 @@ impl Default for ShellPage {
             ],
             display: TextScroll::default(),
             text_cursor: 0,
+            server_threads: None,
+            env_vars: None,
+            requests: vec![],
+            tx_popup: TxPopup::default(),
+            sign_popup: SignPopup::default(),
+
             stdin: None,
             stdout_thread: None,
             stderr_thread: None,
@@ -83,6 +138,95 @@ impl ShellPage {
             .join("\n")
     }
 
+    // TODO gracefully shutdown
+    fn create_server_threads(&mut self, tr: &Sender<Event>, ss: &SharedState) -> crate::Result<()> {
+        let secret = hex::encode(random_bytes32());
+        let networks = NetworkStore::load()?.networks;
+
+        let mut server_threads = vec![];
+        let mut env_vars = HashMap::new();
+
+        let mut port = 9393;
+        for network in networks {
+            let rpc_url = network.get_rpc()?.parse()?;
+            let secret_clone = secret.clone();
+            let tr = tr.clone();
+            let port_actual = network.rpc_port.unwrap_or(port);
+            let network_name = network.name.clone();
+            let current_account = ss.try_current_account()?;
+            server_threads.push(tokio::spawn(async move {
+                let tr_clone = tr.clone();
+                let result =
+                    gm_rpc_proxy::serve(port_actual, &secret_clone, rpc_url, move |request| {
+                        if request.method == "eth_accounts" {
+                            // Synchronous immediate response
+                            Ok(gm_rpc_proxy::OverrideResult::Sync(
+                                ResponsePayload::Success(json!([current_account])),
+                            ))
+                        } else if request.method == "eth_sendTransction" {
+                            let (oneshot_tr, oneshot_rv) =
+                                oneshot::channel::<ResponsePayload<Value>>();
+
+                            let _ = tr.send(Event::ShellUpdate(ShellUpdate::RpcProxyRequest(
+                                RefCell::new(Some(UserRequest {
+                                    params: UserRequestParams::SendTransaction(
+                                        serde_json::from_value(
+                                            request
+                                                .params
+                                                .ok_or(RpcProxyError::RequestMissingParams)?,
+                                        )
+                                        .map_err(RpcProxyError::RequestParseFailed)?,
+                                    ),
+                                    reply_to: Some(oneshot_tr),
+                                })),
+                            )));
+
+                            Ok(gm_rpc_proxy::OverrideResult::Async(oneshot_rv))
+                        } else if request.method == "personal_sign" {
+                            let (oneshot_tr, oneshot_rv) =
+                                oneshot::channel::<ResponsePayload<Value>>();
+
+                            let _ = tr.send(Event::ShellUpdate(ShellUpdate::RpcProxyRequest(
+                                RefCell::new(Some(UserRequest {
+                                    params: UserRequestParams::SignMessage(
+                                        serde_json::from_value(
+                                            request
+                                                .params
+                                                .ok_or(RpcProxyError::RequestMissingParams)?,
+                                        )
+                                        .map_err(RpcProxyError::RequestParseFailed)?,
+                                    ),
+                                    reply_to: Some(oneshot_tr),
+                                })),
+                            )));
+
+                            Ok(gm_rpc_proxy::OverrideResult::Async(oneshot_rv))
+                        } else {
+                            Ok(gm_rpc_proxy::OverrideResult::NoOverride)
+                        }
+                    })
+                    .await;
+                if let Err(e) = result {
+                    let _ = tr_clone.send(Event::ShellUpdate(ShellUpdate::RpcProxyThreadCrashed(
+                        RefCell::new(Some((e, network_name))),
+                    )));
+                }
+            }));
+
+            env_vars.insert(
+                format!("{}_RPC_URL", network.name.to_uppercase().replace(' ', "_")),
+                format!("http://localhost:{port_actual}/{secret}"),
+            );
+
+            port += 1;
+        }
+
+        self.server_threads = Some(server_threads);
+        self.env_vars = Some(env_vars);
+
+        Ok(())
+    }
+
     fn exit_threads_sync(&mut self) {
         if let Some(stdin) = self.stdin.take() {
             drop(stdin);
@@ -108,35 +252,47 @@ impl Component for ShellPage {
         &mut self,
         event: &Event,
         area: Rect,
-        transmitter: &Sender<crate::Event>,
-        _: &Arc<AtomicBool>,
-        _: &SharedState,
+        tr: &Sender<crate::Event>,
+        _sd: &Arc<AtomicBool>,
+        ss: &SharedState,
     ) -> crate::Result<Actions> {
+        let mut actions = Actions::default();
+
+        if self.server_threads.is_none() {
+            self.create_server_threads(tr, ss)?;
+        }
+
         self.display.handle_event(event.key_event(), area);
 
         #[allow(clippy::single_match)]
         match event {
             Event::Input(key_event) => {
+                let mut scroll_to_bottom = false;
+
                 if let Some((text_input, text_cursor)) = self.get_user_input_mut() {
+                    scroll_to_bottom =
                     // Keyboard handling for input
-                    InputBox::handle_event(Some(key_event), text_input, text_cursor);
+                        InputBox::handle_event(Some(key_event), text_input, text_cursor);
 
                     // Execute
                     if key_event.code == KeyCode::Enter {
-                        let text_input = text_input.clone();
+                        scroll_to_bottom = true;
 
+                        let text_input = text_input.clone();
                         if text_input.trim().is_empty() {
                             self.cmd_lines.push(ShellLine::UserInput(String::new()));
-                            self.display.text = self.full_text();
                             self.text_cursor = 0;
-                            self.display
-                                .scroll_to_bottom(area.width as usize, area.height as usize);
                         } else {
                             let mut child = Command::new("sh")
                                 .arg("-c")
                                 .arg(text_input)
                                 // .env("CLICOLOR", "1")
                                 // .env("CLICOLOR_FORCE", "1")
+                                .envs(
+                                    self.env_vars
+                                        .as_ref()
+                                        .ok_or(crate::Error::ShellEnvVarsNotSet)?,
+                                )
                                 .stdin(Stdio::piped())
                                 .stdout(Stdio::piped())
                                 .stderr(Stdio::piped())
@@ -153,7 +309,7 @@ impl Component for ShellPage {
                                 .take()
                                 .ok_or(crate::Error::StderrNotAvailable)?;
 
-                            let tr_stdout = transmitter.clone();
+                            let tr_stdout = tr.clone();
                             self.stdout_thread = Some(thread::spawn(move || {
                                 let reader = BufReader::new(stdout);
                                 for line in reader.lines() {
@@ -171,7 +327,7 @@ impl Component for ShellPage {
                                 }
                             }));
 
-                            let tr_stderr = transmitter.clone();
+                            let tr_stderr = tr.clone();
                             self.stderr_thread = Some(thread::spawn(move || {
                                 let reader = BufReader::new(stderr);
                                 for line in reader.lines() {
@@ -189,7 +345,7 @@ impl Component for ShellPage {
                                 }
                             }));
 
-                            let tr_stderr = transmitter.clone();
+                            let tr_stderr = tr.clone();
                             self.wait_thread = Some(thread::spawn(move || {
                                 let status = child.wait();
                                 match status {
@@ -219,6 +375,12 @@ impl Component for ShellPage {
                         _ => {}
                     }
                 }
+
+                self.display.text = self.full_text();
+                if scroll_to_bottom {
+                    self.display
+                        .scroll_to_bottom(area.width as usize, area.height as usize);
+                }
             }
             Event::ShellUpdate(update) => {
                 match update {
@@ -246,6 +408,18 @@ impl Component for ShellPage {
                     ShellUpdate::Wait_Error(error) => {
                         return Err(crate::Error::ProcessExitWaitFailed(format!("{error:?}")));
                     }
+                    ShellUpdate::RpcProxyRequest(request) => {
+                        if let Some(request) = request.take() {
+                            self.requests.push(request);
+                        }
+                    }
+                    ShellUpdate::RpcProxyThreadCrashed(data) => {
+                        let (error, network_name) = data
+                            .take()
+                            .ok_or(crate::Error::ValueAlreadyTaken("RpcProxyThreadCrashed"))?;
+
+                        return Err(crate::Error::RpcProxyThreadCrashed(error, network_name));
+                    }
                 }
 
                 self.display.text = self.full_text();
@@ -255,14 +429,78 @@ impl Component for ShellPage {
             _ => {}
         }
 
-        Ok(Actions::default())
+        if self.sign_popup.is_open() {
+            actions.ignore_esc();
+        }
+
+        if let Some(request) = self.requests.first_mut() {
+            match &request.params {
+                UserRequestParams::SendTransaction(transaction_request) => {
+                    todo!("{transaction_request:?}")
+                }
+                UserRequestParams::SignMessage((msg, address)) => {
+                    let current = ss.try_current_account()?;
+                    if *address != current {
+                        return Err(crate::Error::RequestAsksForDifferentAddress {
+                            asked: *address,
+                            current,
+                        });
+                    }
+
+                    if !self.sign_popup.is_open() {
+                        self.sign_popup.open();
+                        self.sign_popup.set_text(msg);
+                    }
+
+                    // TODO sign should also take shutdown signal
+                    self.sign_popup
+                        .handle_event((event, area, tr, ss), |sign_event| {
+                            // oneshot's sender is consumed here, cannot be used again
+                            match sign_event {
+                                SignPopupEvent::Signed(signature) => {
+                                    let reply_to = request.reply_to.take().ok_or(
+                                        crate::Error::ValueAlreadyTaken("UserRequest.reply_to"),
+                                    )?;
+                                    reply_to
+                                        .send(ResponsePayload::Success(
+                                            json!(signature.to_string()),
+                                        ))
+                                        .map_err(|_| crate::Error::OneshotSendFailed)?;
+                                }
+                                SignPopupEvent::Rejected | SignPopupEvent::EscapedBeforeSigning => {
+                                    let reply_to = request.reply_to.take().ok_or(
+                                        crate::Error::ValueAlreadyTaken("UserRequest.reply_to"),
+                                    )?;
+                                    reply_to
+                                        .send(ResponsePayload::Error(ErrorObj::user_denied()))
+                                        .map_err(|_| crate::Error::OneshotSendFailed)?;
+                                }
+                                SignPopupEvent::EscapedAfterSigning => {}
+                            }
+
+                            Ok(())
+                        })?;
+
+                    // If sign popup is closed during this moment, remove the request from the queue
+                    if !self.sign_popup.is_open() {
+                        self.requests.remove(0);
+                    }
+                }
+            }
+        }
+
+        Ok(actions)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, _: &SharedState) -> Rect
+    fn render_component(&self, area: Rect, buf: &mut Buffer, ss: &SharedState) -> Rect
     where
         Self: Sized,
     {
         self.display.render(area, buf);
+
+        self.tx_popup.render(area, buf, &ss.theme);
+        self.sign_popup.render(area, buf, &ss.theme);
+
         area
     }
 }

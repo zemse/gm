@@ -65,7 +65,7 @@ impl InputBox<'_> {
         key_event: Option<&KeyEvent>,
         text_input: &mut String,
         text_cursor: &mut usize,
-    ) {
+    ) -> bool {
         if let Some(key_event) = key_event {
             match key_event.code {
                 KeyCode::Left => {
@@ -74,6 +74,7 @@ impl InputBox<'_> {
                     } else if *text_cursor > 0 {
                         *text_cursor -= 1
                     }
+                    return true;
                 }
                 KeyCode::Right => {
                     if key_event.modifiers == KeyModifiers::ALT {
@@ -81,6 +82,7 @@ impl InputBox<'_> {
                     } else if *text_cursor < text_input.len() {
                         *text_cursor += 1
                     }
+                    return true;
                 }
                 KeyCode::Char(char) => {
                     // Handle space key on empty state
@@ -118,6 +120,7 @@ impl InputBox<'_> {
                         text_input.insert(*text_cursor, char);
                         *text_cursor += 1;
                     }
+                    return true;
                 }
                 KeyCode::Backspace => {
                     if key_event.modifiers == KeyModifiers::ALT {
@@ -126,10 +129,13 @@ impl InputBox<'_> {
                         *text_cursor -= 1;
                         text_input.remove(*text_cursor);
                     }
+                    return true;
                 }
                 _ => {}
             }
         }
+
+        false
     }
 
     pub fn render(

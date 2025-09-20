@@ -33,6 +33,7 @@ pub enum FormItem {
     RpcInfura,
     ExplorerUrl,
     IsTestnet,
+    RpcPort,
     TokensButton,
     SaveButton,
     RemoveButton,
@@ -118,6 +119,12 @@ impl TryFrom<FormItem> for FormWidget {
                 label: "Testnet",
                 value: false,
             },
+            FormItem::RpcPort => FormWidget::InputBox {
+                label: "RPC Port",
+                text: String::new(),
+                empty_text: None,
+                currency: None,
+            },
             FormItem::TokensButton => FormWidget::Button { label: "Tokens" },
             FormItem::SaveButton => FormWidget::Button { label: "Save" },
             FormItem::RemoveButton => FormWidget::Button { label: "Remove" },
@@ -189,8 +196,8 @@ impl NetworkCreatePage {
             ),
         })
     }
-    fn network(form: &Form<FormItem, crate::Error>, tokens: &[Token]) -> Network {
-        Network {
+    fn network(form: &Form<FormItem, crate::Error>, tokens: &[Token]) -> crate::Result<Network> {
+        Ok(Network {
             name: form.get_text(FormItem::Name).clone(),
             name_alchemy: form
                 .get_text(FormItem::NameAlchemy)
@@ -231,8 +238,14 @@ impl NetworkCreatePage {
                 .not()
                 .then(|| form.get_text(FormItem::ExplorerUrl).clone()),
             is_testnet: form.get_boolean(FormItem::IsTestnet),
+            rpc_port: form
+                .get_text(FormItem::RpcPort)
+                .is_empty()
+                .not()
+                .then(|| form.get_text(FormItem::RpcPort).clone().parse())
+                .transpose()?,
             tokens: tokens.to_owned(),
-        }
+        })
     }
 }
 
@@ -280,9 +293,9 @@ impl Component for NetworkCreatePage {
                             let mut config = NetworkStore::load()?;
                             if config.networks.get(self.network_index).is_some() {
                                 config.networks[self.network_index] =
-                                    Self::network(form, &self.tokens);
+                                    Self::network(form, &self.tokens)?;
                             } else {
-                                config.networks.push(Self::network(form, &self.tokens));
+                                config.networks.push(Self::network(form, &self.tokens)?);
                             }
                             let _ = config.save();
                             handle_result.page_pops = 1;
@@ -290,7 +303,7 @@ impl Component for NetworkCreatePage {
                         }
                     }
                     FormItem::TokensButton => {
-                        let network = Self::network(form, &self.tokens);
+                        let network = Self::network(form, &self.tokens)?;
                         handle_result.page_pops = 1;
                         handle_result
                             .page_inserts

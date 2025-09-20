@@ -4,6 +4,7 @@
 //! # Examples
 //! See the `examples` folder for usage examples.
 pub mod error;
+// TODO switch to using alloy::rpc::json_rpc instead
 pub mod rpc_types;
 mod serve;
 

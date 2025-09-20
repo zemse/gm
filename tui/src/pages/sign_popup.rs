@@ -62,6 +62,13 @@ enum SignStatus {
     Failed,
 }
 
+pub enum SignPopupEvent {
+    Signed(Signature),
+    Rejected,
+    EscapedBeforeSigning,
+    EscapedAfterSigning,
+}
+
 #[derive(Default)]
 pub struct SignPopup {
     text: TextScroll,
@@ -98,17 +105,13 @@ impl SignPopup {
         }
     }
 
-    pub fn handle_event<F1, F3, F4>(
+    pub fn handle_event<F>(
         &mut self,
         (event, area, tr, ss): (&crate::Event, Rect, &mpsc::Sender<Event>, &SharedState),
-        mut on_signature: F1,
-        mut on_cancel: F3,
-        mut on_esc: F4,
+        mut on_event: F,
     ) -> crate::Result<Actions>
     where
-        F1: FnMut(&Signature) -> crate::Result<()>,
-        F3: FnMut() -> crate::Result<()>,
-        F4: FnMut() -> crate::Result<()>,
+        F: FnMut(SignPopupEvent) -> crate::Result<()>,
     {
         let mut result = Actions::default();
 
@@ -131,12 +134,12 @@ impl SignPopup {
                                     self.sign_thread = Some(sign_thread(&self.text.text, tr, ss)?);
                                 } else {
                                     self.close();
-                                    on_cancel()?;
+                                    on_event(SignPopupEvent::Rejected)?;
                                 }
                             }
                             KeyCode::Esc => {
                                 self.close();
-                                on_esc()?;
+                                on_event(SignPopupEvent::EscapedBeforeSigning)?;
                             }
                             _ => {}
                         },
@@ -144,14 +147,14 @@ impl SignPopup {
                         SignStatus::Done | SignStatus::Failed => {
                             if key_event.code == KeyCode::Esc {
                                 self.close();
-                                on_esc()?;
+                                on_event(SignPopupEvent::EscapedAfterSigning)?;
                             }
                         }
                     }
                 }
             }
             Event::SignResult(signature) => {
-                on_signature(signature)?;
+                on_event(SignPopupEvent::Signed(*signature))?;
                 self.status = SignStatus::Done;
 
                 if let Some(thread) = self.sign_thread.take() {
