@@ -16,11 +16,11 @@ pub struct TextPopup {
 }
 
 impl TextPopup {
-    pub fn new(title: &'static str) -> Self {
+    pub fn new(title: &'static str, break_words: bool) -> Self {
         let text = String::new();
         Self {
             title,
-            text_scroll: TextScroll::new(text),
+            text_scroll: TextScroll::new(text, break_words),
         }
     }
 

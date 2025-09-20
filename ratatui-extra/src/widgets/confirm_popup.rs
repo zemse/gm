@@ -27,7 +27,7 @@ impl ConfirmPopup {
     ) -> Self {
         Self {
             title,
-            text: TextScroll::new(text),
+            text: TextScroll::new(text, true),
             confirm_button_label,
             cancel_button_label,
             open: false,

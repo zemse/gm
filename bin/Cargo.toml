@@ -7,9 +7,13 @@ edition = "2021"
 name = "gm"
 path = "src/main.rs"
 
+[features]
+default = []
+demo = ["gm-tui/demo"]
+
 [dependencies]
 clap = { version = "4.0", features = ["derive", "env"] }
-gm-tui = { path = "../tui"}
+gm-tui = { path = "../tui" }
 tokio = { workspace = true }
 walletconnect-sdk = { workspace = true }
 console = { workspace = true }

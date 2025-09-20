@@ -1,5 +1,6 @@
 use std::cmp::min;
 
+// TODO replace with textwrap crate
 pub fn split_string(s: &str, max_width: usize) -> Vec<&str> {
     let mut lines = vec![];
 

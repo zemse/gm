@@ -8,6 +8,10 @@ repository = "https://github.com/zemse/gm"
 keywords = ["crypto", "blockchain", "ethereum", "tui", "wallet"]
 include = ["src/**", "Cargo.toml", "README.md", "LICENSE*"]
 
+[features]
+default = []
+demo = []  
+
 [dependencies]
 thiserror = { workspace = true }
 serde = { workspace = true }

@@ -24,7 +24,7 @@ impl<T: Widget> BorderedWidget for T {
     ) where
         Self: Sized,
     {
-        let inner_area = block.inner(area);
+        let inner_area = block.inner(area).margin_h(1);
         block.render(area, buf);
         self.render(inner_area, buf);
     }

@@ -1,3 +1,5 @@
+#[cfg(feature = "demo")]
+use std::time::{Duration, Instant};
 use std::{
     io,
     str::FromStr,
@@ -92,12 +94,17 @@ pub struct App {
 
     fatal_error_popup: TextPopup,
     pub invite_popup: InvitePopup,
+    #[cfg(feature = "demo")]
+    demo_popup: TextPopup,
 
     input_thread: Option<std::thread::JoinHandle<()>>,
     eth_price_thread: Option<tokio::task::JoinHandle<()>>,
     assets_thread: Option<tokio::task::JoinHandle<()>>,
     recent_addresses_thread: Option<tokio::task::JoinHandle<()>>,
     helios_thread: Option<tokio::task::JoinHandle<()>>,
+
+    #[cfg(feature = "demo")]
+    demo_timer: Option<Instant>,
 }
 
 impl App {
@@ -122,15 +129,48 @@ impl App {
                 theme,
             },
 
-            fatal_error_popup: TextPopup::new("Fatal Error"),
+            fatal_error_popup: TextPopup::new("Fatal Error", true),
             invite_popup: InvitePopup::default(),
+            #[cfg(feature = "demo")]
+            demo_popup: TextPopup::new("", false),
 
             input_thread: None,
             eth_price_thread: None,
             assets_thread: None,
             recent_addresses_thread: None,
             helios_thread: None,
+
+            #[cfg(feature = "demo")]
+            demo_timer: Some(Instant::now()),
         })
+    }
+
+    #[cfg(feature = "demo")]
+    fn demo_text() -> &'static str {
+        "Welcome to demo trial!\n\
+        \n\
+        This program is currently running on cloud (not on your computer), so some features are disabled in demo mode.\n\
+        \n\
+        Here are few things you can try:\n\
+        - Try using `walletconnect` to connect with a website (e.g. etherscan.io/verifiedSignatures).\n\
+        - Try using the `shell` to prevent passing secrets to a js script that signs a message."
+    }
+
+    #[cfg(feature = "demo")]
+    fn demo_text_2() -> &'static str {
+        "Looks like you've been exploring for a while!\n\
+        \n\
+        Install the full version of gm on your computer to: \n\
+        - Create or load your accounts\n\
+        - Manage assets and send transactions\n\
+        - Run foundry/hardhat scripts without .env files\n\
+        - TouchID on macOS\n\
+        - And more! \n\
+        \n\
+        Instructions: github.com/zemse/gm\n\
+        If you like this project, please consider starring it on github, it helps a lot.\n\
+        \n\
+        Feedback, suggestions, or questions? Feel free to DM on telegram @zemse"
     }
 
     pub async fn run(&mut self, pre_events: Option<Vec<Event>>) -> crate::Result<()> {
@@ -139,6 +179,9 @@ impl App {
         let mut terminal = ratatui::init();
 
         self.init_threads(&event_tr, &shutdown);
+
+        #[cfg(feature = "demo")]
+        self.demo_popup.set_text(Self::demo_text().to_string());
 
         if let Some(events) = pre_events {
             let area = self.draw(&mut terminal).map_err(crate::Error::Draw)?;
@@ -310,12 +353,31 @@ impl App {
     ) -> crate::Result<()> {
         let [_, body_area, _] = self.get_areas(area);
 
+        #[cfg(feature = "demo")]
+        if let Some(demo_timer) = self.demo_timer {
+            if demo_timer.elapsed() >= Duration::from_secs(120) {
+                self.demo_timer = None;
+                self.demo_popup.set_text(Self::demo_text_2().to_string());
+            }
+        }
+
+        #[cfg(feature = "demo")]
+        let demo_popup_shown = self.demo_popup.is_shown();
+        #[cfg(not(feature = "demo"))]
+        let demo_popup_shown = false;
+
         let result = if self.fatal_error_popup.is_shown() {
             self.fatal_error_popup
                 .handle_event::<Actions>(event.key_event(), area)
         } else if self.invite_popup.is_open() {
             self.invite_popup
                 .handle_event(&event, tr, &self.shared_state)?
+        } else if demo_popup_shown {
+            #[cfg(not(feature = "demo"))]
+            unreachable!();
+            #[cfg(feature = "demo")]
+            self.demo_popup
+                .handle_event::<Actions>(event.key_event(), area)
         } else if self.context.last().is_some() {
             let page = self.context.last_mut().unwrap();
             page.handle_event(&event, body_area.block_inner(), tr, sd, &self.shared_state)?
@@ -574,5 +636,9 @@ impl Widget for &App {
 
         self.fatal_error_popup
             .render(area, buf, &self.shared_state.theme.error_popup());
+
+        #[cfg(feature = "demo")]
+        self.demo_popup
+            .render(area, buf, &self.shared_state.theme.popup());
     }
 }

@@ -3,6 +3,8 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     widgets::Widget,
 };
+use std::borrow::Cow;
+use textwrap::{wrap, Options};
 
 use crate::extensions::RectExt;
 
@@ -12,20 +14,22 @@ use super::scroll_bar::CustomScrollBar;
 pub struct TextScroll {
     pub text: String,
     pub scroll_offset: usize,
+    pub break_words: bool,
 }
 
 impl TextScroll {
-    pub fn new(text: String) -> Self {
+    pub fn new(text: String, break_words: bool) -> Self {
         Self {
             text,
             scroll_offset: 0,
+            break_words,
         }
     }
 
-    fn lines(&self, width: usize) -> Vec<&str> {
+    fn lines(&self, width: usize) -> Vec<Cow<'_, str>> {
         self.text
             .lines()
-            .flat_map(|line| split_str_by_width(line, width))
+            .flat_map(|line| wrap(line, Options::new(width).break_words(self.break_words)))
             .collect()
     }
 
@@ -51,16 +55,16 @@ impl TextScroll {
         }
     }
 
-    pub fn get_visible_text(&self, area: Rect) -> (Vec<&str>, usize) {
-        let lines: Vec<&str> = self.lines(area.width as usize);
+    pub fn get_visible_text(&self, area: Rect) -> (Vec<Cow<'_, str>>, usize) {
+        let lines = self.lines(area.width as usize);
+        let lines_len = lines.len();
         (
             lines
-                .iter()
+                .into_iter()
                 .skip(self.scroll_offset)
                 .take(area.height as usize)
-                .map(|line| line.trim_end())
                 .collect(),
-            lines.len(),
+            lines_len,
         )
     }
 
@@ -77,27 +81,6 @@ impl TextScroll {
             }
         }
     }
-}
-
-fn split_str_by_width(s: &str, width: usize) -> Vec<&str> {
-    let mut result = Vec::new();
-    let mut start = 0;
-    let mut count = 0;
-
-    for (i, _) in s.char_indices() {
-        if count == width {
-            result.push(&s[start..i]);
-            start = i;
-            count = 0;
-        }
-        count += 1;
-    }
-
-    if start < s.len() {
-        result.push(&s[start..]);
-    }
-
-    result
 }
 
 impl Widget for &TextScroll {

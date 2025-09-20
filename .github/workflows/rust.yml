@@ -31,6 +31,16 @@ jobs:
       - uses: actions/checkout@v4
       - run: cargo build --verbose
 
+  build-demo:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    name: build-demo (${{ matrix.os }})
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo build --features demo --verbose
+
   test:
     strategy:
       matrix:
