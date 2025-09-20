@@ -60,3 +60,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: cargo clippy -- -D warnings
+
+  gm_log:
+    runs-on: ubuntu-latest
+    name: no gm_log allowed
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          if grep -R --exclude-dir=target --exclude-dir=.git --exclude=*.lock "gm_log!" .; then
+              echo "Found gm_log! macro used in the codebase"
+              exit 1
+          fi
