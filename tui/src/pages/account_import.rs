@@ -15,7 +15,7 @@ use crate::{
 };
 use gm_utils::account::AccountManager;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct AccountImportPage {
     pub screen: usize,
     pub input: String,

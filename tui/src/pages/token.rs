@@ -18,6 +18,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 
+#[derive(Debug)]
 enum TokenSelect {
     Create,
     Existing(Box<Token>),
@@ -31,6 +32,8 @@ impl Display for TokenSelect {
         }
     }
 }
+
+#[derive(Debug)]
 pub struct TokenPage {
     cursor: Cursor,
     focus: bool,

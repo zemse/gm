@@ -109,6 +109,7 @@ impl AddressBookMenuItem {
     }
 }
 
+#[derive(Debug)]
 pub struct AddressBookPage {
     full_list: Vec<AddressBookMenuItem>,
     search_string: String,

@@ -114,11 +114,16 @@ fn get_address_from_mnemonic(phrase: &str) -> crate::Result<Address> {
     Ok(signer.address())
 }
 
+/// Mines a wallet whose address matches the given masks.
+/// - `mask_a` specifies bits that must be 1 in the 20 byte address.
+/// - `mask_b` specifies bits that must be 0 in the 20 byte address.
+/// - `max_dur` specifies the maximum duration to mine for. If None, mines indefinitely.
+/// - `shutdown_signal` can be used to stop mining from main thread.
 pub fn mine_wallet(
     mask_a: Address,
     mask_b: Address,
     max_dur: Option<Duration>,
-    shutdown_signal: Arc<AtomicBool>,
+    exit_signal: Arc<AtomicBool>,
 ) -> crate::Result<(Option<SigningKey>, usize, Duration)> {
     let address_one = address!("0xffffffffffffffffffffffffffffffffffffffff");
     let counter = Arc::new(AtomicUsize::new(0));
@@ -131,13 +136,13 @@ pub fn mine_wallet(
             let counter = Arc::clone(&counter);
             let stop = Arc::clone(&stop);
             let result = Arc::clone(&result);
-            let shutdown_signal = shutdown_signal.clone();
+            let exit_signal = exit_signal.clone();
             s.spawn(move |_| {
-                // first private key is random
+                // Start with a random private key
                 let key = coins_bip32::prelude::SigningKey::random(&mut OsRng);
                 let mut u = U256::from_be_slice(&key.to_bytes());
 
-                while !stop.load(Ordering::Relaxed) && !shutdown_signal.load(Ordering::Relaxed) {
+                while !stop.load(Ordering::Relaxed) && !exit_signal.load(Ordering::Relaxed) {
                     if let Some(max_dur) = max_dur {
                         if Instant::now().duration_since(start) > max_dur {
                             break;
@@ -155,10 +160,9 @@ pub fn mine_wallet(
                             let mut result = result.lock().unwrap();
                             *result = Some(credential);
                         };
-                    } else {
-                        // generate new random key
                     }
-                    // change private key by one
+
+                    // Change private key by one
                     u += U256::ONE;
                     counter.fetch_add(1, Ordering::Relaxed);
                 }

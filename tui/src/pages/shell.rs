@@ -42,6 +42,7 @@ use crate::{
     Event,
 };
 
+#[derive(Debug)]
 enum ShellLine {
     UserInput(String),
     StdOut(String),
@@ -76,6 +77,7 @@ pub enum ShellUpdate {
     RpcProxyThreadCrashed(RefCell<Option<(RpcProxyError, String)>>),
 }
 
+#[derive(Debug)]
 pub struct ShellPage {
     cmd_lines: Vec<ShellLine>,
     display: TextScroll,

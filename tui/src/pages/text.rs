@@ -12,6 +12,7 @@ use crate::{
     Event,
 };
 
+#[derive(Debug)]
 pub struct TextPage {
     pub text: String,
     pub cursor: usize,

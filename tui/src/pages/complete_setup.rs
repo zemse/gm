@@ -16,7 +16,7 @@ use crate::{
     traits::{Actions, Component},
 };
 
-#[derive(Display, PartialEq, EnumIter)]
+#[derive(Debug, Display, PartialEq, EnumIter)]
 pub enum FormItem {
     CreateOrImportWallet,
     AlchemyApiKey,
@@ -57,6 +57,7 @@ impl TryFrom<FormItem> for FormWidget {
     }
 }
 
+#[derive(Debug)]
 pub struct CompleteSetupPage {
     pub form: Form<FormItem, crate::Error>,
 }

@@ -15,7 +15,7 @@ use gm_utils::{
 use std::sync::{atomic::AtomicBool, mpsc, Arc};
 use strum::{Display, EnumIter};
 
-#[derive(Display, EnumIter, PartialEq)]
+#[derive(Debug, Display, EnumIter, PartialEq)]
 pub enum FormItem {
     Heading,
     Name,
@@ -52,6 +52,7 @@ impl TryFrom<FormItem> for FormWidget {
     }
 }
 
+#[derive(Debug)]
 pub struct AddressBookDisplayPage {
     pub id: usize,
     pub form: Form<FormItem, crate::Error>,

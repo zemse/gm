@@ -21,7 +21,7 @@ use gm_ratatui_extra::{
     },
 };
 
-#[derive(Display, EnumIter, PartialEq)]
+#[derive(Debug, Display, EnumIter, PartialEq)]
 pub enum FormItem {
     Heading,
     AlchemyApiKey,
@@ -68,6 +68,7 @@ impl TryFrom<FormItem> for FormWidget {
     }
 }
 
+#[derive(Debug)]
 pub struct ConfigPage {
     pub form: Form<FormItem, crate::Error>,
 }

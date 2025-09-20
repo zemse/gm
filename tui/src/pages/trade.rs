@@ -13,7 +13,7 @@ use crate::{
     Event,
 };
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct TradePage {
     candle_chart: Option<CandleChart>,
     interval: Interval,

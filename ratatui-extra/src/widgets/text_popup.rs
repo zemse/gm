@@ -84,6 +84,6 @@ impl TextPopup {
             .title_bottom("press ESC to dismiss");
 
         self.text_scroll
-            .render_with_block(popup_inner_area, buf, block);
+            .render_with_block(popup_inner_area, buf, block, true);
     }
 }

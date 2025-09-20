@@ -121,7 +121,7 @@ pub enum WcEvent {
     NoOp,
 }
 
-#[derive(Display, EnumIter, PartialEq)]
+#[derive(Debug, Display, EnumIter, PartialEq)]
 enum FormItem {
     Heading,
     UriInput,
@@ -153,6 +153,7 @@ impl TryFrom<FormItem> for FormWidget {
     }
 }
 
+#[derive(Debug)]
 pub struct WalletConnectPage {
     form: Form<FormItem, crate::Error>,
     session_requests: Vec<WcMessage>,

@@ -21,7 +21,7 @@ use strum::{Display, EnumIter};
 
 use super::address_book::AddressBookMenuItem;
 
-#[derive(Display, EnumIter, PartialEq)]
+#[derive(Debug, Display, EnumIter, PartialEq)]
 pub enum FormItem {
     Heading,
     To,
@@ -64,6 +64,7 @@ impl TryFrom<FormItem> for FormWidget {
     }
 }
 
+#[derive(Debug)]
 pub struct AssetTransferPage {
     pub form: Form<FormItem, crate::Error>,
     pub asset: Option<Asset>, // TODO see if we can avoid this here

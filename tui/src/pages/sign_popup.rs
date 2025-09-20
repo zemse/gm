@@ -53,7 +53,7 @@ pub fn sign_thread(
     }))
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 enum SignStatus {
     #[default]
     Idle,
@@ -69,7 +69,7 @@ pub enum SignPopupEvent {
     EscapedAfterSigning,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct SignPopup {
     text: TextScroll,
     open: bool,

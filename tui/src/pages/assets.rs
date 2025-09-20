@@ -11,7 +11,7 @@ use crate::{
 
 use super::{asset_transfer::AssetTransferPage, Page};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct AssetsPage {
     cursor: Cursor,
     focus: bool,

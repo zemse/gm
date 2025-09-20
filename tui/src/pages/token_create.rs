@@ -18,7 +18,7 @@ use std::sync::Arc;
 use strum::Display;
 use strum_macros::EnumIter;
 
-#[derive(Display, EnumIter, PartialEq)]
+#[derive(Debug, Display, EnumIter, PartialEq)]
 pub enum FormItem {
     Heading,
     Name,
@@ -70,6 +70,8 @@ impl TryFrom<FormItem> for FormWidget {
         Ok(widget)
     }
 }
+
+#[derive(Debug)]
 pub struct TokenCreatePage {
     pub form: Form<FormItem, crate::Error>,
     pub token: Token,

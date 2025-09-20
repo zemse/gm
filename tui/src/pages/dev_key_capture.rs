@@ -8,7 +8,7 @@ use crate::{
     Event,
 };
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct DevKeyCapturePage {
     data: Option<String>,
 }

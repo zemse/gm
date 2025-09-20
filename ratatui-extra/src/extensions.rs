@@ -11,6 +11,7 @@ pub trait BorderedWidget {
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         block: Block<'_>,
+        leave_horizontal_space: bool,
     ) where
         Self: Sized;
 }
@@ -21,10 +22,13 @@ impl<T: Widget> BorderedWidget for T {
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         block: Block<'_>,
+        leave_horizontal_space: bool,
     ) where
         Self: Sized,
     {
-        let inner_area = block.inner(area).margin_h(1);
+        let inner_area = block
+            .inner(area)
+            .margin_h(if leave_horizontal_space { 1 } else { 0 });
         block.render(area, buf);
         self.render(inner_area, buf);
     }

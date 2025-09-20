@@ -9,6 +9,7 @@ use crate::{act::Act, extensions::RectExt, thematize::Thematize};
 
 use super::{button::Button, popup::Popup, text_scroll::TextScroll};
 
+#[derive(Debug)]
 pub struct ConfirmPopup {
     title: &'static str,
     text: TextScroll,

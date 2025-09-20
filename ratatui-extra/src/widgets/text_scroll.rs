@@ -10,7 +10,7 @@ use crate::extensions::RectExt;
 
 use super::scroll_bar::CustomScrollBar;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct TextScroll {
     pub text: String,
     pub scroll_offset: usize,

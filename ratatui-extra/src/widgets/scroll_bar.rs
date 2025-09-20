@@ -1,4 +1,3 @@
-use gm_utils::gm_log;
 use ratatui::{layout::Offset, widgets::Widget};
 
 pub struct CustomScrollBar {
@@ -46,8 +45,6 @@ impl Widget for CustomScrollBar {
             "self.cursor = {}, self.total_items = {}, max_height = {}, current_page = {current_page}, num_pages = {num_pages}, top = {top}, middle = {middle}, bottom = {bottom}",
             self.cursor, self.total_items, max_height
         );
-        gm_log!( "self.cursor = {}, self.total_items = {}, max_height = {}, current_page = {current_page}, num_pages = {num_pages}, top = {top}, middle = {middle}, bottom = {bottom}",
-          self.cursor,  self.total_items, max_height);
 
         let mut i = 0;
         for _ in 0..top {

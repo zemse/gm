@@ -12,7 +12,7 @@ use crate::{
 };
 use gm_utils::account::AccountManager;
 
-#[derive(Display, EnumIter, PartialEq)]
+#[derive(Debug, Display, EnumIter, PartialEq)]
 pub enum FormItem {
     Heading,
     Message,
@@ -20,6 +20,7 @@ pub enum FormItem {
     Signature,
 }
 
+#[derive(Debug)]
 pub struct SignMessagePage {
     form: Form<FormItem, crate::Error>,
 }

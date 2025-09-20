@@ -49,7 +49,7 @@ fn spawn_sign_thread(
     }))
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 enum SignStatus {
     #[default]
     Idle,
@@ -58,6 +58,7 @@ enum SignStatus {
     Failed,
 }
 
+#[derive(Debug)]
 pub struct SignTypedDataPopup {
     typed_data_json: Value,
     display: TextScroll,

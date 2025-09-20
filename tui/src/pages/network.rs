@@ -17,6 +17,7 @@ use crate::traits::{Actions, Component};
 use crate::Event;
 use gm_utils::network::{Network, NetworkStore};
 
+#[derive(Debug)]
 enum NetworkSelect {
     Create,
     Existing(Box<Network>),
@@ -29,6 +30,8 @@ impl Display for NetworkSelect {
         }
     }
 }
+
+#[derive(Debug)]
 pub struct NetworkPage {
     cursor: Cursor,
     focus: bool,

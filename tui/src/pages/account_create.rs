@@ -1,11 +1,14 @@
 use std::{
-    sync::{atomic::AtomicBool, mpsc, Arc},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc, Arc,
+    },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
 
 use alloy::primitives::{address, Address};
-use gm_ratatui_extra::thematize::Thematize;
+use gm_ratatui_extra::{act::Act, confirm_popup::ConfirmPopup, thematize::Thematize};
 use ratatui::{
     buffer::Buffer,
     crossterm::event::KeyCode,
@@ -22,7 +25,7 @@ use crate::{
 };
 use gm_utils::account::{mine_wallet, AccountManager, AccountUtils};
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum HashRateResult {
     None,
     Pending,
@@ -30,17 +33,21 @@ pub enum HashRateResult {
     Error(String),
 }
 
+#[derive(Debug)]
 pub struct AccountCreatePage {
-    pub cursor: usize,
-    pub mask: [Option<u8>; 40],
-    pub error: Option<String>,
-    pub hash_rate_thread: Option<JoinHandle<()>>,
-    pub hash_rate: HashRateResult,
-    pub mining: bool,
-    pub started_mining_at: Instant,
-    pub vanity_thread: Option<JoinHandle<()>>,
-    pub vanity_result: Option<(Address, usize, Duration)>,
-    pub mnemonic_result: Option<Address>,
+    cursor: usize,
+    mask: [Option<u8>; 40],
+    hash_rate: HashRateResult,
+    vanity_result: Option<(Address, usize, Duration)>,
+    mnemonic_result: Option<Address>,
+    mining: bool,
+    started_mining_at: Instant,
+
+    exit_signal: Arc<AtomicBool>,
+    hash_rate_thread: Option<JoinHandle<()>>,
+    vanity_thread: Option<JoinHandle<()>>,
+
+    exit_popup: ConfirmPopup,
 }
 
 impl Default for AccountCreatePage {
@@ -48,14 +55,23 @@ impl Default for AccountCreatePage {
         Self {
             cursor: 0,
             mask: [None; 40],
-            error: None,
-            hash_rate_thread: None,
             hash_rate: HashRateResult::None,
-            mining: false,
-            started_mining_at: Instant::now(),
-            vanity_thread: None,
             vanity_result: None,
             mnemonic_result: None,
+            mining: false,
+            started_mining_at: Instant::now(),
+
+            exit_signal: Arc::new(AtomicBool::new(false)),
+            hash_rate_thread: None,
+            vanity_thread: None,
+
+            exit_popup: ConfirmPopup::new(
+                "Warning",
+                "Mining will be ended if you go back. You can press ESC to go back or select End. If you want to continue mining you can choose to wait."
+                    .to_string(),
+                "Wait",
+                "End",
+            ),
         }
     }
 }
@@ -86,6 +102,8 @@ impl AccountCreatePage {
 
 impl Component for AccountCreatePage {
     async fn exit_threads(&mut self) {
+        self.exit_signal.store(true, Ordering::Relaxed);
+
         if let Some(thread) = self.hash_rate_thread.take() {
             thread.join().unwrap();
         }
@@ -97,76 +115,98 @@ impl Component for AccountCreatePage {
     fn handle_event(
         &mut self,
         event: &Event,
-        _area: Rect,
+        area: Rect,
         transmitter: &mpsc::Sender<Event>,
-        shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &Arc<AtomicBool>,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
-        let result = Actions::default();
+        let mut result = Actions::default();
+
+        if self.exit_popup.is_open() {
+            let r = self.exit_popup.handle_event(
+                event.key_event(),
+                area,
+                || Ok(()),
+                || -> crate::Result<()> {
+                    result.page_pops += 1;
+                    Ok(())
+                },
+            )?;
+            result.merge(r);
+        }
 
         let cursor_max = self.mask.len();
         match event {
-            Event::Input(key_event) => match key_event.code {
-                KeyCode::Right => {
-                    self.cursor = (self.cursor + 1) % cursor_max;
-                }
-                KeyCode::Left => {
-                    self.cursor = (self.cursor + cursor_max - 1) % cursor_max;
-                }
-                KeyCode::Char(c) => match c {
-                    '0'..='9' => {
-                        self.mask[self.cursor] = Some(c as u8 - b'0');
-                        if self.cursor < cursor_max - 1 {
-                            self.cursor += 1;
+            Event::Input(key_event) => {
+                if self.mining && key_event.code == KeyCode::Esc {
+                    self.exit_popup.open();
+                } else {
+                    // Handle input only if not mining
+                    match key_event.code {
+                        KeyCode::Right => {
+                            self.cursor = (self.cursor + 1) % cursor_max;
                         }
-                    }
-                    'a'..='f' => {
-                        self.mask[self.cursor] = Some(c as u8 - b'a' + 10);
-                        if self.cursor < cursor_max - 1 {
-                            self.cursor += 1;
+                        KeyCode::Left => {
+                            self.cursor = (self.cursor + cursor_max - 1) % cursor_max;
                         }
-                    }
-                    'A'..='F' => {
-                        self.mask[self.cursor] = Some(c as u8 - b'A' + 10);
-                        if self.cursor < cursor_max - 1 {
-                            self.cursor += 1;
-                        }
-                    }
-                    _ => {}
-                },
-                KeyCode::Backspace => {
-                    if self.cursor > 0 {
-                        self.mask[self.cursor - 1] = None;
-                        self.cursor -= 1;
-                    }
-                    if self.cursor == 0 || self.cursor == cursor_max {
-                        self.mask[self.cursor] = None;
-                    }
-                }
-                KeyCode::Enter => {
-                    if self.is_mask_empty() {
-                        let addr = AccountManager::create_mnemonic_wallet()?;
-                        self.mnemonic_result = Some(addr);
-                    }
-
-                    if !self.mining {
-                        self.mining = true;
-                        self.started_mining_at = Instant::now();
-                        let tr = transmitter.clone();
-                        let (mask_a, mask_b) = self.mask_a_b();
-                        let shutdown_signal = shutdown_signal.clone();
-                        let vanity_thread = thread::spawn(move || {
-                            let result = mine_wallet(mask_a, mask_b, None, shutdown_signal);
-                            if let Ok((Some(key), counter, duration)) = result {
-                                tr.send(Event::VanityResult(key, counter, duration))
-                                    .unwrap();
+                        KeyCode::Char(c) => match c {
+                            '0'..='9' => {
+                                self.mask[self.cursor] = Some(c as u8 - b'0');
+                                if self.cursor < cursor_max - 1 {
+                                    self.cursor += 1;
+                                }
                             }
-                        });
-                        self.vanity_thread = Some(vanity_thread);
+                            'a'..='f' => {
+                                self.mask[self.cursor] = Some(c as u8 - b'a' + 10);
+                                if self.cursor < cursor_max - 1 {
+                                    self.cursor += 1;
+                                }
+                            }
+                            'A'..='F' => {
+                                self.mask[self.cursor] = Some(c as u8 - b'A' + 10);
+                                if self.cursor < cursor_max - 1 {
+                                    self.cursor += 1;
+                                }
+                            }
+                            _ => {}
+                        },
+                        KeyCode::Backspace => {
+                            if self.cursor == 0
+                                || (self.cursor == cursor_max - 1
+                                    && self.mask[self.cursor].is_some())
+                            {
+                                self.mask[self.cursor] = None;
+                            } else if self.cursor > 0 {
+                                self.mask[self.cursor - 1] = None;
+                                self.cursor -= 1;
+                            }
+                        }
+                        KeyCode::Enter => {
+                            if self.is_mask_empty() {
+                                let addr = AccountManager::create_mnemonic_wallet()?;
+                                self.mnemonic_result = Some(addr);
+                            }
+
+                            if !self.mining {
+                                self.mining = true;
+                                self.started_mining_at = Instant::now();
+                                let tr = transmitter.clone();
+                                let (mask_a, mask_b) = self.mask_a_b();
+                                let exit_signal = self.exit_signal.clone();
+                                let vanity_thread = thread::spawn(move || {
+                                    let result = mine_wallet(mask_a, mask_b, None, exit_signal);
+                                    if let Ok((Some(key), counter, duration)) = result {
+                                        tr.send(Event::VanityResult(key, counter, duration))
+                                            .unwrap();
+                                    }
+                                });
+                                self.vanity_thread = Some(vanity_thread);
+                            }
+                        }
+                        _ => {}
                     }
                 }
-                _ => {}
-            },
+            }
             Event::HashRateResult(hash_rate) => {
                 self.hash_rate = HashRateResult::Some(*hash_rate as usize);
             }
@@ -187,14 +227,14 @@ impl Component for AccountCreatePage {
             self.hash_rate = HashRateResult::Pending;
 
             let tr = transmitter.clone();
-            let shutdown_signal = shutdown_signal.clone();
+            let exit_signal = self.exit_signal.clone();
             let hash_rate_thread = thread::spawn(move || {
                 let address_one = address!("0xffffffffffffffffffffffffffffffffffffffff");
                 let result = mine_wallet(
                     Address::ZERO,
                     address_one,
                     Some(Duration::from_secs(1)),
-                    shutdown_signal,
+                    exit_signal,
                 );
                 match result {
                     Ok((_, counter, duration)) => {
@@ -208,6 +248,8 @@ impl Component for AccountCreatePage {
             });
             self.hash_rate_thread = Some(hash_rate_thread);
         }
+
+        result.ignore_esc();
 
         Ok(result)
     }
@@ -327,6 +369,9 @@ impl Component for AccountCreatePage {
             )
             .render(area.offset(Offset { x: 0, y: 12 }), buf);
         }
+
+        self.exit_popup.render(area, buf, &shared_state.theme);
+
         area
     }
 }

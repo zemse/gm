@@ -8,9 +8,9 @@ use crate::app::SharedState;
 use super::{events::Event, pages::Page};
 
 // TODO change the name of this struct and trait, something like trait PostHandleEvent
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Actions {
-    // Number of pages to go back, usually 1.
+    // Number of pages to go back, usually 1. // TODO change to bool
     pub page_pops: usize,
     // Page to insert into the context stack.
     pub page_inserts: Vec<Page>,

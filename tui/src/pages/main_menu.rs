@@ -25,7 +25,7 @@ use gm_ratatui_extra::{
     widgets::{cursor::Cursor, select::Select},
 };
 
-#[derive(Display, EnumIter, PartialEq)]
+#[derive(Debug, Display, EnumIter, PartialEq)]
 pub enum MainMenuItem {
     CompleteSetup,
     Portfolio,
@@ -111,6 +111,7 @@ impl MainMenuItem {
     }
 }
 
+#[derive(Debug)]
 pub struct MainMenuPage {
     pub cursor: Cursor,
     pub list: Vec<MainMenuItem>,

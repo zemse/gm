@@ -58,6 +58,7 @@ pub mod tx_popup;
 pub mod walletconnect;
 
 #[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
 pub enum Page {
     MainMenu(MainMenuPage),
     CompleteSetup(CompleteSetupPage),

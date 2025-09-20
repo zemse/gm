@@ -23,7 +23,7 @@ use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use strum::{Display, EnumIter};
 
-#[derive(Display, EnumIter, PartialEq)]
+#[derive(Debug, Display, EnumIter, PartialEq)]
 pub enum FormItem {
     Heading,
     To,
@@ -66,6 +66,7 @@ impl TryFrom<FormItem> for FormWidget {
     }
 }
 
+#[derive(Debug)]
 pub struct SendMessagePage {
     pub form: Form<FormItem, crate::Error>,
     pub address_book_popup: AddressBookPopup,

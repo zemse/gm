@@ -18,7 +18,7 @@ use crate::Event;
 use gm_utils::network::{Network, NetworkStore, Token};
 use strum::{Display, EnumIter};
 
-#[derive(Display, EnumIter, PartialEq)]
+#[derive(Debug, Display, EnumIter, PartialEq)]
 pub enum FormItem {
     Heading,
     Name,
@@ -133,6 +133,8 @@ impl TryFrom<FormItem> for FormWidget {
         Ok(widget)
     }
 }
+
+#[derive(Debug)]
 pub struct NetworkCreatePage {
     pub form: Form<FormItem, crate::Error>,
     pub tokens: Vec<Token>,

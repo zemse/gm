@@ -24,6 +24,7 @@ use ratatui::{
 
 use super::{account_create::AccountCreatePage, account_import::AccountImportPage, Page};
 
+#[derive(Debug)]
 enum AccountSelect {
     Create,
     Import,
@@ -40,6 +41,7 @@ impl Display for AccountSelect {
     }
 }
 
+#[derive(Debug)]
 pub struct AccountPage {
     cursor: Cursor,
     focus: bool,

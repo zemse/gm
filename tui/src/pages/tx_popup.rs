@@ -51,7 +51,7 @@ pub enum TxStatus {
     Failed(FixedBytes<32>),
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct TxPopup {
     network: Network,
     tx_req: TransactionRequest,
