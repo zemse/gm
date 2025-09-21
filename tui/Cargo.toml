@@ -20,7 +20,6 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 gm-common = { path = "../common" }
 gm-utils = { path = "../utils" }
-gm-macos = { path = "../macos" }
 gm-ratatui-extra = { path = "../ratatui-extra" }
 gm-rpc-proxy = { path = "../rpc-proxy" }
 
@@ -39,3 +38,6 @@ humantime = "2.2.0"
 data3 = "0.2.0"
 helios-ethereum = { package = "zemse-helios-ethereum", version = "0.9" }
 eyre = "0.6"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+gm-macos = { path = "../macos" }

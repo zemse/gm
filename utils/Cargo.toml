@@ -26,5 +26,6 @@ serde_yaml = "0.9.34"
 directories = "5.0"
 
 gm-common = { path = "../common" }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 gm-macos = { path = "../macos" }

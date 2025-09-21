@@ -10,6 +10,7 @@ pub type Result<T> = std::result::Result<T, UtilsError>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum UtilsError {
+    #[cfg(target_os = "macos")]
     #[error(transparent)]
     MacosError(#[from] gm_macos::Error),
 

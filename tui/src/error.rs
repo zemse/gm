@@ -8,10 +8,13 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[cfg(target_os = "macos")]
     #[error(transparent)]
     MacosError(#[from] gm_macos::Error),
+
     #[error(transparent)]
     UtilsError(#[from] gm_utils::Error),
+
     #[error(transparent)]
     RatatuiExtraError(#[from] gm_ratatui_extra::Error),
 
