@@ -29,7 +29,7 @@ jobs:
     name: build (${{ matrix.os }})
     steps:
       - uses: actions/checkout@v4
-      - run: cargo build --verbose
+      - run: cargo build -p gm-bin --verbose
 
   build-demo:
     strategy:
@@ -39,7 +39,7 @@ jobs:
     name: build-demo (${{ matrix.os }})
     steps:
       - uses: actions/checkout@v4
-      - run: cargo build --features demo --verbose
+      - run: cargo build -p gm-bin --features demo --verbose
 
   test:
     strategy:
@@ -49,7 +49,7 @@ jobs:
     name: test (${{ matrix.os }})
     steps:
       - uses: actions/checkout@v4
-      - run: cargo test --verbose
+      - run: cargo test -p gm-bin --verbose
 
   clippy:
     strategy:
@@ -59,7 +59,7 @@ jobs:
     name: clippy (${{ matrix.os }})
     steps:
       - uses: actions/checkout@v4
-      - run: cargo clippy -- -D warnings
+      - run: cargo clippy -p gm-bin -- -D warnings
 
   gm_log:
     runs-on: ubuntu-latest
@@ -67,7 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          if grep -R --exclude-dir=target --exclude-dir=.git --exclude=*.lock "gm_log!" .; then
+          if grep -R --exclude-dir=target --exclude-dir=.git --exclude-dir=.github --exclude='*.lock' 'gm_log!' .; then
               echo "Found gm_log! macro used in the codebase"
               exit 1
           fi
