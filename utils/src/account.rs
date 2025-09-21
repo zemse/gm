@@ -67,7 +67,7 @@ impl AccountUtils for AccountManager {
         #[cfg(target_os = "macos")]
         return Ok(gm_macos::Macos::store_mnemonic_wallet(phrase, address)?);
 
-        #[cfg(target_os = "linux")]
+        #[cfg(not(target_os = "macos"))]
         return linux_insecure::LinuxInsecure::store_mnemonic_wallet(phrase, address);
     }
 
@@ -75,7 +75,7 @@ impl AccountUtils for AccountManager {
         #[cfg(target_os = "macos")]
         return Ok(gm_macos::Macos::store_private_key(private_key, address)?);
 
-        #[cfg(target_os = "linux")]
+        #[cfg(not(target_os = "macos"))]
         return linux_insecure::LinuxInsecure::store_private_key(private_key, address);
     }
 
@@ -83,7 +83,7 @@ impl AccountUtils for AccountManager {
         #[cfg(target_os = "macos")]
         return Ok(gm_macos::Macos::get_account_list()?);
 
-        #[cfg(target_os = "linux")]
+        #[cfg(not(target_os = "macos"))]
         return linux_insecure::LinuxInsecure::get_account_list();
     }
 
@@ -91,7 +91,7 @@ impl AccountUtils for AccountManager {
         #[cfg(target_os = "macos")]
         return Ok(gm_macos::Macos::get_secret(address)?);
 
-        #[cfg(target_os = "linux")]
+        #[cfg(not(target_os = "macos"))]
         return linux_insecure::LinuxInsecure::get_secret(address);
     }
 }
