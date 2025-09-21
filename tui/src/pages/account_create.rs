@@ -129,6 +129,7 @@ impl Component for AccountCreatePage {
                 || Ok(()),
                 || -> crate::Result<()> {
                     result.page_pops += 1;
+                    result.reload = true;
                     Ok(())
                 },
             )?;
@@ -187,7 +188,7 @@ impl Component for AccountCreatePage {
                                 self.mnemonic_result = Some(addr);
                             }
 
-                            if !self.mining {
+                            if !self.mining && self.vanity_result.is_none() {
                                 self.mining = true;
                                 self.started_mining_at = Instant::now();
                                 let tr = transmitter.clone();
@@ -202,6 +203,10 @@ impl Component for AccountCreatePage {
                                 });
                                 self.vanity_thread = Some(vanity_thread);
                             }
+                        }
+                        KeyCode::Esc => {
+                            // When context goes back to previous page, it should reload state
+                            result.reload = true;
                         }
                         _ => {}
                     }
