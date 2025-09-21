@@ -38,7 +38,7 @@ pub struct AccountCreatePage {
     cursor: usize,
     mask: [Option<u8>; 40],
     hash_rate: HashRateResult,
-    vanity_result: Option<(Address, usize, Duration)>,
+    vanity_result: Option<(Address, u64, Duration)>,
     mnemonic_result: Option<Address>,
     mining: bool,
     started_mining_at: Instant,
@@ -351,7 +351,7 @@ impl Component for AccountCreatePage {
                 Gauge::default()
                     // TODO rename theme.block to theme.style, or add method
                     .gauge_style(shared_state.theme.block())
-                    .percent(std::cmp::max(
+                    .percent(std::cmp::min(
                         100,
                         (elapsed_time.as_secs() * 100)
                             .checked_div(est_time as u64)

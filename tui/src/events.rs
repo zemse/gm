@@ -38,7 +38,7 @@ pub enum Event {
 
     HashRateResult(f64),
     HashRateError(String),
-    VanityResult(SigningKey, usize, Duration),
+    VanityResult(SigningKey, u64, Duration),
 
     AssetsUpdate(Address, Vec<Asset>),
     AssetsUpdateError(gm_utils::Error, bool), // bool - whether to silence the error

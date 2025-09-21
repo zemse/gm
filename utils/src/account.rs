@@ -1,24 +1,25 @@
-use std::{
-    sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Mutex,
-    },
-    time::{Duration, Instant},
-};
-
 use alloy::{
     hex,
-    primitives::{address, Address, U256},
+    primitives::{keccak256, Address},
     signers::{
-        k256::{ecdsa::SigningKey, FieldBytes},
+        k256::{
+            ecdsa::SigningKey, elliptic_curve::sec1::ToEncodedPoint, AffinePoint, FieldBytes,
+            ProjectivePoint, Scalar,
+        },
         local::{MnemonicBuilder, PrivateKeySigner},
-        utils::secret_key_to_address,
     },
 };
 use coins_bip39::{English, Mnemonic};
 use gm_common::secret::Secret;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
+use std::{
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc, Mutex,
+    },
+    time::{Duration, Instant},
+};
 
 pub trait AccountUtils {
     fn store_mnemonic_wallet(phrase: &str, address: Address) -> crate::Result<()>;
@@ -124,9 +125,8 @@ pub fn mine_wallet(
     mask_b: Address,
     max_dur: Option<Duration>,
     exit_signal: Arc<AtomicBool>,
-) -> crate::Result<(Option<SigningKey>, usize, Duration)> {
-    let address_one = address!("0xffffffffffffffffffffffffffffffffffffffff");
-    let counter = Arc::new(AtomicUsize::new(0));
+) -> crate::Result<(Option<SigningKey>, u64, Duration)> {
+    let counter = Arc::new(AtomicU64::new(0));
     let stop = Arc::new(AtomicBool::new(false));
     let result = Arc::new(Mutex::new(None));
     let start = Instant::now();
@@ -139,8 +139,10 @@ pub fn mine_wallet(
             let exit_signal = exit_signal.clone();
             s.spawn(move |_| {
                 // Start with a random private key
-                let key = coins_bip32::prelude::SigningKey::random(&mut OsRng);
-                let mut u = U256::from_be_slice(&key.to_bytes());
+                let initial_random_key = **SigningKey::random(&mut OsRng).as_nonzero_scalar();
+
+                let mut k = initial_random_key;
+                let mut curve_point = ProjectivePoint::GENERATOR * k;
 
                 while !stop.load(Ordering::Relaxed) && !exit_signal.load(Ordering::Relaxed) {
                     if let Some(max_dur) = max_dur {
@@ -149,23 +151,22 @@ pub fn mine_wallet(
                         }
                     }
 
-                    if let Ok(credential) =
-                        SigningKey::from_bytes(FieldBytes::from_slice(&u.to_be_bytes_vec()))
-                    {
-                        let address = secret_key_to_address(&credential);
-                        if address.bit_and(mask_a) == mask_a
-                            && address.bit_xor(address_one).bit_and(mask_b) == mask_b
-                        {
-                            stop.store(true, Ordering::Relaxed);
-                            let mut result = result.lock().unwrap();
-                            *result = Some(credential);
-                        };
-                    }
+                    let address = eth_addr_from_affine(&curve_point.to_affine());
+                    if addr_match(&address, &mask_a, &mask_b) {
+                        stop.store(true, Ordering::Relaxed);
+                        let mut result = result.lock().unwrap();
+                        *result = Some(SigningKey::from_bytes(&k.to_bytes()).unwrap());
+                        break;
+                    };
 
                     // Change private key by one
-                    u += U256::ONE;
-                    counter.fetch_add(1, Ordering::Relaxed);
+                    k += Scalar::ONE;
+                    curve_point += ProjectivePoint::GENERATOR;
                 }
+
+                let count_bytes: [u8; 32] = (k - initial_random_key).to_bytes().into();
+                let count = u64::from_be_bytes(count_bytes[24..32].try_into().unwrap());
+                counter.fetch_add(count, Ordering::Relaxed);
             });
         }
     });
@@ -173,6 +174,27 @@ pub fn mine_wallet(
     let result = result.lock().unwrap().clone();
     let counter = counter.load(Ordering::Relaxed);
     Ok((result, counter, Instant::now().duration_since(start)))
+}
+
+#[inline(always)]
+fn addr_match(addr: &[u8; 20], mask_a: &[u8; 20], mask_b: &[u8; 20]) -> bool {
+    for i in 0..20 {
+        if (addr[i] & mask_a[i]) != mask_a[i] {
+            return false;
+        }
+        if ((!addr[i]) & mask_b[i]) != mask_b[i] {
+            return false;
+        }
+    }
+    true
+}
+
+#[inline(always)]
+fn eth_addr_from_affine(aff: &AffinePoint) -> [u8; 20] {
+    let ep = aff.to_encoded_point(false);
+    let bytes = ep.as_bytes(); // 65
+    let out = keccak256(&bytes[1..]);
+    out[12..32].try_into().unwrap()
 }
 
 pub mod linux_insecure {
