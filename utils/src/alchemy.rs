@@ -12,7 +12,7 @@ pub struct TokensByWalletEntry {
     #[serde(rename = "tokenAddress")]
     pub token_address: Option<Address>,
     #[serde(rename = "tokenBalance")]
-    pub token_balance: U256,
+    pub token_balance: Option<U256>,
     #[serde(rename = "tokenMetadata")]
     pub token_metadata: TokenMetadata,
     #[serde(rename = "tokenPrices")]

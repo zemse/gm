@@ -190,58 +190,59 @@ pub async fn get_all_assets() -> crate::Result<(Address, Vec<Asset>)> {
     )
     .await?
     {
-        let network = networks
-            .get_by_name(&entry.network)
-            .ok_or(crate::Error::NetworkNotFound(entry.network))?;
-        let asset = Asset {
-            wallet_address,
-            r#type: AssetType {
-                token_address: match entry.token_address {
-                    Some(token_address) => TokenAddress::Contract(token_address),
-                    None => TokenAddress::Native,
-                },
-                network: network.name.clone(),
-                symbol: entry
-                    .token_metadata
-                    .symbol
-                    .unwrap_or(if entry.token_address.is_none() {
-                        network.symbol.unwrap_or(format!("{}ETH", network.name))
-                    } else {
-                        "UNKNOWN".to_string()
-                    }),
-                name: entry
-                    .token_metadata
-                    .name
-                    .unwrap_or(if entry.token_address.is_none() {
-                        network.name
-                    } else {
-                        "UNKNOWN".to_string()
-                    }),
-                decimals: entry.token_metadata.decimals.unwrap_or(
-                    if entry.token_address.is_none() {
-                        network.native_decimals.unwrap_or(0)
-                    } else {
-                        0
+        if let Some(token_balance) = entry.token_balance {
+            let network = networks
+                .get_by_name(&entry.network)
+                .ok_or(crate::Error::NetworkNotFound(entry.network))?;
+            let asset = Asset {
+                wallet_address,
+                r#type: AssetType {
+                    token_address: match entry.token_address {
+                        Some(token_address) => TokenAddress::Contract(token_address),
+                        None => TokenAddress::Native,
                     },
-                ),
-                price: entry
-                    .token_prices
-                    .first()
-                    .map(|p| {
-                        assert_eq!(p.currency, "usd"); // TODO could blow up
-                        Price::InUSD(p.value.parse().unwrap())
-                    })
-                    .unwrap_or(Price::Unknown),
-            },
-            value: entry.token_balance,
-            light_client_verification: LightClientVerification::Pending,
-        };
+                    network: network.name.clone(),
+                    symbol: entry.token_metadata.symbol.unwrap_or(
+                        if entry.token_address.is_none() {
+                            network.symbol.unwrap_or(format!("{}ETH", network.name))
+                        } else {
+                            "UNKNOWN".to_string()
+                        },
+                    ),
+                    name: entry
+                        .token_metadata
+                        .name
+                        .unwrap_or(if entry.token_address.is_none() {
+                            network.name
+                        } else {
+                            "UNKNOWN".to_string()
+                        }),
+                    decimals: entry.token_metadata.decimals.unwrap_or(
+                        if entry.token_address.is_none() {
+                            network.native_decimals.unwrap_or(0)
+                        } else {
+                            0
+                        },
+                    ),
+                    price: entry
+                        .token_prices
+                        .first()
+                        .map(|p| {
+                            assert_eq!(p.currency, "usd"); // TODO could blow up
+                            Price::InUSD(p.value.parse().unwrap())
+                        })
+                        .unwrap_or(Price::Unknown),
+                },
+                value: token_balance,
+                light_client_verification: LightClientVerification::Pending,
+            };
 
-        if asset.value > U256::ZERO
-            && (config.testnet_mode || asset.usd_value().map(|v| v > 0.0).unwrap_or_default())
-        // || has_token(&networks, &asset.r#type.token_address)
-        {
-            balances.push(asset);
+            if asset.value > U256::ZERO
+                && (config.testnet_mode || asset.usd_value().map(|v| v > 0.0).unwrap_or_default())
+            // || has_token(&networks, &asset.r#type.token_address)
+            {
+                balances.push(asset);
+            }
         }
     }
 
