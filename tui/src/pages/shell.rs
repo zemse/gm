@@ -451,7 +451,7 @@ impl Component for ShellPage {
 
                     if !self.sign_popup.is_open() {
                         self.sign_popup.open();
-                        self.sign_popup.set_text(msg);
+                        self.sign_popup.set_msg_hex(msg);
                     }
 
                     // TODO sign should also take shutdown signal

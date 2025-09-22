@@ -71,6 +71,7 @@ pub enum SignPopupEvent {
 
 #[derive(Default, Debug)]
 pub struct SignPopup {
+    msg_hex: String,
     text: TextScroll,
     open: bool,
     button_cursor: bool, // is cursor on the confirm button?
@@ -92,8 +93,13 @@ impl SignPopup {
         self.open = false;
     }
 
-    pub fn set_text(&mut self, text: &str) {
-        self.text.text = text.to_string();
+    pub fn set_msg_hex(&mut self, msg_hex: &str) {
+        self.msg_hex = msg_hex.to_string();
+        let utf8_str = hex::decode(msg_hex)
+            .map_err(crate::Error::FromHexError)
+            .and_then(|bytes| String::from_utf8(bytes).map_err(crate::Error::FromUtf8Error));
+
+        self.text.text = utf8_str.unwrap_or(self.msg_hex.clone());
         self.reset();
     }
 

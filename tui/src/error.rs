@@ -133,7 +133,7 @@ pub enum Error {
     #[error(transparent)]
     IoError(Box<std::io::Error>),
     #[error(transparent)]
-    FromHexError(Box<alloy::hex::FromHexError>),
+    FromHexError(alloy::hex::FromHexError),
     #[error("Alloy Ecdsa: {0}")]
     AlloyEcdsaError(Box<alloy::signers::k256::ecdsa::Error>),
     #[error("Serde Json Error: {0}")]
@@ -151,7 +151,7 @@ pub enum Error {
     #[error("Alloy Local Signer Error: {0}")]
     AlloyLocalSignerError(Box<alloy::signers::local::LocalSignerError>),
     #[error("FromUtf8 Error: {0}")]
-    FromUtf8Error(Box<std::string::FromUtf8Error>),
+    FromUtf8Error(std::string::FromUtf8Error),
     #[error("Rpc Error: {0}")]
     RpcError(Box<alloy::transports::RpcError<alloy::transports::TransportErrorKind>>),
     #[error("Units Error: {0}")]
@@ -222,12 +222,6 @@ impl From<std::sync::mpsc::SendError<crate::pages::walletconnect::WcEvent>> for 
 impl From<alloy::signers::local::LocalSignerError> for Error {
     fn from(e: alloy::signers::local::LocalSignerError) -> Self {
         Error::AlloyLocalSignerError(Box::new(e))
-    }
-}
-
-impl From<std::string::FromUtf8Error> for Error {
-    fn from(e: std::string::FromUtf8Error) -> Self {
-        Error::FromUtf8Error(Box::new(e))
     }
 }
 

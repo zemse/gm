@@ -231,7 +231,7 @@ impl WalletConnectPage {
                 self.tx_popup.open();
             }
             SessionRequestData::PersonalSign { message, .. } => {
-                self.sign_popup.set_text(message);
+                self.sign_popup.set_msg_hex(message);
                 self.sign_popup.open();
             }
             SessionRequestData::EthSignTypedDataV4 {
