@@ -1,4 +1,4 @@
-# gm
+![>gm](./gm-banner-white.png)
 
 Terminal-based Ethereum accounts manager
 
@@ -8,22 +8,20 @@ Terminal-based Ethereum accounts manager
 - Address book: keep familiar accounts handy
 - Light client: don't trust rpc data blindly
 - Walletconnect: connect to dapps
+- EIP-1193 provider + shell exec: avoid .env secrets in your scripts
 
 ## Installation
 
-Prerequisites:
+### From package managers
 
-- Rust (for development)
-- Ethereum client (e.g., Geth or Infura)
+### From source
 
-Steps:
+Installation from source is highly recommended if you do not trust the pre-built binaries in the releases. However, building locally takes several minutes depending on your system, but once its done you're good to go.
 
 ```sh
 # 1. Clone the repository:
 git clone https://github.com/zemse/gm.git
-cd gm
-
-# 2. Install the binary:
+cd gm/bin
 cargo install --path .
 ```
 
