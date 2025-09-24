@@ -1029,6 +1029,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0674a1ddeecb70197781e945de4b3b8ffb61fa939a5597bcf48503737663100"
 
 [[package]]
+name = "arc-swap"
+version = "1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
+
+[[package]]
 name = "ark-bls12-381"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3471,6 +3477,7 @@ name = "gm-utils"
 version = "0.0.1"
 dependencies = [
  "alloy",
+ "arc-swap",
  "coins-bip32",
  "coins-bip39",
  "directories",
@@ -3486,6 +3493,7 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "thiserror 2.0.16",
+ "tokio",
  "toml",
  "url",
 ]

@@ -10,6 +10,7 @@ pub mod error;
 pub mod inquire;
 pub mod log;
 pub mod network;
+pub mod price_manager;
 pub mod reqwest;
 pub mod serde;
 pub mod text;

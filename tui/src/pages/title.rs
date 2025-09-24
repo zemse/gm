@@ -51,9 +51,10 @@ impl Component for Title {
             "testnet".to_string()
         } else {
             shared_state
-                .eth_price
+                .price_manager
+                .get_latest_price(1)
                 .as_ref()
-                .map(|price| format!("ETH {price}"))
+                .map(|price| format!("ETH {:.2}", price.usd))
                 .unwrap_or("loading...".to_string())
         };
 

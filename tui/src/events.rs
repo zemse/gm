@@ -21,7 +21,6 @@ use crate::pages::{
 };
 
 pub mod assets;
-pub mod eth_price;
 pub mod helios;
 pub mod input;
 pub mod recent_addresses;
@@ -33,8 +32,8 @@ pub enum Event {
     AccountChange(Address),
     ConfigUpdate,
 
-    EthPriceUpdate(String),
-    EthPriceError(UtilsError),
+    PricesUpdate,
+    PricesUpdateError(UtilsError),
 
     HashRateResult(f64),
     HashRateError(String),

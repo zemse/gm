@@ -30,6 +30,7 @@ use gm_utils::{
     config::Config,
     disk_storage::DiskStorageInterface,
     network::NetworkStore,
+    price_manager::PriceManager,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
@@ -52,12 +53,12 @@ use crate::{
 pub struct SharedState {
     pub online: Option<bool>,
     pub asset_manager: Arc<RwLock<AssetManager>>,
+    pub price_manager: Arc<PriceManager>,
     pub recent_addresses: Option<Vec<Address>>,
     pub testnet_mode: bool,
     pub developer_mode: bool,
     pub current_account: Option<Address>,
     pub alchemy_api_key_available: bool,
-    pub eth_price: Option<String>,
     pub theme: Theme,
 }
 
@@ -98,7 +99,7 @@ pub struct App {
     demo_popup: TextPopup,
 
     input_thread: Option<std::thread::JoinHandle<()>>,
-    eth_price_thread: Option<tokio::task::JoinHandle<()>>,
+    refresh_prices_thread: Option<tokio::task::JoinHandle<()>>,
     assets_thread: Option<tokio::task::JoinHandle<()>>,
     recent_addresses_thread: Option<tokio::task::JoinHandle<()>>,
     helios_thread: Option<tokio::task::JoinHandle<()>>,
@@ -109,7 +110,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> crate::Result<Self> {
-        NetworkStore::load_and_update()?;
+        let networks = NetworkStore::load_and_update()?;
 
         let config = Config::load()?;
         let theme_name = ThemeName::from_str(&config.theme_name)?;
@@ -119,12 +120,12 @@ impl App {
             context: vec![Page::MainMenu(MainMenuPage::new(config.developer_mode)?)],
             shared_state: SharedState {
                 asset_manager: Arc::new(RwLock::new(AssetManager::default())),
+                price_manager: Arc::new(PriceManager::new(networks.networks)?),
                 recent_addresses: None,
                 current_account: config.current_account,
                 developer_mode: config.developer_mode,
                 alchemy_api_key_available: config.alchemy_api_key.is_some(),
                 online: None,
-                eth_price: None,
                 testnet_mode: config.testnet_mode,
                 theme,
             },
@@ -135,7 +136,7 @@ impl App {
             demo_popup: TextPopup::new("", false),
 
             input_thread: None,
-            eth_price_thread: None,
+            refresh_prices_thread: None,
             assets_thread: None,
             recent_addresses_thread: None,
             helios_thread: None,
@@ -230,9 +231,16 @@ impl App {
 
         let tr_eth_price = tr.clone();
         let shutdown_signal = sd.clone();
-        self.eth_price_thread = Some(tokio::spawn(async move {
-            events::eth_price::watch_eth_price_change(tr_eth_price, shutdown_signal).await
-        }));
+        self.refresh_prices_thread =
+            Some(self.shared_state.price_manager.spawn_refresh_prices_thread(
+                shutdown_signal,
+                move |res| {
+                    let _ = match res {
+                        Ok(()) => tr_eth_price.send(Event::PricesUpdate),
+                        Err(e) => tr_eth_price.send(Event::PricesUpdateError(e)),
+                    };
+                },
+            ));
     }
 
     fn start_other_threads(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
@@ -296,7 +304,7 @@ impl App {
         if let Some(thread) = self.input_thread.take() {
             thread.join().unwrap();
         }
-        if let Some(thread) = self.eth_price_thread.take() {
+        if let Some(thread) = self.refresh_prices_thread.take() {
             thread.await.unwrap();
         }
         if let Some(thread) = self.assets_thread.take() {
@@ -438,12 +446,11 @@ impl App {
                 self.reload()?;
             }
 
-            // ETH Price API
-            Event::EthPriceUpdate(eth_price) => {
-                self.shared_state.eth_price = Some(eth_price);
+            Event::PricesUpdate => {
+                // The prices have already been updated in the PriceManager store in shared_state
                 self.set_online(tr, sd);
             }
-            Event::EthPriceError(error) => {
+            Event::PricesUpdateError(error) => {
                 if error.is_connect() {
                     // ETH Price is the main API for understanding if we are connected to internet
                     self.set_offline().await;

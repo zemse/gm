@@ -34,6 +34,8 @@ pub enum FormItem {
     ExplorerUrl,
     IsTestnet,
     RpcPort,
+    ChainlinkNativePriceFeed,
+    ChainlinkNativePriceFeedDecimals,
     TokensButton,
     SaveButton,
     RemoveButton,
@@ -125,6 +127,18 @@ impl TryFrom<FormItem> for FormWidget {
                 empty_text: None,
                 currency: None,
             },
+            FormItem::ChainlinkNativePriceFeed => FormWidget::InputBox {
+                label: "Chainlink Native Price Feed",
+                text: String::new(),
+                empty_text: None,
+                currency: None,
+            },
+            FormItem::ChainlinkNativePriceFeedDecimals => FormWidget::InputBox {
+                label: "Chainlink Native Price Feed Decimals",
+                text: String::new(),
+                empty_text: None,
+                currency: None,
+            },
             FormItem::TokensButton => FormWidget::Button { label: "Tokens" },
             FormItem::SaveButton => FormWidget::Button { label: "Save" },
             FormItem::RemoveButton => FormWidget::Button { label: "Remove" },
@@ -179,6 +193,19 @@ impl NetworkCreatePage {
                 if let Some(explorer_url) = network.explorer_url {
                     *form.get_text_mut(FormItem::ExplorerUrl) = explorer_url;
                 }
+                if let Some(rpc_port) = network.rpc_port {
+                    *form.get_text_mut(FormItem::RpcPort) = rpc_port.to_string();
+                }
+                if let Some(chainlink_native_price_feed) = network.chainlink_native_price_feed {
+                    *form.get_text_mut(FormItem::ChainlinkNativePriceFeed) =
+                        chainlink_native_price_feed.to_string()
+                }
+                if let Some(chainlink_native_price_feed_decimals) =
+                    network.chainlink_native_price_feed_decimals
+                {
+                    *form.get_text_mut(FormItem::ChainlinkNativePriceFeedDecimals) =
+                        chainlink_native_price_feed_decimals.to_string()
+                }
                 if config.networks.get(network_index).is_none() {
                     form.hide_item(FormItem::RemoveButton);
                 }
@@ -198,6 +225,7 @@ impl NetworkCreatePage {
             ),
         })
     }
+
     fn network(form: &Form<FormItem, crate::Error>, tokens: &[Token]) -> crate::Result<Network> {
         Ok(Network {
             name: form.get_text(FormItem::Name).clone(),
@@ -245,6 +273,27 @@ impl NetworkCreatePage {
                 .is_empty()
                 .not()
                 .then(|| form.get_text(FormItem::RpcPort).clone().parse())
+                .transpose()?,
+            chainlink_native_price_feed: form
+                .get_text(FormItem::ChainlinkNativePriceFeed)
+                .is_empty()
+                .not()
+                .then(|| {
+                    form.get_text(FormItem::ChainlinkNativePriceFeed)
+                        .clone()
+                        .parse()
+                })
+                .transpose()
+                .map_err(crate::Error::FromHexError)?,
+            chainlink_native_price_feed_decimals: form
+                .get_text(FormItem::ChainlinkNativePriceFeedDecimals)
+                .is_empty()
+                .not()
+                .then(|| {
+                    form.get_text(FormItem::ChainlinkNativePriceFeedDecimals)
+                        .clone()
+                        .parse()
+                })
                 .transpose()?,
             tokens: tokens.to_owned(),
         })

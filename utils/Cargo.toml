@@ -15,7 +15,7 @@ reqwest = { workspace = true }
 alloy = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
-
+tokio = { workspace = true }
 
 # file system
 serde_json = { workspace = true }
@@ -24,6 +24,7 @@ serde_with = "3.14.0"
 toml = "0.8"
 serde_yaml = "0.9.34"
 directories = "5.0"
+arc-swap = "1.7.1"
 
 gm-common = { path = "../common" }
 

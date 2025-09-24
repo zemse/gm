@@ -115,6 +115,24 @@ pub enum UtilsError {
 
     #[error("Invalid URL: {0}")]
     InvalidUrl(String),
+
+    #[error("Chainlink price feed not configured for network: {0}")]
+    ChainlinkPriceFeedNotConfigured(String),
+
+    #[error("Failed to fetch latest round data from Chainlink oracle for network {network_name}. (Error: {error:?})")]
+    ChainlinkLatestRoundData {
+        network_name: String,
+        error: Box<alloy::contract::Error>,
+    },
+
+    #[error("Failed to fetch decimals from Chainlink oracle {network_name}. (Error: {error:?})")]
+    ChainlinkFetchDecimalsFailed {
+        network_name: String,
+        error: Box<alloy::contract::Error>,
+    },
+
+    #[error("Chainlink oracle returned a negative price on network {network_name}: {price}")]
+    ChainlinkNegativePrice { network_name: String, price: String },
 }
 
 impl UtilsError {

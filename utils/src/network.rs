@@ -33,6 +33,8 @@ pub struct Network {
     #[serde(default, skip_serializing_if = "is_false")]
     pub is_testnet: bool,
     pub rpc_port: Option<usize>,
+    pub chainlink_native_price_feed: Option<Address>,
+    pub chainlink_native_price_feed_decimals: Option<u8>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tokens: Vec<Token>,
 }
@@ -171,6 +173,12 @@ impl NetworkStore {
                     explorer_url: new_entry.explorer_url.or(existing.explorer_url),
                     is_testnet: new_entry.is_testnet,
                     rpc_port: new_entry.rpc_port.or(existing.rpc_port),
+                    chainlink_native_price_feed: new_entry
+                        .chainlink_native_price_feed
+                        .or(existing.chainlink_native_price_feed),
+                    chainlink_native_price_feed_decimals: new_entry
+                        .chainlink_native_price_feed_decimals
+                        .or(existing.chainlink_native_price_feed_decimals),
                     tokens: merge_tokens(new_entry.tokens, existing.tokens),
                 }
             } else {
@@ -314,6 +322,12 @@ fn default_networks() -> Vec<Network> {
             explorer_url: None,
             is_testnet: false,
             rpc_port: None,
+            chainlink_native_price_feed: Some(
+                "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+                    .parse()
+                    .unwrap(),
+            ),
+            chainlink_native_price_feed_decimals: Some(8),
             tokens: vec![
                 Token {
                     name: "Wrapped Ether".to_string(),
@@ -363,6 +377,8 @@ fn default_networks() -> Vec<Network> {
             explorer_url: Some("https://arbiscan.io/tx/{}".to_string()),
             is_testnet: false,
             rpc_port: None,
+            chainlink_native_price_feed: None,
+            chainlink_native_price_feed_decimals: None,
             tokens: vec![
                 Token {
                     name: "Wrapped Ether".to_string(),
@@ -420,6 +436,8 @@ fn default_networks() -> Vec<Network> {
             explorer_url: None,
             is_testnet: false,
             rpc_port: None,
+            chainlink_native_price_feed: None,
+            chainlink_native_price_feed_decimals: None,
             tokens: vec![],
         },
         Network {
@@ -436,6 +454,8 @@ fn default_networks() -> Vec<Network> {
             explorer_url: None,
             is_testnet: false,
             rpc_port: None,
+            chainlink_native_price_feed: None,
+            chainlink_native_price_feed_decimals: None,
             tokens: vec![
                 Token {
                     name: "Wrapped Ether".to_string(),
@@ -469,6 +489,8 @@ fn default_networks() -> Vec<Network> {
             explorer_url: None,
             is_testnet: false,
             rpc_port: None,
+            chainlink_native_price_feed: None,
+            chainlink_native_price_feed_decimals: None,
             tokens: vec![],
         },
         Network {
@@ -485,6 +507,8 @@ fn default_networks() -> Vec<Network> {
             explorer_url: Some("https://sepolia.etherscan.io/tx/{}".to_string()),
             is_testnet: true,
             rpc_port: None,
+            chainlink_native_price_feed: None,
+            chainlink_native_price_feed_decimals: None,
             tokens: vec![],
         },
     ]
