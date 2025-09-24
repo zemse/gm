@@ -13,7 +13,6 @@ use gm_ratatui_extra::{cursor::Cursor, select::Select, thematize::Thematize};
 use gm_utils::{
     account::{AccountManager, AccountUtils},
     config::Config,
-    disk_storage::DiskStorageInterface,
 };
 use ratatui::{
     buffer::Buffer,
@@ -104,9 +103,7 @@ impl Component for AccountPage {
                                 .push(Page::AccountImport(AccountImportPage::default()));
                         }
                         AccountSelect::Existing(address) => {
-                            let mut config = Config::load()?;
-                            config.current_account = Some(*address);
-                            config.save()?;
+                            Config::set_current_account(*address)?;
                             transmitter.send(Event::AccountChange(*address))?;
                             transmitter.send(Event::ConfigUpdate)?;
                             result.page_pops = 1;

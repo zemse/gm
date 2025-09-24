@@ -37,19 +37,12 @@ impl TryFrom<FormItem> for FormWidget {
             FormItem::CreateOrImportWallet => FormWidget::Button {
                 label: "Create or Import Wallet",
             },
-            FormItem::AlchemyApiKey => {
-                let mut config = Config::load()?;
-                if config.alchemy_api_key.is_none() {
-                    config.alchemy_api_key = Some("".to_string());
-                };
-
-                FormWidget::InputBox {
-                    label: "Alchemy API Key",
-                    text: config.alchemy_api_key.unwrap_or_default(),
-                    empty_text: Some("Please get an Alchemy API key from https://www.alchemy.com/"),
-                    currency: None,
-                }
-            }
+            FormItem::AlchemyApiKey => FormWidget::InputBox {
+                label: "Alchemy API Key",
+                text: Config::alchemy_api_key(false).ok().unwrap_or_default(),
+                empty_text: Some("Please get an Alchemy API key from https://www.alchemy.com/"),
+                currency: None,
+            },
             FormItem::Save => FormWidget::Button { label: "Save" },
             FormItem::Display => FormWidget::DisplayText(String::new()),
         };
@@ -67,11 +60,11 @@ impl CompleteSetupPage {
         Ok(Self {
             form: Form::init(|form| {
                 let config = Config::load()?;
-                if config.current_account.is_some() {
+                if config.get_current_account().is_ok() {
                     form.hide_item(FormItem::CreateOrImportWallet);
                 }
                 if config
-                    .alchemy_api_key
+                    .get_alchemy_api_key(false)
                     .map(|s| !s.is_empty())
                     .unwrap_or(false)
                 {
@@ -119,9 +112,7 @@ impl Component for CompleteSetupPage {
                 } else {
                     handle_result.reload = true;
 
-                    let mut config = Config::load()?;
-                    config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
-                    config.save()?;
+                    Config::set_alchemy_api_key(form.get_text(FormItem::AlchemyApiKey).clone())?;
                     transmitter.send(Event::ConfigUpdate)?;
 
                     let display_text = form.get_text_mut(FormItem::Display);

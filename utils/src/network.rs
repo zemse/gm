@@ -79,12 +79,12 @@ impl Network {
         if let Some(rpc_url) = &self.rpc_url {
             Ok(rpc_url.clone())
         } else if let Some(rpc_alchemy) = &self.rpc_alchemy {
-            Ok(rpc_alchemy.replace("{}", &Config::alchemy_api_key()?))
+            Ok(rpc_alchemy.replace("{}", &Config::alchemy_api_key(true)?))
         } else if let Some(name_alchemy) = &self.name_alchemy {
             Ok(format!(
                 "https://{}.g.alchemy.com/v2/{}",
                 name_alchemy,
-                Config::alchemy_api_key()?
+                Config::alchemy_api_key(true)?
             ))
         } else if let Some(rpc_infura) = &self.rpc_infura {
             Ok(rpc_infura.clone())

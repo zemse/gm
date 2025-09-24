@@ -186,7 +186,7 @@ pub async fn get_all_assets() -> crate::Result<(Address, Vec<Asset>)> {
 
     for entry in Alchemy::get_tokens_by_wallet(
         wallet_address,
-        networks.get_alchemy_network_names(config.testnet_mode),
+        networks.get_alchemy_network_names(config.get_testnet_mode()),
     )
     .await?
     {
@@ -238,7 +238,8 @@ pub async fn get_all_assets() -> crate::Result<(Address, Vec<Asset>)> {
             };
 
             if asset.value > U256::ZERO
-                && (config.testnet_mode || asset.usd_value().map(|v| v > 0.0).unwrap_or_default())
+                && (config.get_testnet_mode()
+                    || asset.usd_value().map(|v| v > 0.0).unwrap_or_default())
             // || has_token(&networks, &asset.r#type.token_address)
             {
                 balances.push(asset);

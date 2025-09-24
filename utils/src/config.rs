@@ -5,14 +5,14 @@ use crate::disk_storage::{DiskStorageInterface, FileFormat};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
-    pub current_account: Option<Address>,
-    pub testnet_mode: bool,
+    current_account: Option<Address>,
+    testnet_mode: bool,
     #[serde(default)]
-    pub developer_mode: bool,
-    pub alchemy_api_key: Option<String>,
+    developer_mode: bool,
+    alchemy_api_key: Option<String>,
     // TODO theme_name must be enum, which means either move themes into utils or this module in tui
     #[serde(default = "default_theme_name")]
-    pub theme_name: String,
+    theme_name: String,
 }
 
 // TODO this is a temporary fix, need to have theme_name as an enum which requires a refactor
@@ -44,7 +44,7 @@ impl Config {
 
     pub fn get_current_account(&self) -> crate::Result<Address> {
         self.current_account
-            .ok_or_else(|| crate::Error::CurrentAccountNotSet)
+            .ok_or(crate::Error::CurrentAccountNotSet)
     }
 
     pub fn set_current_account(address: Address) -> crate::Result<()> {
@@ -54,16 +54,65 @@ impl Config {
         Ok(())
     }
 
-    pub fn alchemy_api_key() -> crate::Result<String> {
-        Config::load()?
+    #[inline]
+    pub fn get_testnet_mode(&self) -> bool {
+        self.testnet_mode
+    }
+
+    #[inline]
+    pub fn get_developer_mode(&self) -> bool {
+        self.developer_mode
+    }
+
+    pub fn alchemy_api_key(use_default: bool) -> crate::Result<String> {
+        Config::load()?.get_alchemy_api_key(use_default)
+    }
+
+    pub fn get_alchemy_api_key(&self, use_default: bool) -> crate::Result<String> {
+        let config = Config::load()?;
+
+        config
             .alchemy_api_key
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                if use_default {
+                    // default key has very limited free quota and activity is monitored
+                    Some("kRwsQjMj5B_JfTKetkN2n".to_string())
+                } else {
+                    None
+                }
+            })
             .ok_or(crate::Error::AlchemyApiKeyNotSet)
     }
 
     pub fn set_alchemy_api_key(alchemy_api_key: String) -> crate::Result<()> {
         let mut config = Config::load()?;
-        config.alchemy_api_key = Some(alchemy_api_key);
+        if alchemy_api_key.is_empty() {
+            config.alchemy_api_key = None;
+        } else {
+            config.alchemy_api_key = Some(alchemy_api_key);
+        }
         config.save()?;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn get_theme_name(&self) -> &str {
+        &self.theme_name
+    }
+
+    pub fn set_values(
+        &mut self,
+        alchemy_api_key: Option<String>,
+        testnet_mode: bool,
+        developer_mode: bool,
+        theme_name: String,
+    ) -> crate::Result<()> {
+        self.alchemy_api_key = alchemy_api_key;
+        self.testnet_mode = testnet_mode;
+        self.developer_mode = developer_mode;
+        self.theme_name = theme_name;
+        self.save()?;
         Ok(())
     }
 }

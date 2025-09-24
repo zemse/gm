@@ -113,20 +113,22 @@ impl App {
         let networks = NetworkStore::load_and_update()?;
 
         let config = Config::load()?;
-        let theme_name = ThemeName::from_str(&config.theme_name)?;
+        let theme_name = ThemeName::from_str(config.get_theme_name())?;
         let theme = Theme::new(theme_name);
         Ok(Self {
             exit: false,
-            context: vec![Page::MainMenu(MainMenuPage::new(config.developer_mode)?)],
+            context: vec![Page::MainMenu(MainMenuPage::new(
+                config.get_developer_mode(),
+            )?)],
             shared_state: SharedState {
                 asset_manager: Arc::new(RwLock::new(AssetManager::default())),
                 price_manager: Arc::new(PriceManager::new(networks.networks)?),
                 recent_addresses: None,
-                current_account: config.current_account,
-                developer_mode: config.developer_mode,
-                alchemy_api_key_available: config.alchemy_api_key.is_some(),
+                current_account: config.get_current_account().ok(),
+                developer_mode: config.get_developer_mode(),
+                alchemy_api_key_available: config.get_developer_mode(),
                 online: None,
-                testnet_mode: config.testnet_mode,
+                testnet_mode: config.get_testnet_mode(),
                 theme,
             },
 
@@ -318,11 +320,11 @@ impl App {
 
     fn reload(&mut self) -> crate::Result<()> {
         let config = Config::load()?;
-        self.shared_state.testnet_mode = config.testnet_mode;
-        self.shared_state.alchemy_api_key_available = config.alchemy_api_key.is_some();
-        self.shared_state.current_account = config.current_account;
-        self.shared_state.developer_mode = config.developer_mode;
-        let theme_name = ThemeName::from_str(&config.theme_name)?;
+        self.shared_state.testnet_mode = config.get_testnet_mode();
+        self.shared_state.alchemy_api_key_available = config.get_alchemy_api_key(false).is_ok();
+        self.shared_state.current_account = config.get_current_account().ok();
+        self.shared_state.developer_mode = config.get_developer_mode();
+        let theme_name = ThemeName::from_str(config.get_theme_name())?;
         let theme = Theme::new(theme_name);
         self.shared_state.theme = theme;
         for page in &mut self.context {
@@ -455,7 +457,7 @@ impl App {
                     // ETH Price is the main API for understanding if we are connected to internet
                     self.set_offline().await;
                 } else {
-                    self.fatal_error_popup.set_text(format!("{error}"));
+                    self.fatal_error_popup.set_text(error.to_string());
                 }
             }
 
@@ -467,7 +469,7 @@ impl App {
             }
             Event::AssetsUpdateError(error, silence_error) => {
                 if !silence_error {
-                    self.fatal_error_popup.set_text(format!("{error:#?}"));
+                    self.fatal_error_popup.set_text(error.to_string());
                 }
             }
 
@@ -491,12 +493,12 @@ impl App {
                 self.shared_state.recent_addresses = Some(addresses);
             }
             Event::RecentAddressesUpdateError(error) => {
-                self.fatal_error_popup.set_text(format!("{error:#?}"));
+                self.fatal_error_popup.set_text(error.to_string());
             }
 
             // Candles API
             Event::CandlesUpdateError(error) => {
-                self.fatal_error_popup.set_text(format!("{error}"));
+                self.fatal_error_popup.set_text(error.to_string());
             }
 
             // Transaction API

@@ -22,7 +22,7 @@ fn parse_url<U: ToString>(url: U) -> crate::Result<Url> {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct ReqwestErrorContext {
-    url: Url,
+    pub url: Url,
     query: String,
     json_body: String,
 }

@@ -1,9 +1,22 @@
 use alloy::primitives::{Address, U256};
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 
-use crate::{config::Config, serde::SerdeResponseParseAsync, Error};
+use crate::{config::Config, Error, Reqwest};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Asset {
+    pub symbol: String,
+    pub prices: Vec<Price>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Price {
+    pub currency: String,
+    pub value: String,
+    #[serde(rename = "lastUpdatedAt")]
+    pub last_updated_at: String,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokensByWalletEntry {
@@ -47,6 +60,11 @@ pub struct TokenBalancesByWalletEntry {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct Tokens<T> {
+    tokens: Vec<T>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct AlchemyData<T> {
     pub data: T,
 }
@@ -59,89 +77,29 @@ pub struct TokensByWallet {
 pub struct Alchemy;
 
 impl Alchemy {
+    // TODO move this into price manager
     pub async fn get_price(symbol: &str) -> crate::Result<(f64, String)> {
-        let api_key = Config::alchemy_api_key()?;
+        let api_key = Config::alchemy_api_key(true)?;
 
-        let client = reqwest::Client::new();
+        let response = Reqwest::get(format!(
+            "https://api.g.alchemy.com/prices/v1/{api_key}/tokens/by-symbol?symbols={symbol}"
+        ))?
+        .receive_json::<AlchemyData<Vec<Asset>>>()
+        .await?;
 
-        let res = client
-            .get(format!(
-                "https://api.g.alchemy.com/prices/v1/{api_key}/tokens/by-symbol?symbols={symbol}"
-            ))
-            .header("accept", "application/json")
-            .send()
-            .await?
-            .json::<Value>()
-            .await?;
-        let res = res
-            .as_object()
-            .ok_or(crate::Error::AlchemyResponse("response not an object"))?;
+        let asset = response
+            .data
+            .into_iter()
+            .find(|asset| asset.symbol == symbol)
+            .ok_or_else(|| crate::Error::AlchemyResponse("asset not found"))?;
 
-        let data = res
-            .get("data")
-            .ok_or(crate::Error::AlchemyResponse("data not found in response"))?;
+        let usd_price = asset
+            .prices
+            .into_iter()
+            .find(|price| price.currency == "usd")
+            .ok_or_else(|| crate::Error::AlchemyResponse("usd price not found"))?;
 
-        let data = data
-            .as_array()
-            .ok_or(crate::Error::AlchemyResponse("data not an object"))?
-            .first()
-            .ok_or(crate::Error::AlchemyResponse("data array is empty"))?;
-
-        let data_symbol = data
-            .get("symbol")
-            .ok_or(crate::Error::AlchemyResponse(
-                "symbol not found in response",
-            ))?
-            .as_str()
-            .ok_or(crate::Error::AlchemyResponse("symbol not a string"))?;
-
-        if data_symbol != symbol {
-            return Err(crate::Error::AlchemyResponse(
-                "symbol in response does not match requested symbol",
-            ));
-        }
-
-        let prices = data
-            .get("prices")
-            .ok_or(crate::Error::AlchemyResponse(
-                "prices not found in response",
-            ))?
-            .as_array()
-            .ok_or(crate::Error::AlchemyResponse("prices not array"))?
-            .first()
-            .ok_or(crate::Error::AlchemyResponse("prices array is empty"))?
-            .as_object()
-            .ok_or(crate::Error::AlchemyResponse("prices[0] is not object"))?;
-
-        let currency = prices
-            .get("currency")
-            .ok_or(crate::Error::AlchemyResponse(
-                "currency not found in prices[0]",
-            ))?
-            .as_str()
-            .ok_or(crate::Error::AlchemyResponse("currency not a string"))?;
-
-        if currency != "usd" {
-            return Err(crate::Error::AlchemyResponse("currency is not USD"));
-        }
-
-        let value = prices
-            .get("value")
-            .ok_or(crate::Error::AlchemyResponse(
-                "value not found in prices[0]",
-            ))?
-            .as_str()
-            .ok_or(crate::Error::AlchemyResponse("currency not a string"))?;
-
-        let last_updated_at = prices
-            .get("lastUpdatedAt")
-            .ok_or(crate::Error::AlchemyResponse(
-                "lastUpdatedAt not found in prices[0]",
-            ))?
-            .as_str()
-            .ok_or(crate::Error::AlchemyResponse("currency not a string"))?;
-
-        Ok((value.parse()?, last_updated_at.to_string()))
+        Ok((usd_price.value.parse()?, usd_price.last_updated_at))
     }
 
     // docs: https://docs.alchemy.com/reference/get-tokens-by-address
@@ -149,7 +107,7 @@ impl Alchemy {
         address: Address,
         networks: Vec<String>,
     ) -> Result<Vec<TokensByWalletEntry>, Error> {
-        let api_key = Config::alchemy_api_key()?;
+        let api_key = Config::alchemy_api_key(true)?;
 
         let mut result = Vec::new();
         for networks in networks.chunks(5) {
@@ -165,29 +123,14 @@ impl Alchemy {
                 "withPrices": true
             });
 
-            // Initialize the reqwest Client
-            let client = Client::new();
-
-            // Make the POST request
-            let response = client
-                .post(format!(
-                    "https://api.g.alchemy.com/data/v1/{api_key}/assets/tokens/by-address"
-                ))
-                .header("accept", "application/json")
-                .header("content-type", "application/json")
-                .json(&body) // send JSON body
-                .send() // execute the request
+            let url =
+                format!("https://api.g.alchemy.com/data/v1/{api_key}/assets/tokens/by-address");
+            let response = Reqwest::post(url)?
+                .json_body(&body)
+                .receive_json::<AlchemyData<TokensByWallet>>()
                 .await?;
 
-            // let text = response.text().await?;
-
-            // Err(Error::InternalError(format!("Response: {:?}", text)))?;
-
-            let parsed = response
-                .serde_parse_custom::<AlchemyData<TokensByWallet>>()
-                .await?;
-
-            result.extend(parsed.data.tokens);
+            result.extend(response.data.tokens);
         }
 
         Ok(result)
@@ -196,7 +139,6 @@ impl Alchemy {
     pub async fn get_token_balances_by_wallet(
         address: Address,
     ) -> Result<Vec<TokenBalancesByWalletEntry>, Error> {
-        // Build the request body using serde_json::json! macro:
         let body = json!({
             "addresses": [
                 {
@@ -206,32 +148,17 @@ impl Alchemy {
             ]
         });
 
-        // Initialize the reqwest Client
-        let client = Client::new();
+        let api_key = Config::alchemy_api_key(true)?;
 
-        let api_key = Config::alchemy_api_key()?;
+        let url = format!(
+            "https://api.g.alchemy.com/data/v1/{api_key}/assets/tokens/balances/by-address"
+        );
 
-        // Make the POST request
-        let response = client
-            .post(format!(
-                "https://api.g.alchemy.com/data/v1/{api_key}/assets/tokens/balances/by-address"
-            ))
-            .header("accept", "application/json")
-            .header("content-type", "application/json")
-            .json(&body) // send JSON body
-            .send() // execute the request
-            .await? // await the response
-            .json::<Value>() // Parse the JSON into serde_json::Value
+        let response = Reqwest::post(url)?
+            .json_body(&body)
+            .receive_json::<AlchemyData<Tokens<TokenBalancesByWalletEntry>>>()
             .await?;
 
-        let response = response
-            .get("data")
-            .expect("'data' not present in response")
-            .get("tokens")
-            .expect("'tokens' not present in response");
-
-        let parsed: Vec<TokenBalancesByWalletEntry> = serde_json::from_value(response.clone())
-            .map_err(|e| crate::Error::SerdeJsonValueParseFailed(response.clone(), e))?;
-        Ok(parsed)
+        Ok(response.data.tokens)
     }
 }

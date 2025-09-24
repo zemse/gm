@@ -78,13 +78,13 @@ impl ConfigPage {
         let form = Form::init(|form| {
             let config = Config::load()?;
             *form.get_text_mut(FormItem::AlchemyApiKey) =
-                config.alchemy_api_key.clone().unwrap_or_default();
-            *form.get_boolean_mut(FormItem::TestnetMode) = config.testnet_mode;
-            *form.get_boolean_mut(FormItem::DeveloperMode) = config.developer_mode;
-            *form.get_text_mut(FormItem::Theme) = config.theme_name.clone();
+                config.get_alchemy_api_key(false).unwrap_or_default();
+            *form.get_boolean_mut(FormItem::TestnetMode) = config.get_testnet_mode();
+            *form.get_boolean_mut(FormItem::DeveloperMode) = config.get_developer_mode();
+            *form.get_text_mut(FormItem::Theme) = config.get_theme_name().to_string();
             let popup = form.get_popup_mut(FormItem::Theme);
             popup.set_items(Some(ThemeName::list()));
-            popup.set_cursor(&config.theme_name);
+            popup.set_cursor(&config.get_theme_name().to_string());
             Ok(())
         })?;
 
@@ -117,13 +117,15 @@ impl Component for ConfigPage {
                 handle_result.reload = true;
 
                 let mut config = Config::load()?;
-                config.alchemy_api_key = Some(form.get_text(FormItem::AlchemyApiKey).clone());
-                config.testnet_mode = form.get_boolean(FormItem::TestnetMode);
-                config.developer_mode = form.get_boolean(FormItem::DeveloperMode);
-                let theme_name = form.get_text(FormItem::Theme).clone();
-                config.theme_name = theme::ThemeName::from_str(&theme_name)?.to_string();
-
-                config.save()?;
+                config.set_values(
+                    Some(form.get_text(FormItem::AlchemyApiKey).clone()),
+                    form.get_boolean(FormItem::TestnetMode),
+                    form.get_boolean(FormItem::DeveloperMode),
+                    {
+                        let theme_name = form.get_text(FormItem::Theme).clone();
+                        theme::ThemeName::from_str(&theme_name)?.to_string()
+                    },
+                )?;
 
                 let display_text = form.get_text_mut(FormItem::DisplayText);
                 *display_text = "Configuration saved".to_string();

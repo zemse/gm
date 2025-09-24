@@ -103,7 +103,7 @@ pub enum UtilsError {
     #[error("Please check your internet connection, the URL seems to be unreachable: {0}")]
     Internet(Url),
 
-    #[error("Request failed at stage {stage:?}: Context='{context:?}', Error='{inner:?}'")]
+    #[error("Request '{url}' failed at stage '{stage:?}' (Error='{inner:?}', Context='{context:?}')", url = context.url)]
     ReqwestFailed {
         stage: ReqwestStage,
         context: Box<ReqwestErrorContext>,
