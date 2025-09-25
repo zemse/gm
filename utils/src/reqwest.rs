@@ -112,16 +112,7 @@ impl Reqwest {
             }
         };
 
-        let status_result = response.error_for_status();
-        let Ok(response) = status_result else {
-            let err = status_result.unwrap_err();
-            return Err(crate::Error::ReqwestFailed {
-                stage: ReqwestStage::Status,
-                context: error_context,
-                inner: ReqwestInnerError::Reqwest(err),
-            });
-        };
-
+        let status_code = response.status();
         let text_result = response.text().await;
         let Ok(text) = text_result else {
             let err = text_result.unwrap_err();
@@ -129,6 +120,14 @@ impl Reqwest {
                 stage: ReqwestStage::DecodeText,
                 context: error_context,
                 inner: ReqwestInnerError::Reqwest(err),
+            });
+        };
+
+        if !status_code.is_success() {
+            return Err(crate::Error::ReqwestBadResponse {
+                status: status_code,
+                context: error_context,
+                response: Some(text),
             });
         };
 

@@ -80,7 +80,7 @@ impl Config {
             .or_else(|| {
                 if use_default {
                     // default key has very limited free quota and activity is monitored
-                    Some("kRwsQjMj5B_JfTKetkN2n".to_string())
+                    Some("T0Fv_dXv5Kepb_KIa69-JR_JDxXdABxG".to_string())
                 } else {
                     None
                 }

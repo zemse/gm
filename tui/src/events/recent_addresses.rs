@@ -13,17 +13,14 @@ use std::{
 
 use super::Event;
 
-const DELAY: Duration = Duration::from_secs(10);
+const DELAY: Duration = Duration::from_secs(30);
 
 pub async fn watch_recent_addresses(transmitter: Sender<Event>, shutdown_signal: Arc<AtomicBool>) {
     let mut delay = Duration::from_secs(0);
 
     loop {
         tokio::select! {
-            result = {
-                tokio::time::sleep(delay).await;
-                run_interval()
-            } => {
+            result = run_interval(delay) => {
                 let _ = match result {
                     Ok(Some(addresses)) => {
                         delay = DELAY; // default duration
@@ -48,7 +45,9 @@ pub async fn watch_recent_addresses(transmitter: Sender<Event>, shutdown_signal:
     }
 }
 
-async fn run_interval() -> crate::Result<Option<Vec<Address>>> {
+async fn run_interval(wait_for: Duration) -> crate::Result<Option<Vec<Address>>> {
+    tokio::time::sleep(wait_for).await;
+
     let Ok(current_address) = Config::current_account() else {
         return Ok(None);
     };

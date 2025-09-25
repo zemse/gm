@@ -1,4 +1,7 @@
-use std::fmt::{Display, Formatter};
+use std::{
+    fmt::{Display, Formatter},
+    time::Duration,
+};
 
 use alloy::primitives::{map::HashMap, utils::format_units, Address, U256};
 
@@ -176,7 +179,11 @@ impl Display for Asset {
     }
 }
 
-pub async fn get_all_assets() -> crate::Result<(Address, Vec<Asset>)> {
+pub async fn get_all_assets(wait_for: Option<Duration>) -> crate::Result<(Address, Vec<Asset>)> {
+    if let Some(dur) = wait_for {
+        tokio::time::sleep(dur).await;
+    }
+
     let config = Config::load()?;
     let wallet_address = config.get_current_account()?;
 

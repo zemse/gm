@@ -10,17 +10,15 @@ use std::{
 
 use super::Event;
 
-const DELAY: Duration = Duration::from_secs(10);
+const DELAY_ZERO: Duration = Duration::from_secs(0);
+const DELAY: Duration = Duration::from_secs(30);
 
 pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Arc<AtomicBool>) {
     let mut delay = Duration::from_secs(0);
 
     loop {
         tokio::select! {
-            result = {
-                tokio::time::sleep(delay).await;
-                get_all_assets()
-            } => {
+            result = get_all_assets(Some(delay)) => {
                 let _ = match result {
                     Ok((wallet_address, assets)) => {
                         delay = DELAY; // default duration
@@ -32,8 +30,11 @@ pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Arc<Atomi
                             gm_utils::Error::CurrentAccountNotSet
                                 | gm_utils::Error::AlchemyApiKeyNotSet
                         );
-                        delay += DELAY; // exponential backoff in case api fails
-                        delay *= 2; // exponential backoff in case api fails
+                        if delay == DELAY_ZERO {
+                            delay += DELAY; // backoff in case api fails
+                        } else {
+                            delay *= 2; // exponential backoff in case api fails
+                        }
                         transmitter.send(Event::AssetsUpdateError(error, silence_error))
                     }
                 };

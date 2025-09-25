@@ -30,7 +30,7 @@ use gm_rpc_proxy::{
     error::RpcProxyError,
     rpc_types::{ErrorObj, ResponsePayload},
 };
-use gm_utils::{disk_storage::DiskStorageInterface, gm_log, network::NetworkStore};
+use gm_utils::{disk_storage::DiskStorageInterface, network::NetworkStore};
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{KeyCode, KeyModifiers},
@@ -318,7 +318,6 @@ impl Component for ShellPage {
                     // Additional handling on top of InputBox
                     match key_event.code {
                         KeyCode::Char(c) => {
-                            gm_log!("Key char: {c}, modifiers: {:?}", key_event.modifiers);
                             if c == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
                                 self.exit_shell_threads_sync();
                                 self.cmd_lines.push(ShellLine::UserInput(String::new()));
@@ -429,7 +428,6 @@ impl Component for ShellPage {
                 } else if let Some(stdin) = &mut self.stdin {
                     match key_event.code {
                         KeyCode::Char(c) => {
-                            gm_log!("Key char: {c}, modifiers: {:?}", key_event.modifiers);
                             if c == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
                                 self.exit_shell_threads_sync();
                                 self.cmd_lines.push(ShellLine::UserInput(String::new()));

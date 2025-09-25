@@ -57,12 +57,17 @@ pub async fn helios_thread(
 
     eth_client.wait_synced().await?;
 
+    let mut dur = Duration::from_secs(0);
     loop {
-        let _ = run_interval(transmitter, &asset_manager, &eth_client).await;
-
         // wait for 10 seconds
         tokio::select! {
-            _ = tokio::time::sleep(Duration::from_secs(10)) => {},
+            result = run_interval(dur, transmitter, &asset_manager, &eth_client) => {
+                if result.is_ok() {
+                    dur = Duration::from_secs(10);
+                } else {
+                    dur += Duration::from_secs(30);
+                }
+            },
             _ = async {
                 while !shutdown_signal.load(Ordering::Relaxed) {
                     tokio::task::yield_now().await;
@@ -77,10 +82,13 @@ pub async fn helios_thread(
 }
 
 async fn run_interval(
+    wait_for: Duration,
     transmitter: &Sender<Event>,
     asset_manager: &Arc<RwLock<AssetManager>>,
     eth_client: &EthereumClient,
 ) -> crate::Result<()> {
+    tokio::time::sleep(wait_for).await;
+
     let owner = Config::current_account()?;
     let assets = asset_manager
         .read()

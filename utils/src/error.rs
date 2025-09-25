@@ -110,6 +110,13 @@ pub enum UtilsError {
         inner: ReqwestInnerError,
     },
 
+    #[error("Request '{url}' returned bad status code {status} (Response='{response:?}')", url = context.url)]
+    ReqwestBadResponse {
+        status: reqwest::StatusCode,
+        context: Box<ReqwestErrorContext>,
+        response: Option<String>,
+    },
+
     #[error("Reqwest builder missing error context, this is a bug please report it.")]
     ReqwestErrorContextMissing,
 
