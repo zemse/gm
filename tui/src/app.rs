@@ -257,9 +257,10 @@ impl App {
         // TODO enable disabling helios through config
         if self.helios_thread.is_none() {
             let tr = tr.clone();
+            let sd = sd.clone();
             let assets_manager = Arc::clone(&self.shared_state.asset_manager);
             self.helios_thread = Some(tokio::spawn(async move {
-                if let Err(e) = helios_thread(&tr, assets_manager).await {
+                if let Err(e) = helios_thread(&tr, &sd, assets_manager).await {
                     let _ = tr.send(Event::HeliosError(e.fmt_err("HeliosError")));
                 }
             }));

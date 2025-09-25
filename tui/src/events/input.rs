@@ -29,6 +29,7 @@ pub fn watch_input_events(tx: mpsc::Sender<super::Event>, shutdown_signal: Arc<A
                 // go to the while loop condition check.
                 if key_event.code == KeyCode::Char('c') || key_event.code == KeyCode::Esc {
                     // TODO improve this as this is a hacky solution
+                    // TODO explore using tokio::signal::ctrl_c()
                     thread::sleep(std::time::Duration::from_millis(10));
                 }
             }

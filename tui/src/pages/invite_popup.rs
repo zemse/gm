@@ -32,7 +32,7 @@ pub enum InviteCodeClaimStatus {
     Failed(String),
 }
 
-const BASE_URL: &str = "https://invites.gm-tui.com/";
+const BASE_URL: &str = "https://invites.gm-tui.com";
 
 pub fn start_check_thread(
     invite_code: &str,

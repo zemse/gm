@@ -82,7 +82,6 @@ pub struct ShellPage {
     cmd_lines: Vec<ShellLine>,
     display: TextScroll,
     text_cursor: usize,
-    server_threads: Option<Vec<tokio::task::JoinHandle<()>>>,
     env_vars: Option<HashMap<String, String>>,
     requests: Vec<UserRequest>,
     tx_popup: TxPopup,
@@ -92,6 +91,8 @@ pub struct ShellPage {
     stdout_thread: Option<thread::JoinHandle<()>>,
     stderr_thread: Option<thread::JoinHandle<()>>,
     wait_thread: Option<thread::JoinHandle<()>>,
+
+    server_threads: Option<Vec<tokio::task::JoinHandle<()>>>,
 }
 
 impl Default for ShellPage {
@@ -103,7 +104,6 @@ impl Default for ShellPage {
             ],
             display: TextScroll::default(),
             text_cursor: 0,
-            server_threads: None,
             env_vars: None,
             requests: vec![],
             tx_popup: TxPopup::default(),
@@ -113,6 +113,8 @@ impl Default for ShellPage {
             stdout_thread: None,
             stderr_thread: None,
             wait_thread: None,
+
+            server_threads: None,
         }
     }
 }
@@ -141,7 +143,12 @@ impl ShellPage {
     }
 
     // TODO gracefully shutdown
-    fn create_server_threads(&mut self, tr: &Sender<Event>, ss: &SharedState) -> crate::Result<()> {
+    fn create_server_threads(
+        &mut self,
+        tr: &Sender<Event>,
+        sd: &Arc<AtomicBool>,
+        ss: &SharedState,
+    ) -> crate::Result<()> {
         let secret = hex::encode(random_bytes32());
         let networks = NetworkStore::load()?.networks;
 
@@ -156,10 +163,15 @@ impl ShellPage {
             let port_actual = network.rpc_port.unwrap_or(port);
             let network_name = network.name.clone();
             let current_account = ss.try_current_account()?;
+            let sd_clone = sd.clone();
             server_threads.push(tokio::spawn(async move {
                 let tr_clone = tr.clone();
-                let result =
-                    gm_rpc_proxy::serve(port_actual, &secret_clone, rpc_url, move |request| {
+                let result = gm_rpc_proxy::serve(
+                    port_actual,
+                    &secret_clone,
+                    rpc_url,
+                    sd_clone,
+                    move |request| {
                         if request.method == "eth_accounts" {
                             // Synchronous immediate response
                             Ok(gm_rpc_proxy::OverrideResult::Sync(
@@ -206,8 +218,9 @@ impl ShellPage {
                         } else {
                             Ok(gm_rpc_proxy::OverrideResult::NoOverride)
                         }
-                    })
-                    .await;
+                    },
+                )
+                .await;
                 if let Err(e) = result {
                     let _ = tr_clone.send(Event::ShellUpdate(ShellUpdate::RpcProxyThreadCrashed(
                         RefCell::new(Some((e, network_name))),
@@ -255,13 +268,13 @@ impl Component for ShellPage {
         event: &Event,
         area: Rect,
         tr: &Sender<crate::Event>,
-        _sd: &Arc<AtomicBool>,
+        sd: &Arc<AtomicBool>,
         ss: &SharedState,
     ) -> crate::Result<Actions> {
         let mut actions = Actions::default();
 
         if self.server_threads.is_none() {
-            self.create_server_threads(tr, ss)?;
+            self.create_server_threads(tr, sd, ss)?;
         }
 
         self.display.handle_event(event.key_event(), area);

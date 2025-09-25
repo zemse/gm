@@ -388,11 +388,7 @@ impl Component for WalletConnectPage {
                                 let _ = tr.send(Event::WalletConnectMessage(addr, Box::new(msg)));
                             }
 
-                            loop {
-                                if shutdown_signal.load(Ordering::Relaxed) {
-                                    break;
-                                }
-
+                            while !shutdown_signal.load(Ordering::Relaxed) {
                                 match pairing.watch_messages(Topic::Derived, None).await {
                                     Ok(messages) => {
                                         for msg in messages {

@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
 use gm_rpc_proxy::rpc_types::ResponsePayload;
 use serde_json::Value;
@@ -12,12 +12,14 @@ struct ExternalMessage {
 #[tokio::main]
 async fn main() {
     let (tr, rv) = mpsc::channel::<ExternalMessage>();
+    let sd = Arc::new(AtomicBool::new(false));
 
     tokio::spawn(async move {
         gm_rpc_proxy::serve(
             3000,
             &"abcd",
             "http://127.0.0.1:8545".parse().unwrap(),
+            sd,
             move |req| {
                 if req.method == "eth_blockNumber" {
                     // Channel created for every async request

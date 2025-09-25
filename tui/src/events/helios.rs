@@ -1,6 +1,10 @@
 use std::{
     path::PathBuf,
-    sync::{mpsc::Sender, Arc, RwLock},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::Sender,
+        Arc, RwLock,
+    },
     time::Duration,
 };
 
@@ -23,6 +27,7 @@ use gm_utils::{
 
 pub async fn helios_thread(
     transmitter: &Sender<Event>,
+    shutdown_signal: &Arc<AtomicBool>,
     asset_manager: Arc<RwLock<AssetManager>>,
 ) -> crate::Result<()> {
     let eth_network = Network::from_chain_id(1)?;
@@ -55,8 +60,20 @@ pub async fn helios_thread(
     loop {
         let _ = run_interval(transmitter, &asset_manager, &eth_client).await;
 
-        tokio::time::sleep(Duration::from_secs(10)).await;
+        // wait for 10 seconds
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(10)) => {},
+            _ = async {
+                while !shutdown_signal.load(Ordering::Relaxed) {
+                    tokio::task::yield_now().await;
+                }
+            } => break,
+        }
     }
+
+    eth_client.shutdown().await;
+
+    Ok(())
 }
 
 async fn run_interval(
