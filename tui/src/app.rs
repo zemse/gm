@@ -561,6 +561,11 @@ impl Widget for &App {
     where
         Self: Sized,
     {
+        if area.width < 30 || area.height < 10 {
+            "Increase size of your terminal please".render(area, buf);
+            return;
+        }
+
         let [title_area, body_area, footer_area] = self.get_areas(area);
 
         Title.render_component(title_area, buf, &self.shared_state);
