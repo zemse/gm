@@ -222,6 +222,7 @@ impl NetworkCreatePage {
                 ),
                 "Remove",
                 "Cancel",
+                true,
             ),
         })
     }

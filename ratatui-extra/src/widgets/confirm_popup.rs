@@ -25,6 +25,7 @@ impl ConfirmPopup {
         text: String,
         confirm_button_label: &'static str,
         cancel_button_label: &'static str,
+        initial_cursor_on_confirm: bool,
     ) -> Self {
         Self {
             title,
@@ -32,7 +33,7 @@ impl ConfirmPopup {
             confirm_button_label,
             cancel_button_label,
             open: false,
-            button_cursor: false,
+            button_cursor: initial_cursor_on_confirm,
         }
     }
 

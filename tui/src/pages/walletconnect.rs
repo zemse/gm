@@ -174,13 +174,14 @@ impl WalletConnectPage {
             session_requests: vec![],
             cursor: Cursor::default(),
             status: WalletConnectStatus::Idle,
-            confirm_popup: ConfirmPopup::new("WalletConnect", String::new(), "Approve", "Reject"),
+            confirm_popup: ConfirmPopup::new("WalletConnect", String::new(), "Approve", "Reject", true),
             exit_popup: ConfirmPopup::new(
                 "Warning",
                 "The WalletConnect session will be ended if you go back. You can also press ESC to go back. If you want to continue session you can choose to wait."
                     .to_string(),
                 "Wait",
                 "End",
+                false,
             ),
             tx_popup: TxPopup::default(),
             sign_popup: SignPopup::default(),

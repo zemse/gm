@@ -70,7 +70,8 @@ impl Default for AccountCreatePage {
                 "Mining will be ended if you go back. You can press ESC to go back or select End. If you want to continue mining you can choose to wait."
                     .to_string(),
                 "Wait",
-                "End",
+                "Exit",
+                false
             ),
         }
     }
@@ -140,6 +141,7 @@ impl Component for AccountCreatePage {
         match event {
             Event::Input(key_event) => {
                 if self.mining && key_event.code == KeyCode::Esc {
+                    result.ignore_esc();
                     self.exit_popup.open();
                 } else {
                     // Handle input only if not mining

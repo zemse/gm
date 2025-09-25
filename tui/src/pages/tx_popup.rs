@@ -77,7 +77,7 @@ impl TxPopup {
 
     pub fn open(&mut self) {
         self.open = true;
-        self.button_cursor = false;
+        self.button_cursor = true;
     }
 
     pub fn close(&mut self) {

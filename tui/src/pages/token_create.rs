@@ -100,6 +100,7 @@ impl TokenCreatePage {
                 "Are you sure you want to remove this token?".to_string(),
                 "Remove",
                 "Cancel",
+                true,
             ),
             token,
             network,
