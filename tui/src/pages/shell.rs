@@ -16,7 +16,11 @@ use std::{
     collections::HashMap,
     io::{self, BufRead, BufReader, Write},
     process::{self, Command, Stdio},
-    sync::{atomic::AtomicBool, mpsc::Sender, Arc},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::Sender,
+        Arc,
+    },
     thread,
 };
 
@@ -26,8 +30,13 @@ use gm_rpc_proxy::{
     error::RpcProxyError,
     rpc_types::{ErrorObj, ResponsePayload},
 };
-use gm_utils::{disk_storage::DiskStorageInterface, network::NetworkStore};
-use ratatui::{buffer::Buffer, crossterm::event::KeyCode, layout::Rect, widgets::Widget};
+use gm_utils::{disk_storage::DiskStorageInterface, gm_log, network::NetworkStore};
+use ratatui::{
+    buffer::Buffer,
+    crossterm::event::{KeyCode, KeyModifiers},
+    layout::Rect,
+    widgets::Widget,
+};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 use walletconnect_sdk::utils::random_bytes32;
@@ -71,7 +80,8 @@ pub enum ShellUpdate {
     StdErr_Error(io::Error),
 
     Wait(process::ExitStatus),
-    Wait_Error(io::Error),
+
+    Kill_Error(io::Error),
 
     RpcProxyRequest(RefCell<Option<UserRequest>>),
     RpcProxyThreadCrashed(RefCell<Option<(RpcProxyError, String)>>),
@@ -87,11 +97,13 @@ pub struct ShellPage {
     tx_popup: TxPopup,
     sign_popup: SignPopup,
 
+    kill_signal: Arc<AtomicBool>,
     stdin: Option<process::ChildStdin>,
     stdout_thread: Option<thread::JoinHandle<()>>,
     stderr_thread: Option<thread::JoinHandle<()>>,
     wait_thread: Option<thread::JoinHandle<()>>,
 
+    exit_signal: Arc<AtomicBool>,
     server_threads: Option<Vec<tokio::task::JoinHandle<()>>>,
 }
 
@@ -109,11 +121,13 @@ impl Default for ShellPage {
             tx_popup: TxPopup::default(),
             sign_popup: SignPopup::default(),
 
+            kill_signal: Arc::new(AtomicBool::new(false)),
             stdin: None,
             stdout_thread: None,
             stderr_thread: None,
             wait_thread: None,
 
+            exit_signal: Arc::new(AtomicBool::new(false)),
             server_threads: None,
         };
 
@@ -146,12 +160,7 @@ impl ShellPage {
             .join("\n")
     }
 
-    fn create_server_threads(
-        &mut self,
-        tr: &Sender<Event>,
-        sd: &Arc<AtomicBool>,
-        ss: &SharedState,
-    ) -> crate::Result<()> {
+    fn create_server_threads(&mut self, tr: &Sender<Event>, ss: &SharedState) -> crate::Result<()> {
         let secret = hex::encode(random_bytes32());
         let networks = NetworkStore::load()?.networks;
 
@@ -166,14 +175,14 @@ impl ShellPage {
             let port_actual = network.rpc_port.unwrap_or(port);
             let network_name = network.name.clone();
             let current_account = ss.try_current_account()?;
-            let sd_clone = sd.clone();
+            let exit_signal = self.exit_signal.clone();
             server_threads.push(tokio::spawn(async move {
                 let tr_clone = tr.clone();
                 let result = gm_rpc_proxy::serve(
                     port_actual,
                     &secret_clone,
                     rpc_url,
-                    sd_clone,
+                    exit_signal,
                     move |request| {
                         if request.method == "eth_accounts" {
                             // Synchronous immediate response
@@ -245,25 +254,37 @@ impl ShellPage {
         Ok(())
     }
 
-    fn exit_threads_sync(&mut self) {
+    fn exit_shell_threads_sync(&mut self) {
+        self.kill_signal.store(true, Ordering::Relaxed);
+
         if let Some(stdin) = self.stdin.take() {
             drop(stdin);
         }
+
         if let Some(stdout_thread) = self.stdout_thread.take() {
             stdout_thread.join().unwrap();
         }
+
         if let Some(stderr_thread) = self.stderr_thread.take() {
             stderr_thread.join().unwrap();
         }
-        if let Some(wait_thread) = self.wait_thread.take() {
-            wait_thread.join().unwrap();
+    }
+
+    fn exit_server_sync(&mut self) {
+        self.exit_signal.store(true, Ordering::Relaxed);
+        if let Some(server_threads) = self.server_threads.take() {
+            for thread in server_threads {
+                thread.abort();
+            }
+            self.server_threads = None;
         }
     }
 }
 
 impl Component for ShellPage {
     async fn exit_threads(&mut self) {
-        self.exit_threads_sync();
+        self.exit_shell_threads_sync();
+        self.exit_server_sync();
     }
 
     fn handle_event(
@@ -271,16 +292,18 @@ impl Component for ShellPage {
         event: &Event,
         area: Rect,
         tr: &Sender<crate::Event>,
-        sd: &Arc<AtomicBool>,
+        _: &Arc<AtomicBool>,
         ss: &SharedState,
     ) -> crate::Result<Actions> {
         let mut actions = Actions::default();
 
         if self.server_threads.is_none() {
-            self.create_server_threads(tr, sd, ss)?;
+            self.create_server_threads(tr, ss)?;
         }
 
         self.display.handle_event(event.key_event(), area);
+
+        actions.ignore_ctrlc();
 
         #[allow(clippy::single_match)]
         match event {
@@ -292,97 +315,127 @@ impl Component for ShellPage {
                     // Keyboard handling for input
                         InputBox::handle_event(Some(key_event), text_input, text_cursor);
 
-                    // Execute
-                    if key_event.code == KeyCode::Enter {
-                        scroll_to_bottom = true;
+                    // Additional handling on top of InputBox
+                    match key_event.code {
+                        KeyCode::Char(c) => {
+                            gm_log!("Key char: {c}, modifiers: {:?}", key_event.modifiers);
+                            if c == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
+                                self.exit_shell_threads_sync();
+                                self.cmd_lines.push(ShellLine::UserInput(String::new()));
+                                self.text_cursor = 0;
+                            }
+                        }
+                        KeyCode::Enter => {
+                            scroll_to_bottom = true;
 
-                        let text_input = text_input.clone();
-                        if text_input.trim().is_empty() {
-                            self.cmd_lines.push(ShellLine::UserInput(String::new()));
-                            self.text_cursor = 0;
-                        } else {
-                            let mut child = Command::new("sh")
-                                .arg("-c")
-                                .arg(text_input)
-                                // .env("CLICOLOR", "1")
-                                // .env("CLICOLOR_FORCE", "1")
-                                .envs(
-                                    self.env_vars
-                                        .as_ref()
-                                        .ok_or(crate::Error::ShellEnvVarsNotSet)?,
-                                )
-                                .stdin(Stdio::piped())
-                                .stdout(Stdio::piped())
-                                .stderr(Stdio::piped())
-                                .spawn()
-                                .map_err(crate::Error::SpawnFailed)?;
+                            let text_input = text_input.clone();
+                            if text_input.trim().is_empty() {
+                                self.cmd_lines.push(ShellLine::UserInput(String::new()));
+                                self.text_cursor = 0;
+                            } else {
+                                let mut child = Command::new("sh")
+                                    .arg("-c")
+                                    .arg(text_input)
+                                    // .env("CLICOLOR", "1")
+                                    // .env("CLICOLOR_FORCE", "1")
+                                    .envs(
+                                        self.env_vars
+                                            .as_ref()
+                                            .ok_or(crate::Error::ShellEnvVarsNotSet)?,
+                                    )
+                                    .stdin(Stdio::piped())
+                                    .stdout(Stdio::piped())
+                                    .stderr(Stdio::piped())
+                                    .spawn()
+                                    .map_err(crate::Error::SpawnFailed)?;
 
-                            self.stdin = child.stdin.take();
-                            let stdout = child
-                                .stdout
-                                .take()
-                                .ok_or(crate::Error::StdoutNotAvailable)?;
-                            let stderr = child
-                                .stderr
-                                .take()
-                                .ok_or(crate::Error::StderrNotAvailable)?;
+                                self.stdin = child.stdin.take();
+                                let stdout = child
+                                    .stdout
+                                    .take()
+                                    .ok_or(crate::Error::StdoutNotAvailable)?;
+                                let stderr = child
+                                    .stderr
+                                    .take()
+                                    .ok_or(crate::Error::StderrNotAvailable)?;
 
-                            let tr_stdout = tr.clone();
-                            self.stdout_thread = Some(thread::spawn(move || {
-                                let reader = BufReader::new(stdout);
-                                for line in reader.lines() {
-                                    match line {
-                                        Ok(s) => {
-                                            let _ = tr_stdout
-                                                .send(Event::ShellUpdate(ShellUpdate::StdOut(s)));
-                                        }
-                                        Err(e) => {
-                                            let _ = tr_stdout.send(Event::ShellUpdate(
-                                                ShellUpdate::StdOut_Error(e),
-                                            ));
+                                let tr_stdout = tr.clone();
+                                self.stdout_thread = Some(thread::spawn(move || {
+                                    let reader = BufReader::new(stdout);
+                                    for line in reader.lines() {
+                                        match line {
+                                            Ok(s) => {
+                                                let _ = tr_stdout.send(Event::ShellUpdate(
+                                                    ShellUpdate::StdOut(s),
+                                                ));
+                                            }
+                                            Err(e) => {
+                                                let _ = tr_stdout.send(Event::ShellUpdate(
+                                                    ShellUpdate::StdOut_Error(e),
+                                                ));
+                                            }
                                         }
                                     }
-                                }
-                            }));
+                                }));
 
-                            let tr_stderr = tr.clone();
-                            self.stderr_thread = Some(thread::spawn(move || {
-                                let reader = BufReader::new(stderr);
-                                for line in reader.lines() {
-                                    match line {
-                                        Ok(s) => {
-                                            let _ = tr_stderr
-                                                .send(Event::ShellUpdate(ShellUpdate::StdErr(s)));
+                                let tr_stderr = tr.clone();
+                                self.stderr_thread = Some(thread::spawn(move || {
+                                    let reader = BufReader::new(stderr);
+                                    for line in reader.lines() {
+                                        match line {
+                                            Ok(s) => {
+                                                let _ = tr_stderr.send(Event::ShellUpdate(
+                                                    ShellUpdate::StdErr(s),
+                                                ));
+                                            }
+                                            Err(e) => {
+                                                let _ = tr_stderr.send(Event::ShellUpdate(
+                                                    ShellUpdate::StdErr_Error(e),
+                                                ));
+                                            }
                                         }
+                                    }
+                                }));
+
+                                let tr_stderr = tr.clone();
+                                let kill_signal = self.kill_signal.clone();
+                                self.wait_thread = Some(thread::spawn(move || {
+                                    while kill_signal.load(Ordering::Relaxed) {
+                                        if let Ok(status) = child.try_wait() {
+                                            match status {
+                                                Some(s) => {
+                                                    let _ = tr_stderr.send(Event::ShellUpdate(
+                                                        ShellUpdate::Wait(s),
+                                                    ));
+                                                }
+                                                None => {}
+                                            }
+                                            thread::sleep(std::time::Duration::from_millis(100));
+                                        }
+                                    }
+                                    match child.kill() {
+                                        Ok(_) => {}
                                         Err(e) => {
                                             let _ = tr_stderr.send(Event::ShellUpdate(
-                                                ShellUpdate::StdErr_Error(e),
+                                                ShellUpdate::Kill_Error(e),
                                             ));
                                         }
                                     }
-                                }
-                            }));
-
-                            let tr_stderr = tr.clone();
-                            self.wait_thread = Some(thread::spawn(move || {
-                                let status = child.wait();
-                                match status {
-                                    Ok(s) => {
-                                        let _ = tr_stderr
-                                            .send(Event::ShellUpdate(ShellUpdate::Wait(s)));
-                                    }
-                                    Err(e) => {
-                                        let _ = tr_stderr
-                                            .send(Event::ShellUpdate(ShellUpdate::Wait_Error(e)));
-                                    }
-                                }
-                            }));
+                                }));
+                            }
                         }
+                        _ => {}
                     }
                 } else if let Some(stdin) = &mut self.stdin {
                     match key_event.code {
                         KeyCode::Char(c) => {
-                            write!(stdin, "{c}").map_err(crate::Error::StdinWriteFailed)?;
+                            gm_log!("Key char: {c}, modifiers: {:?}", key_event.modifiers);
+                            if c == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
+                                self.exit_shell_threads_sync();
+                                self.cmd_lines.push(ShellLine::UserInput(String::new()));
+                            } else {
+                                write!(stdin, "{c}").map_err(crate::Error::StdinWriteFailed)?;
+                            }
                         }
                         KeyCode::Enter => {
                             writeln!(stdin).map_err(crate::Error::StdinWriteFailed)?;
@@ -415,7 +468,7 @@ impl Component for ShellPage {
                         return Err(crate::Error::StderrReadFailed(format!("{error:?}")));
                     }
                     ShellUpdate::Wait(exit_status) => {
-                        self.exit_threads_sync();
+                        self.exit_shell_threads_sync();
                         self.cmd_lines.push(ShellLine::StdOut(format!(
                             "Process exited with {}",
                             exit_status
@@ -423,8 +476,8 @@ impl Component for ShellPage {
                         self.cmd_lines.push(ShellLine::UserInput(String::new()));
                         self.text_cursor = 0;
                     }
-                    ShellUpdate::Wait_Error(error) => {
-                        return Err(crate::Error::ProcessExitWaitFailed(format!("{error:?}")));
+                    ShellUpdate::Kill_Error(error) => {
+                        return Err(crate::Error::ProcessKillFailed(format!("{error:?}")));
                     }
                     ShellUpdate::RpcProxyRequest(request) => {
                         if let Some(request) = request.take() {

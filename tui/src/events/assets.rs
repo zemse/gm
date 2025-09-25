@@ -10,37 +10,41 @@ use std::{
 
 use super::Event;
 
+const DELAY: Duration = Duration::from_secs(10);
+
 pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Arc<AtomicBool>) {
-    // Query interval is the API query delay, however to prevent blocking at
-    // the thread::sleep, which will cause delayed processing of shutdown_signal.
-    // To prevent this, we check shutdown_signal at shorter intervals while
-    // making API calls at a longer duration.
-    let query_interval_milli = 2000;
-    let thread_sleep_duration_milli = 100;
+    let mut delay = Duration::from_secs(0);
 
-    let mut counter = query_interval_milli;
-    while !shutdown_signal.load(Ordering::Relaxed) {
-        if counter >= query_interval_milli {
-            // Send result back to main thread. If main thread has already
-            // shutdown, then we will get error. Since our event is not
-            // critical, we do not store it to disk.
-            let _ = match get_all_assets().await {
-                Ok((wallet_address, assets)) => {
-                    transmitter.send(Event::AssetsUpdate(wallet_address, assets))
+    loop {
+        tokio::select! {
+            result = {
+                tokio::time::sleep(delay).await;
+                get_all_assets()
+            } => {
+                let _ = match result {
+                    Ok((wallet_address, assets)) => {
+                        delay = DELAY; // default duration
+                        transmitter.send(Event::AssetsUpdate(wallet_address, assets))
+                    }
+                    Err(error) => {
+                        let silence_error = matches!(
+                            error,
+                            gm_utils::Error::CurrentAccountNotSet
+                                | gm_utils::Error::AlchemyApiKeyNotSet
+                        );
+                        delay += DELAY; // exponential backoff in case api fails
+                        delay *= 2; // exponential backoff in case api fails
+                        transmitter.send(Event::AssetsUpdateError(error, silence_error))
+                    }
+                };
+            }
+            _ = async {
+                while !shutdown_signal.load(Ordering::Relaxed) {
+                    tokio::task::yield_now().await;
                 }
-                Err(error) => {
-                    let silence_error = matches!(
-                        error,
-                        gm_utils::Error::CurrentAccountNotSet
-                            | gm_utils::Error::AlchemyApiKeyNotSet
-                    );
-                    transmitter.send(Event::AssetsUpdateError(error, silence_error))
-                }
-            };
-            counter = 0;
-        }
-
-        counter += thread_sleep_duration_milli;
-        tokio::time::sleep(Duration::from_millis(thread_sleep_duration_milli)).await;
+            } => {
+                break;
+            }
+        };
     }
 }

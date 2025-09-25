@@ -105,8 +105,8 @@ pub enum Error {
     #[error("Failed to read from child stderr. (Error: {0})")]
     StderrReadFailed(String),
 
-    #[error("Failed to wait for process exit. (Error: {0})")]
-    ProcessExitWaitFailed(String),
+    #[error("Failed to kill the process. (Error: {0})")]
+    ProcessKillFailed(String),
 
     #[error("RPC Proxy thread crashed for {1}. (Error: {0})")]
     RpcProxyThreadCrashed(gm_rpc_proxy::Error, String),

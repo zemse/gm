@@ -116,7 +116,9 @@ impl InputBox<'_> {
                         option_right(text_input, text_cursor);
                     }
                     // Simple char press
-                    else {
+                    else if key_event.modifiers == KeyModifiers::NONE
+                        || key_event.modifiers == KeyModifiers::SHIFT
+                    {
                         text_input.insert(*text_cursor, char);
                         *text_cursor += 1;
                     }

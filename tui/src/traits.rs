@@ -14,9 +14,10 @@ pub struct Actions {
     pub page_pops: usize,
     // Page to insert into the context stack.
     pub page_inserts: Vec<Page>,
-    // Number of [ESC] key presses to ignore. This is to enable the current page
-    // wants to handle the [ESC] key.
+    // Enable if current page wants to handle the [ESC] key.
     pub ignore_esc: bool,
+    // Ignore [CTRL+C] key presses which would quit app
+    pub ignore_ctrlc: bool,
     // Regenerate the data for the current page, this is used when we expect
     // that the external state is updated and we need to reflect that in the UI.
     pub reload: bool,
@@ -35,6 +36,12 @@ impl Act for Actions {
 
     fn ignore_esc(&mut self) {
         self.ignore_esc = true;
+    }
+}
+
+impl Actions {
+    pub fn ignore_ctrlc(&mut self) {
+        self.ignore_ctrlc = true;
     }
 }
 

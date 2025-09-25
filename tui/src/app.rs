@@ -350,7 +350,7 @@ impl App {
         Ok(())
     }
 
-    async fn process_result(&mut self, result: Actions) -> crate::Result<bool> {
+    async fn process_result(&mut self, result: Actions) -> crate::Result<(bool, bool)> {
         for _ in 0..result.page_pops {
             self.context.pop();
         }
@@ -367,7 +367,7 @@ impl App {
             }
         }
         self.context.extend(result.page_inserts);
-        Ok(result.ignore_esc)
+        Ok((result.ignore_esc, result.ignore_ctrlc))
     }
 
     async fn handle_event(
@@ -411,7 +411,7 @@ impl App {
             Actions::default()
         };
 
-        let esc_ignores = self.process_result(result).await?;
+        let (ignore_esc, ignore_ctrlc) = self.process_result(result).await?;
 
         if self.context.is_empty() {
             self.exit = true;
@@ -428,7 +428,10 @@ impl App {
                             // if char == 'q' && self.navigation.text_input().is_none() {
                             //     self.exit = true;
                             // }
-                            if char == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
+                            if char == 'c'
+                                && key_event.modifiers == KeyModifiers::CONTROL
+                                && !ignore_ctrlc
+                            {
                                 self.exit = true;
                             }
                             if char == 'r' && key_event.modifiers == KeyModifiers::CONTROL {
@@ -441,7 +444,7 @@ impl App {
                         KeyCode::Esc => {
                             if self.fatal_error_popup.is_shown() {
                                 self.fatal_error_popup.clear();
-                            } else if !esc_ignores {
+                            } else if !ignore_esc {
                                 let page = self.context.pop();
                                 if let Some(mut page) = page {
                                     page.exit_threads().await;
