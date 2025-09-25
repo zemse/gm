@@ -1,10 +1,6 @@
 use std::{
     str::FromStr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc::{self, Sender},
-        Arc,
-    },
+    sync::mpsc::{self, Sender},
     time::Duration,
 };
 
@@ -26,6 +22,7 @@ use ratatui::{
 use serde_json::Value;
 use strum::{Display, EnumIter};
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use walletconnect_sdk::{
     pairing::{Pairing, Topic},
     types::{IrnTag, Metadata, SessionProposeParams, SessionRequestData},
@@ -283,7 +280,7 @@ impl Component for WalletConnectPage {
         event: &Event,
         area: Rect,
         tr: &mpsc::Sender<Event>,
-        sd: &Arc<AtomicBool>,
+        sd: &CancellationToken,
         ss: &SharedState,
     ) -> crate::Result<crate::traits::Actions> {
         let mut handle_result = Actions::default();
@@ -393,7 +390,7 @@ impl Component for WalletConnectPage {
                                 let _ = tr.send(Event::WalletConnectMessage(addr, Box::new(msg)));
                             }
 
-                            while !shutdown_signal.load(Ordering::Relaxed) {
+                            while !shutdown_signal.is_cancelled() {
                                 match pairing.watch_messages(Topic::Derived, None).await {
                                     Ok(messages) => {
                                         for msg in messages {
@@ -425,7 +422,7 @@ impl Component for WalletConnectPage {
                         let shutdown_signal = sd.clone();
                         self.send_thread = Some(tokio::spawn(async move {
                             loop {
-                                if shutdown_signal.load(Ordering::Relaxed) {
+                                if shutdown_signal.is_cancelled() {
                                     break;
                                 }
 

@@ -33,6 +33,7 @@ ratatui = { workspace = true }
 
 # misc
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 url = { workspace = true }
 humantime = "2.2.0"
 data3 = "0.2.0"

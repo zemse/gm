@@ -1,8 +1,5 @@
 use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc, Arc,
-    },
+    sync::mpsc,
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
@@ -17,6 +14,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Gauge, Widget},
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
@@ -43,7 +41,7 @@ pub struct AccountCreatePage {
     mining: bool,
     started_mining_at: Instant,
 
-    exit_signal: Arc<AtomicBool>,
+    exit_signal: CancellationToken,
     hash_rate_thread: Option<JoinHandle<()>>,
     vanity_thread: Option<JoinHandle<()>>,
 
@@ -61,7 +59,7 @@ impl Default for AccountCreatePage {
             mining: false,
             started_mining_at: Instant::now(),
 
-            exit_signal: Arc::new(AtomicBool::new(false)),
+            exit_signal: CancellationToken::new(),
             hash_rate_thread: None,
             vanity_thread: None,
 
@@ -103,7 +101,7 @@ impl AccountCreatePage {
 
 impl Component for AccountCreatePage {
     async fn exit_threads(&mut self) {
-        self.exit_signal.store(true, Ordering::Relaxed);
+        self.exit_signal.cancel();
 
         if let Some(thread) = self.hash_rate_thread.take() {
             thread.join().unwrap();
@@ -118,7 +116,7 @@ impl Component for AccountCreatePage {
         event: &Event,
         area: Rect,
         transmitter: &mpsc::Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let mut result = Actions::default();

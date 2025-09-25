@@ -1,6 +1,7 @@
-use std::sync::{atomic::AtomicBool, mpsc::Sender, Arc};
+use std::sync::mpsc::Sender;
 
 use ratatui::{layout::Rect, widgets::Widget};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
@@ -19,7 +20,7 @@ impl Component for DevKeyCapturePage {
         event: &Event,
         _area: Rect,
         _transmitter: &Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         if let Event::Input(key_event) = event {

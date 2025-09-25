@@ -14,9 +14,8 @@ use ratatui::crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::layout::Rect;
 use ratatui::prelude::Widget;
 use std::fmt::{Display, Formatter};
-use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::Sender;
-use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug)]
 enum TokenSelect {
@@ -76,7 +75,7 @@ impl Component for TokenPage {
         event: &Event,
         _area: Rect,
         _transmitter: &Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let cursor_max = self.list.len();

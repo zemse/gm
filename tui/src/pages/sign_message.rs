@@ -1,9 +1,10 @@
-use std::sync::{atomic::AtomicBool, mpsc, Arc};
+use std::sync::mpsc;
 
 use alloy::signers::SignerSync;
 use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
 use ratatui::{buffer::Buffer, layout::Rect};
 use strum::{Display, EnumIter};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
@@ -67,7 +68,7 @@ impl Component for SignMessagePage {
         event: &Event,
         _area: Rect,
         _transmitter: &mpsc::Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         self.form.handle_event(

@@ -1,10 +1,4 @@
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc, Arc,
-    },
-    time::Duration,
-};
+use std::{sync::mpsc, time::Duration};
 
 use alloy::{
     consensus::{SignableTransaction, TxEnvelope, TxType},
@@ -32,6 +26,7 @@ use ratatui::{
 };
 use serde_json::Value;
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 use crate::{app::SharedState, error::FmtError, theme::Theme, traits::Actions, Event};
 use gm_utils::{account::AccountManager, network::Network};
@@ -121,7 +116,7 @@ impl TxPopup {
             &crate::Event,
             Rect,
             &mpsc::Sender<Event>,
-            &Arc<AtomicBool>,
+            &CancellationToken,
             &SharedState,
         ),
         mut on_tx_submit: F1,
@@ -310,7 +305,7 @@ pub fn send_tx_thread(
     tx_req: &TransactionRequest,
     network: &Network,
     tr: &mpsc::Sender<Event>,
-    shutdown_signal: &Arc<AtomicBool>,
+    shutdown_signal: &CancellationToken,
     shared_state: &SharedState,
 ) -> crate::Result<JoinHandle<()>> {
     let tr = tr.clone();
@@ -341,7 +336,7 @@ pub fn send_tx_thread(
             sender_account: Address,
             network: Network,
             mut tx: TransactionRequest,
-            shutdown_signal: Arc<AtomicBool>,
+            shutdown_signal: CancellationToken,
         ) -> crate::Result<SendTxResult> {
             let provider = network.get_provider()?;
 
@@ -414,7 +409,7 @@ pub fn send_tx_thread(
             tx_typed.encode(&mut out);
             let out = rlp::decode_exact::<Bytes>(out)?;
 
-            if shutdown_signal.load(Ordering::Relaxed) {
+            if shutdown_signal.is_cancelled() {
                 return Err(crate::Error::Abort("shutdown signal received"));
             }
 
@@ -433,7 +428,7 @@ pub fn send_tx_thread(
 pub fn watch_tx_thread(
     network: &Network,
     tr: &mpsc::Sender<Event>,
-    shutdown_signal: &Arc<AtomicBool>,
+    shutdown_signal: &CancellationToken,
     tx_hash: FixedBytes<32>,
 ) -> crate::Result<JoinHandle<()>> {
     let tr = tr.clone();
@@ -442,29 +437,31 @@ pub fn watch_tx_thread(
     let provider = network.get_provider()?;
     Ok(tokio::spawn(async move {
         loop {
-            match provider.get_transaction_receipt(tx_hash).await {
-                Ok(result) => {
-                    if let Some(result) = result {
-                        let _ = tr.send(Event::TxUpdate(if result.status() {
-                            TxStatus::Confirmed(tx_hash)
-                        } else {
-                            TxStatus::Failed(tx_hash)
-                        }));
-                        break;
+            tokio::select! {
+                result = provider.get_transaction_receipt(tx_hash) => {
+                    match result {
+                        Ok(result) => {
+                            if let Some(result) = result {
+                                let _ = tr.send(Event::TxUpdate(if result.status() {
+                                    TxStatus::Confirmed(tx_hash)
+                                } else {
+                                    TxStatus::Failed(tx_hash)
+                                }));
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            let _ = tr.send(Event::TxError(
+                                crate::Error::from(e).fmt_err("TxStatusError"),
+                            ));
+                        }
                     }
                 }
-                Err(e) => {
-                    let _ = tr.send(Event::TxError(
-                        crate::Error::from(e).fmt_err("TxStatusError"),
-                    ));
-                }
-            }
+                _ = shutdown_signal.cancelled() => break
+            };
 
+            // TODO properly handle the wait in the first leg might need a util
             tokio::time::sleep(Duration::from_secs(2)).await;
-
-            if shutdown_signal.load(Ordering::Relaxed) {
-                break;
-            }
         }
     }))
 }

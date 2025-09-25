@@ -1,11 +1,9 @@
-use std::{
-    str::FromStr,
-    sync::{atomic::AtomicBool, mpsc, Arc},
-};
+use std::{str::FromStr, sync::mpsc};
 
 use gm_utils::{config::Config, disk_storage::DiskStorageInterface};
 use ratatui::{buffer::Buffer, layout::Rect};
 use strum::{Display, EnumIter};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
@@ -108,7 +106,7 @@ impl Component for ConfigPage {
         event: &Event,
         _area: Rect,
         _transmitter: &mpsc::Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let display_text = self.form.get_text_mut(FormItem::DisplayText);

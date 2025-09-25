@@ -16,8 +16,8 @@ use gm_utils::assets::{Asset, TokenAddress};
 use gm_utils::erc20;
 use gm_utils::network::Network;
 use std::sync::mpsc;
-use std::sync::{atomic::AtomicBool, Arc};
 use strum::{Display, EnumIter};
+use tokio_util::sync::CancellationToken;
 
 use super::address_book::AddressBookMenuItem;
 
@@ -114,7 +114,7 @@ impl Component for AssetTransferPage {
         event: &Event,
         area: ratatui::prelude::Rect,
         tr: &mpsc::Sender<Event>,
-        sd: &Arc<AtomicBool>,
+        sd: &CancellationToken,
         ss: &SharedState,
     ) -> Result<Actions> {
         let mut result = Actions::default();

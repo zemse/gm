@@ -15,11 +15,12 @@ use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
         Arc, Mutex,
     },
     time::{Duration, Instant},
 };
+use tokio_util::sync::CancellationToken;
 
 pub trait AccountUtils {
     fn store_mnemonic_wallet(phrase: &str, address: Address) -> crate::Result<()>;
@@ -124,17 +125,17 @@ pub fn mine_wallet(
     mask_a: Address,
     mask_b: Address,
     max_dur: Option<Duration>,
-    exit_signal: Arc<AtomicBool>,
+    exit_signal: CancellationToken,
 ) -> crate::Result<(Option<SigningKey>, u64, Duration)> {
     let counter = Arc::new(AtomicU64::new(0));
-    let stop = Arc::new(AtomicBool::new(false));
+    let stop = CancellationToken::new();
     let result = Arc::new(Mutex::new(None));
     let start = Instant::now();
 
     rayon::scope(|s| {
         for _ in 0..rayon::current_num_threads() {
             let counter = Arc::clone(&counter);
-            let stop = Arc::clone(&stop);
+            let stop = stop.clone();
             let result = Arc::clone(&result);
             let exit_signal = exit_signal.clone();
             s.spawn(move |_| {
@@ -144,7 +145,7 @@ pub fn mine_wallet(
                 let mut k = initial_random_key;
                 let mut curve_point = ProjectivePoint::GENERATOR * k;
 
-                while !stop.load(Ordering::Relaxed) && !exit_signal.load(Ordering::Relaxed) {
+                while !stop.is_cancelled() && !exit_signal.is_cancelled() {
                     if let Some(max_dur) = max_dur {
                         if Instant::now().duration_since(start) > max_dur {
                             break;
@@ -153,7 +154,7 @@ pub fn mine_wallet(
 
                     let address = eth_addr_from_affine(&curve_point.to_affine());
                     if addr_match(&address, &mask_a, &mask_b) {
-                        stop.store(true, Ordering::Relaxed);
+                        stop.cancel();
                         let mut result = result.lock().unwrap();
                         *result = Some(SigningKey::from_bytes(&k.to_bytes()).unwrap());
                         break;

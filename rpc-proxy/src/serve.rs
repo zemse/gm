@@ -1,19 +1,9 @@
 use axum::{extract::State, routing::post, Json, Router};
 use reqwest::Client;
 use serde_json::Value;
-use std::{
-    fmt,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
-use tokio::{
-    net::TcpListener,
-    sync::oneshot,
-    time::{sleep, timeout},
-};
+use std::{fmt, sync::Arc, time::Duration};
+use tokio::{net::TcpListener, sync::oneshot, time::timeout};
+use tokio_util::sync::CancellationToken;
 use url::Url;
 
 use crate::rpc_types::{
@@ -49,7 +39,7 @@ pub async fn serve<F>(
     port: usize,
     secret: &impl fmt::Display,
     fwd_to: Url,
-    shutdown_signal: Arc<AtomicBool>,
+    shutdown_signal: CancellationToken,
     overrider: F,
 ) -> crate::Result<()>
 where
@@ -67,25 +57,13 @@ where
     let listener = TcpListener::bind(format!("0.0.0.0:{port}"))
         .await
         .map_err(|e| crate::Error::PortBindingFailed(port, e))?;
+
     axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_future(shutdown_signal.clone()))
+        .with_graceful_shutdown(shutdown_signal.cancelled_owned())
         .await
         .map_err(crate::Error::ServerCrashed)?;
 
     Ok(())
-}
-
-async fn shutdown_future(flag: Arc<AtomicBool>) {
-    let mut ctrlc = Box::pin(tokio::signal::ctrl_c());
-    loop {
-        if flag.load(Ordering::Acquire) {
-            break;
-        }
-        tokio::select! {
-            _ = &mut ctrlc => break,
-            _ = sleep(Duration::from_millis(200)) => {},
-        }
-    }
 }
 
 async fn handler<F>(State(state): State<ServerState<F>>, Json(payload): Json<Value>) -> Json<Value>

@@ -1,7 +1,4 @@
-use std::{
-    fmt::Display,
-    sync::{atomic::AtomicBool, mpsc, Arc},
-};
+use std::{fmt::Display, sync::mpsc};
 
 use crate::{
     app::SharedState,
@@ -20,6 +17,7 @@ use ratatui::{
     layout::Rect,
     widgets::Widget,
 };
+use tokio_util::sync::CancellationToken;
 
 use super::{account_create::AccountCreatePage, account_import::AccountImportPage, Page};
 
@@ -80,7 +78,7 @@ impl Component for AccountPage {
         event: &Event,
         _area: Rect,
         transmitter: &mpsc::Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let cursor_max = self.list.len();

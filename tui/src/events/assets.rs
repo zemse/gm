@@ -1,19 +1,13 @@
 use gm_utils::assets::get_all_assets;
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc::Sender,
-        Arc,
-    },
-    time::Duration,
-};
+use std::{sync::mpsc::Sender, time::Duration};
+use tokio_util::sync::CancellationToken;
 
 use super::Event;
 
 const DELAY_ZERO: Duration = Duration::from_secs(0);
 const DELAY: Duration = Duration::from_secs(30);
 
-pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Arc<AtomicBool>) {
+pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: CancellationToken) {
     let mut delay = Duration::from_secs(0);
 
     loop {
@@ -39,13 +33,7 @@ pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Arc<Atomi
                     }
                 };
             }
-            _ = async {
-                while !shutdown_signal.load(Ordering::Relaxed) {
-                    tokio::task::yield_now().await;
-                }
-            } => {
-                break;
-            }
+            _ = shutdown_signal.cancelled() => break
         };
     }
 }

@@ -12,8 +12,9 @@ use gm_utils::{
     alloy::StringExt,
     disk_storage::DiskStorageInterface,
 };
-use std::sync::{atomic::AtomicBool, mpsc, Arc};
+use std::sync::mpsc;
 use strum::{Display, EnumIter};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Display, EnumIter, PartialEq)]
 pub enum FormItem {
@@ -77,7 +78,7 @@ impl Component for AddressBookDisplayPage {
         event: &Event,
         _area: ratatui::prelude::Rect,
         _transmitter: &mpsc::Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let mut handle_result = Actions::default();

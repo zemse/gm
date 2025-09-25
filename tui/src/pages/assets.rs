@@ -1,7 +1,8 @@
-use std::sync::{atomic::AtomicBool, mpsc, Arc};
+use std::sync::mpsc;
 
 use gm_ratatui_extra::{cursor::Cursor, select::Select, thematize::Thematize};
 use ratatui::{buffer::Buffer, crossterm::event::KeyCode, layout::Rect, widgets::Widget};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
@@ -27,7 +28,7 @@ impl Component for AssetsPage {
         event: &Event,
         _area: Rect,
         _transmitter: &mpsc::Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let assets = shared_state.assets_read()?;

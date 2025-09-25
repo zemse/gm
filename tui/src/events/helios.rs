@@ -1,10 +1,6 @@
 use std::{
     path::PathBuf,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc::Sender,
-        Arc, RwLock,
-    },
+    sync::{mpsc::Sender, Arc, RwLock},
     time::Duration,
 };
 
@@ -16,6 +12,7 @@ use alloy::{
 use helios_ethereum::{
     config::networks::Network as HeliosNetwork, EthereumClient, EthereumClientBuilder,
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::Event;
 use gm_utils::{
@@ -27,7 +24,7 @@ use gm_utils::{
 
 pub async fn helios_thread(
     transmitter: &Sender<Event>,
-    shutdown_signal: &Arc<AtomicBool>,
+    shutdown_signal: &CancellationToken,
     asset_manager: Arc<RwLock<AssetManager>>,
 ) -> crate::Result<()> {
     let eth_network = Network::from_chain_id(1)?;
@@ -68,11 +65,7 @@ pub async fn helios_thread(
                     dur += Duration::from_secs(30);
                 }
             },
-            _ = async {
-                while !shutdown_signal.load(Ordering::Relaxed) {
-                    tokio::task::yield_now().await;
-                }
-            } => break,
+            _ = shutdown_signal.cancelled() => break
         }
     }
 

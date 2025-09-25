@@ -16,6 +16,7 @@ alloy = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 
 # file system
 serde_json = { workspace = true }

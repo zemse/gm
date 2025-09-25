@@ -6,6 +6,7 @@ use ratatui::{
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 use crate::app::SharedState;
 use crate::{
@@ -33,7 +34,7 @@ impl Component for TradePage {
         event: &crate::Event,
         _area: ratatui::prelude::Rect,
         transmitter: &std::sync::mpsc::Sender<crate::Event>,
-        _shutdown_signal: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<crate::traits::Actions> {
         match event {
@@ -174,6 +175,7 @@ fn start_api_thread(
                 }
             }
 
+            // TODO shutdown handling
             tokio::time::sleep(query_duration.unwrap_or(Duration::from_secs(5))).await;
         }
     })

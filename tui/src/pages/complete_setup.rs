@@ -1,4 +1,4 @@
-use std::sync::{atomic::AtomicBool, mpsc, Arc};
+use std::sync::mpsc;
 
 use gm_ratatui_extra::{
     act::Act,
@@ -7,6 +7,7 @@ use gm_ratatui_extra::{
 use gm_utils::{config::Config, disk_storage::DiskStorageInterface};
 use ratatui::{buffer::Buffer, layout::Rect};
 use strum::{Display, EnumIter};
+use tokio_util::sync::CancellationToken;
 
 use super::{account::AccountPage, Page};
 use crate::{
@@ -98,7 +99,7 @@ impl Component for CompleteSetupPage {
         event: &Event,
         _area: Rect,
         transmitter: &mpsc::Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let display_text = self.form.get_text_mut(FormItem::Display);

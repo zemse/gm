@@ -3,10 +3,7 @@ use std::time::{Duration, Instant};
 use std::{
     io,
     str::FromStr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc, Arc, RwLock, RwLockWriteGuard,
-    },
+    sync::{mpsc, Arc, RwLock, RwLockWriteGuard},
 };
 
 use crate::pages::{
@@ -29,6 +26,7 @@ use gm_utils::{
     assets::{Asset, AssetManager},
     config::Config,
     disk_storage::DiskStorageInterface,
+    gm_log,
     network::NetworkStore,
     price_manager::PriceManager,
 };
@@ -39,6 +37,7 @@ use ratatui::{
     widgets::{Block, Widget},
     DefaultTerminal,
 };
+use tokio_util::sync::CancellationToken;
 
 use super::{
     events::{self, Event},
@@ -178,7 +177,7 @@ impl App {
 
     pub async fn run(&mut self, pre_events: Option<Vec<Event>>) -> crate::Result<()> {
         let (event_tr, event_rc) = mpsc::channel::<Event>();
-        let shutdown = Arc::new(AtomicBool::new(false));
+        let shutdown = CancellationToken::new();
         let mut terminal = ratatui::init();
 
         self.init_threads(&event_tr, &shutdown);
@@ -209,7 +208,7 @@ impl App {
         self.draw(&mut terminal).map_err(crate::Error::Draw)?;
 
         // signal all the threads to exit
-        shutdown.store(true, Ordering::Relaxed);
+        shutdown.cancel();
         self.exit_threads().await;
 
         ratatui::restore();
@@ -224,7 +223,7 @@ impl App {
         Ok(completed_frame.area)
     }
 
-    fn init_threads(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
+    fn init_threads(&mut self, tr: &mpsc::Sender<Event>, sd: &CancellationToken) {
         let tr_input = tr.clone();
         let shutdown_signal = sd.clone();
         self.input_thread = Some(std::thread::spawn(move || {
@@ -248,7 +247,7 @@ impl App {
     fn start_other_threads(
         &mut self,
         tr: &mpsc::Sender<Event>,
-        sd: &Arc<AtomicBool>,
+        sd: &CancellationToken,
     ) -> crate::Result<()> {
         if self.assets_thread.is_none() {
             let tr_assets = tr.clone();
@@ -296,7 +295,11 @@ impl App {
         }
     }
 
-    fn set_online(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) -> crate::Result<()> {
+    fn set_online(
+        &mut self,
+        tr: &mpsc::Sender<Event>,
+        sd: &CancellationToken,
+    ) -> crate::Result<()> {
         self.shared_state.online = Some(true);
 
         self.start_other_threads(tr, sd)
@@ -309,29 +312,37 @@ impl App {
     }
 
     pub async fn exit_threads(&mut self) {
+        gm_log!("App: exit_threads 1");
         if let Some(thread) = self.input_thread.take() {
             thread.join().unwrap();
         }
 
+        gm_log!("App: exit_threads 2");
+
         if let Some(thread) = self.refresh_prices_thread.take() {
             thread.await.unwrap();
         }
+        gm_log!("App: exit_threads 3");
 
         if let Some(thread) = self.assets_thread.take() {
             thread.await.unwrap();
         }
+        gm_log!("App: exit_threads 4");
 
         if let Some(thread) = self.recent_addresses_thread.take() {
             thread.await.unwrap();
         }
+        gm_log!("App: exit_threads 5");
 
         if let Some(thread) = self.helios_thread.take() {
             thread.await.unwrap();
         }
+        gm_log!("App: exit_threads 6");
 
         for page in &mut self.context {
             page.exit_threads().await;
         }
+        gm_log!("App: exit_threads 7");
     }
 
     fn reload(&mut self) -> crate::Result<()> {
@@ -375,7 +386,7 @@ impl App {
         event: super::events::Event,
         area: Rect,
         tr: &mpsc::Sender<Event>,
-        sd: &Arc<AtomicBool>,
+        sd: &CancellationToken,
     ) -> crate::Result<()> {
         let [_, body_area, _] = self.get_areas(area);
 

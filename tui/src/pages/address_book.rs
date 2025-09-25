@@ -1,7 +1,4 @@
-use std::{
-    fmt::Display,
-    sync::{atomic::AtomicBool, mpsc, Arc},
-};
+use std::{fmt::Display, sync::mpsc};
 
 use alloy::primitives::Address;
 use gm_ratatui_extra::{cursor::Cursor, filter_select::FilterSelect, thematize::Thematize};
@@ -9,6 +6,7 @@ use ratatui::{
     crossterm::event::{KeyCode, KeyEventKind},
     widgets::Widget,
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
@@ -148,7 +146,7 @@ impl Component for AddressBookPage {
         event: &Event,
         _area: ratatui::prelude::Rect,
         _transmitter: &mpsc::Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let list: Vec<&AddressBookMenuItem> = self

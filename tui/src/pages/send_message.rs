@@ -12,6 +12,7 @@ use gm_ratatui_extra::widgets::form::FormItemIndex;
 use gm_utils::alloy::StringExt;
 use gm_utils::disk_storage::DiskStorageInterface;
 use gm_utils::network::{Network, NetworkStore};
+use tokio_util::sync::CancellationToken;
 
 use super::address_book::AddressBookMenuItem;
 use crate::Result;
@@ -20,7 +21,6 @@ use alloy::primitives::Bytes;
 use alloy::rpc::types::{TransactionInput, TransactionRequest};
 use ratatui::layout::Rect;
 use std::sync::mpsc;
-use std::sync::{atomic::AtomicBool, Arc};
 use strum::{Display, EnumIter};
 
 #[derive(Debug, Display, EnumIter, PartialEq)]
@@ -95,7 +95,7 @@ impl Component for SendMessagePage {
         event: &Event,
         area: Rect,
         tr: &mpsc::Sender<Event>,
-        sd: &Arc<AtomicBool>,
+        sd: &CancellationToken,
         ss: &SharedState,
     ) -> Result<Actions> {
         let mut result = Actions::default();

@@ -1,14 +1,9 @@
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc, Arc,
-    },
-    time::Duration,
-};
+use std::{sync::mpsc, time::Duration};
 
 use ratatui::crossterm::{self, event::Event};
+use tokio_util::sync::CancellationToken;
 
-pub fn watch_input_events(tx: mpsc::Sender<super::Event>, shutdown_signal: Arc<AtomicBool>) {
+pub fn watch_input_events(tx: mpsc::Sender<super::Event>, shutdown_signal: CancellationToken) {
     loop {
         if crossterm::event::poll(Duration::from_millis(100)).unwrap() {
             #[allow(clippy::single_match)]
@@ -22,7 +17,7 @@ pub fn watch_input_events(tx: mpsc::Sender<super::Event>, shutdown_signal: Arc<A
                 _ => {}
             }
         }
-        if shutdown_signal.load(Ordering::Relaxed) {
+        if shutdown_signal.is_cancelled() {
             break;
         }
     }

@@ -6,9 +6,8 @@ use gm_utils::disk_storage::DiskStorageInterface;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::ops::Not;
-use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::Sender;
-use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 use crate::app::SharedState;
 use crate::pages::token::TokenPage;
@@ -307,7 +306,7 @@ impl Component for NetworkCreatePage {
         event: &Event,
         area: Rect,
         _transmitter: &Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let mut handle_result = Actions::default();

@@ -1,11 +1,10 @@
-use std::sync::{atomic::AtomicBool, Arc};
-
 use gm_rpc_proxy::rpc_types::ResponsePayload;
 use serde_json::Value;
+use tokio_util::sync::CancellationToken;
 
 #[tokio::main]
 async fn main() {
-    let sd = Arc::new(AtomicBool::new(false));
+    let sd = CancellationToken::new();
 
     gm_rpc_proxy::serve(
         3000,

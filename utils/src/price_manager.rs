@@ -1,14 +1,12 @@
 use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use alloy::{primitives::Address, providers::Provider, sol};
 use arc_swap::ArcSwap;
 use serde::Deserialize;
+use tokio_util::sync::CancellationToken;
 
 use crate::{alloy::StringExt, network::Network};
 
@@ -35,7 +33,11 @@ impl PriceManager {
         })
     }
 
-    async fn fetch_prices(&self) -> crate::Result<Vec<Price>> {
+    async fn fetch_prices(&self, delay: Option<Duration>) -> crate::Result<Vec<Price>> {
+        if let Some(d) = delay {
+            tokio::time::sleep(d).await;
+        }
+
         let mut prices = Vec::new();
 
         if let Ok(price) = Binance::get_eth_price().await {
@@ -65,7 +67,7 @@ impl PriceManager {
     /// Refresh prices and update the store
     pub fn spawn_refresh_prices_thread<F>(
         self: &Arc<Self>,
-        shutdown_signal: Arc<AtomicBool>,
+        shutdown_signal: CancellationToken,
         on_update: F,
     ) -> tokio::task::JoinHandle<()>
     where
@@ -75,34 +77,28 @@ impl PriceManager {
         let store = Arc::clone(&self.prices_store);
 
         tokio::spawn(async move {
+            let mut delay = None;
+
             loop {
                 tokio::select! {
-                    result = self_clone.fetch_prices() => {
+                    result = self_clone.fetch_prices(delay) => {
                         match result {
                             Ok(prices) => {
                                 on_update(Ok(()));
                                 store.store(Arc::new(prices));
+                                delay = Some(Duration::from_secs(10));
                             }
                             Err(err) => {
                                 on_update(Err(err));
+                                if let Some(d) = delay.as_mut() {
+                                    *d *= 2; // exponential backoff in case api fails
+                                } else {
+                                    delay = Some(Duration::from_secs(10));
+                                }
                             }
                         }
                     },
-                    _ = async {
-                        while !shutdown_signal.load(Ordering::Relaxed) {
-                            tokio::task::yield_now().await;
-                        }
-                    } => break,
-                }
-
-                // wait for 10 seconds
-                tokio::select! {
-                    _ = tokio::time::sleep(Duration::from_secs(10)) => {},
-                    _ = async {
-                        while !shutdown_signal.load(Ordering::Relaxed) {
-                            tokio::task::yield_now().await;
-                        }
-                    } => break,
+                    _ = shutdown_signal.cancelled() => break,
                 }
             }
         })

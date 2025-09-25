@@ -3443,6 +3443,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.16",
  "tokio",
+ "tokio-util",
  "url",
 ]
 
@@ -3467,6 +3468,7 @@ dependencies = [
  "strum_macros 0.26.4",
  "thiserror 2.0.16",
  "tokio",
+ "tokio-util",
  "url",
  "walletconnect-sdk",
  "zemse-helios-ethereum",
@@ -3494,6 +3496,7 @@ dependencies = [
  "serde_yaml",
  "thiserror 2.0.16",
  "tokio",
+ "tokio-util",
  "toml",
  "url",
 ]

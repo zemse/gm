@@ -16,11 +16,7 @@ use std::{
     collections::HashMap,
     io::{self, BufRead, BufReader, Write},
     process::{self, Command, Stdio},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc::Sender,
-        Arc,
-    },
+    sync::mpsc::Sender,
     thread,
 };
 
@@ -39,6 +35,7 @@ use ratatui::{
 };
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
+use tokio_util::sync::CancellationToken;
 use walletconnect_sdk::utils::random_bytes32;
 
 use crate::{
@@ -98,13 +95,13 @@ pub struct ShellPage {
     sign_popup: SignPopup,
     prevent_ctrlc_exit: bool,
 
-    kill_signal: Arc<AtomicBool>,
+    kill_signal: CancellationToken,
     stdin: Option<process::ChildStdin>,
     stdout_thread: Option<thread::JoinHandle<()>>,
     stderr_thread: Option<thread::JoinHandle<()>>,
     wait_thread: Option<thread::JoinHandle<()>>,
 
-    exit_signal: Arc<AtomicBool>,
+    exit_signal: CancellationToken,
     server_threads: Option<Vec<tokio::task::JoinHandle<()>>>,
 }
 
@@ -123,13 +120,13 @@ impl Default for ShellPage {
             sign_popup: SignPopup::default(),
             prevent_ctrlc_exit: true,
 
-            kill_signal: Arc::new(AtomicBool::new(false)),
+            kill_signal: CancellationToken::new(),
             stdin: None,
             stdout_thread: None,
             stderr_thread: None,
             wait_thread: None,
 
-            exit_signal: Arc::new(AtomicBool::new(false)),
+            exit_signal: CancellationToken::new(),
             server_threads: None,
         };
 
@@ -262,7 +259,7 @@ impl ShellPage {
             || self.wait_thread.is_some()
             || self.stdin.is_some();
 
-        self.kill_signal.store(true, Ordering::Relaxed);
+        self.kill_signal.cancel();
 
         if let Some(stdin) = self.stdin.take() {
             drop(stdin);
@@ -280,7 +277,7 @@ impl ShellPage {
     }
 
     fn exit_server_sync(&mut self) {
-        self.exit_signal.store(true, Ordering::Relaxed);
+        self.exit_signal.cancel();
         if let Some(server_threads) = self.server_threads.take() {
             for thread in server_threads {
                 thread.abort();
@@ -301,7 +298,7 @@ impl Component for ShellPage {
         event: &Event,
         area: Rect,
         tr: &Sender<crate::Event>,
-        _: &Arc<AtomicBool>,
+        _: &CancellationToken,
         ss: &SharedState,
     ) -> crate::Result<Actions> {
         let mut actions = Actions::default();
@@ -348,7 +345,7 @@ impl Component for ShellPage {
                                 self.cmd_lines.push(ShellLine::UserInput(String::new()));
                                 self.text_cursor = 0;
                             } else {
-                                self.kill_signal.store(false, Ordering::Relaxed);
+                                self.kill_signal.cancel();
                                 let mut child = Command::new("sh")
                                     .arg("-c")
                                     .arg(text_input)
@@ -416,7 +413,7 @@ impl Component for ShellPage {
                                 let tr_stderr = tr.clone();
                                 let kill_signal = self.kill_signal.clone();
                                 self.wait_thread = Some(thread::spawn(move || {
-                                    while !kill_signal.load(Ordering::Relaxed) {
+                                    while !kill_signal.is_cancelled() {
                                         if let Ok(status) = child.try_wait() {
                                             match status {
                                                 Some(s) => {

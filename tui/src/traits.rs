@@ -1,7 +1,8 @@
-use std::sync::{atomic::AtomicBool, mpsc, Arc};
+use std::sync::mpsc;
 
 use gm_ratatui_extra::{act::Act, thematize::Thematize};
 use ratatui::widgets::{Block, Widget};
+use tokio_util::sync::CancellationToken;
 
 use crate::app::SharedState;
 
@@ -66,7 +67,7 @@ pub trait Component {
         event: &Event,
         area: ratatui::prelude::Rect,
         transmitter: &mpsc::Sender<Event>,
-        shutdown_signal: &Arc<AtomicBool>,
+        shutdown_signal: &CancellationToken,
         shared_state: &SharedState,
     ) -> crate::Result<Actions>;
 

@@ -1,4 +1,4 @@
-use std::sync::{atomic::AtomicBool, mpsc, Arc};
+use std::sync::mpsc;
 
 use account::AccountPage;
 use account_create::AccountCreatePage;
@@ -15,6 +15,7 @@ use main_menu::{MainMenuItem, MainMenuPage};
 use send_message::SendMessagePage;
 use sign_message::SignMessagePage;
 use text::TextPage;
+use tokio_util::sync::CancellationToken;
 use trade::TradePage;
 use walletconnect::WalletConnectPage;
 
@@ -238,7 +239,7 @@ impl Component for Page {
         event: &Event,
         area: ratatui::prelude::Rect,
         tr: &mpsc::Sender<Event>,
-        sd: &Arc<AtomicBool>,
+        sd: &CancellationToken,
         ss: &SharedState,
     ) -> crate::Result<Actions> {
         match self {

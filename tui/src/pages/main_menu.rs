@@ -1,4 +1,4 @@
-use std::sync::{atomic::AtomicBool, mpsc, Arc};
+use std::sync::mpsc;
 
 use gm_utils::config::Config;
 use ratatui::{
@@ -7,6 +7,7 @@ use ratatui::{
     widgets::Widget,
 };
 use strum::{Display, EnumIter, IntoEnumIterator};
+use tokio_util::sync::CancellationToken;
 
 use super::{
     account::AccountPage, address_book::AddressBookPage, assets::AssetsPage,
@@ -153,7 +154,7 @@ impl Component for MainMenuPage {
         event: &Event,
         _area: Rect,
         _transmitter: &mpsc::Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let cursor_max = self.list.len();

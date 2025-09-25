@@ -7,8 +7,8 @@ use ratatui::crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::layout::Rect;
 use ratatui::prelude::Widget;
 use std::fmt::Display;
-use std::sync::atomic::AtomicBool;
-use std::sync::{mpsc, Arc};
+use std::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 use crate::app::SharedState;
 use crate::pages::network_create::NetworkCreatePage;
@@ -70,7 +70,7 @@ impl Component for NetworkPage {
         event: &Event,
         _area: Rect,
         _transmitter: &mpsc::Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let cursor_max = self.list.len();

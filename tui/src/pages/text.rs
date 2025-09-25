@@ -1,10 +1,11 @@
-use std::sync::{atomic::AtomicBool, mpsc::Sender, Arc};
+use std::sync::mpsc::Sender;
 
 use ratatui::{
     layout::Rect,
     text::Text,
     widgets::{Paragraph, Widget, Wrap},
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
@@ -30,7 +31,7 @@ impl Component for TextPage {
         _event: &Event,
         _area: Rect,
         _transmitter: &Sender<Event>,
-        _shutdown_signal: &Arc<AtomicBool>,
+        _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         Ok(Actions::default())

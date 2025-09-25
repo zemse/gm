@@ -1,8 +1,9 @@
-use std::sync::{atomic::AtomicBool, mpsc, Arc};
+use std::sync::mpsc;
 
 use gm_rpc_proxy::rpc_types::ResponsePayload;
 use serde_json::Value;
 use tokio::sync::oneshot;
+use tokio_util::sync::CancellationToken;
 
 struct ExternalMessage {
     content: String,
@@ -12,7 +13,7 @@ struct ExternalMessage {
 #[tokio::main]
 async fn main() {
     let (tr, rv) = mpsc::channel::<ExternalMessage>();
-    let sd = Arc::new(AtomicBool::new(false));
+    let sd = CancellationToken::new();
 
     tokio::spawn(async move {
         gm_rpc_proxy::serve(
