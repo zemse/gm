@@ -96,6 +96,7 @@ pub struct ShellPage {
     requests: Vec<UserRequest>,
     tx_popup: TxPopup,
     sign_popup: SignPopup,
+    prevent_ctrlc_exit: bool,
 
     kill_signal: Arc<AtomicBool>,
     stdin: Option<process::ChildStdin>,
@@ -120,6 +121,7 @@ impl Default for ShellPage {
             requests: vec![],
             tx_popup: TxPopup::default(),
             sign_popup: SignPopup::default(),
+            prevent_ctrlc_exit: true,
 
             kill_signal: Arc::new(AtomicBool::new(false)),
             stdin: None,
@@ -254,7 +256,12 @@ impl ShellPage {
         Ok(())
     }
 
-    fn exit_shell_threads_sync(&mut self) {
+    fn exit_shell_threads_sync(&mut self) -> bool {
+        let active = self.stdout_thread.is_some()
+            || self.stderr_thread.is_some()
+            || self.wait_thread.is_some()
+            || self.stdin.is_some();
+
         self.kill_signal.store(true, Ordering::Relaxed);
 
         if let Some(stdin) = self.stdin.take() {
@@ -268,6 +275,8 @@ impl ShellPage {
         if let Some(stderr_thread) = self.stderr_thread.take() {
             stderr_thread.join().unwrap();
         }
+
+        active
     }
 
     fn exit_server_sync(&mut self) {
@@ -303,7 +312,9 @@ impl Component for ShellPage {
 
         self.display.handle_event(event.key_event(), area);
 
-        actions.ignore_ctrlc();
+        if self.prevent_ctrlc_exit {
+            actions.ignore_ctrlc();
+        }
 
         #[allow(clippy::single_match)]
         match event {
@@ -319,9 +330,14 @@ impl Component for ShellPage {
                     match key_event.code {
                         KeyCode::Char(c) => {
                             if c == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
-                                self.exit_shell_threads_sync();
+                                self.cmd_lines.push(ShellLine::StdOut(
+                                    "Press ctrl+c again to exit".to_string(),
+                                ));
                                 self.cmd_lines.push(ShellLine::UserInput(String::new()));
                                 self.text_cursor = 0;
+                                self.prevent_ctrlc_exit = false;
+                            } else {
+                                self.prevent_ctrlc_exit = true;
                             }
                         }
                         KeyCode::Enter => {
@@ -332,6 +348,7 @@ impl Component for ShellPage {
                                 self.cmd_lines.push(ShellLine::UserInput(String::new()));
                                 self.text_cursor = 0;
                             } else {
+                                self.kill_signal.store(false, Ordering::Relaxed);
                                 let mut child = Command::new("sh")
                                     .arg("-c")
                                     .arg(text_input)
@@ -399,7 +416,7 @@ impl Component for ShellPage {
                                 let tr_stderr = tr.clone();
                                 let kill_signal = self.kill_signal.clone();
                                 self.wait_thread = Some(thread::spawn(move || {
-                                    while kill_signal.load(Ordering::Relaxed) {
+                                    while !kill_signal.load(Ordering::Relaxed) {
                                         if let Ok(status) = child.try_wait() {
                                             match status {
                                                 Some(s) => {
@@ -423,7 +440,9 @@ impl Component for ShellPage {
                                 }));
                             }
                         }
-                        _ => {}
+                        _ => {
+                            self.prevent_ctrlc_exit = true;
+                        }
                     }
                 } else if let Some(stdin) = &mut self.stdin {
                     match key_event.code {
