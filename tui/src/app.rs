@@ -312,10 +312,20 @@ impl App {
         if let Some(thread) = self.input_thread.take() {
             thread.join().unwrap();
         }
+
         if let Some(thread) = self.refresh_prices_thread.take() {
             thread.await.unwrap();
         }
+
         if let Some(thread) = self.assets_thread.take() {
+            thread.await.unwrap();
+        }
+
+        if let Some(thread) = self.recent_addresses_thread.take() {
+            thread.await.unwrap();
+        }
+
+        if let Some(thread) = self.helios_thread.take() {
             thread.await.unwrap();
         }
 

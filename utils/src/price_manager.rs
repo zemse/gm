@@ -75,18 +75,35 @@ impl PriceManager {
         let store = Arc::clone(&self.prices_store);
 
         tokio::spawn(async move {
-            while !shutdown_signal.load(Ordering::Relaxed) {
-                match self_clone.fetch_prices().await {
-                    Ok(prices) => {
-                        on_update(Ok(()));
-                        store.store(Arc::new(prices));
-                    }
-                    Err(err) => {
-                        on_update(Err(err));
-                    }
+            loop {
+                tokio::select! {
+                    result = self_clone.fetch_prices() => {
+                        match result {
+                            Ok(prices) => {
+                                on_update(Ok(()));
+                                store.store(Arc::new(prices));
+                            }
+                            Err(err) => {
+                                on_update(Err(err));
+                            }
+                        }
+                    },
+                    _ = async {
+                        while !shutdown_signal.load(Ordering::Relaxed) {
+                            tokio::task::yield_now().await;
+                        }
+                    } => break,
                 }
 
-                tokio::time::sleep(Duration::from_secs(10)).await;
+                // wait for 10 seconds
+                tokio::select! {
+                    _ = tokio::time::sleep(Duration::from_secs(10)) => {},
+                    _ = async {
+                        while !shutdown_signal.load(Ordering::Relaxed) {
+                            tokio::task::yield_now().await;
+                        }
+                    } => break,
+                }
             }
         })
     }
