@@ -97,7 +97,7 @@ pub struct ShellPage {
 
 impl Default for ShellPage {
     fn default() -> Self {
-        Self {
+        let mut page = Self {
             cmd_lines: vec![
                 ShellLine::StdOut("Welcome to gm shell".to_string()),
                 ShellLine::UserInput(String::new()),
@@ -115,7 +115,11 @@ impl Default for ShellPage {
             wait_thread: None,
 
             server_threads: None,
-        }
+        };
+
+        page.display.text = page.full_text();
+
+        page
     }
 }
 
@@ -142,7 +146,6 @@ impl ShellPage {
             .join("\n")
     }
 
-    // TODO gracefully shutdown
     fn create_server_threads(
         &mut self,
         tr: &Sender<Event>,

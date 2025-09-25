@@ -28,6 +28,7 @@ pub enum FormItem {
     TestnetMode,
     DeveloperMode,
     Theme,
+    HeliosEnabled,
     DisplayText,
     SaveButton,
 }
@@ -61,6 +62,10 @@ impl TryFrom<FormItem> for FormWidget {
                 empty_text: Some("Select a theme"),
                 popup: FilterSelectPopup::new("Select a theme", Some("No themes available")),
             },
+            FormItem::HeliosEnabled => FormWidget::BooleanInput {
+                label: "Enable Helios (requires restart)",
+                value: false,
+            },
             FormItem::SaveButton => FormWidget::Button { label: "Save" },
             FormItem::DisplayText => FormWidget::DisplayText(String::new()),
         };
@@ -85,6 +90,7 @@ impl ConfigPage {
             let popup = form.get_popup_mut(FormItem::Theme);
             popup.set_items(Some(ThemeName::list()));
             popup.set_cursor(&config.get_theme_name().to_string());
+            *form.get_boolean_mut(FormItem::HeliosEnabled) = config.get_helios_enabled();
             Ok(())
         })?;
 
@@ -125,10 +131,13 @@ impl Component for ConfigPage {
                         let theme_name = form.get_text(FormItem::Theme).clone();
                         theme::ThemeName::from_str(&theme_name)?.to_string()
                     },
+                    form.get_boolean(FormItem::HeliosEnabled),
                 )?;
 
                 let display_text = form.get_text_mut(FormItem::DisplayText);
                 *display_text = "Configuration saved".to_string();
+
+                handle_result.page_pops += 1;
 
                 Ok(())
             },

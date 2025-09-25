@@ -245,17 +245,20 @@ impl App {
             ));
     }
 
-    fn start_other_threads(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
+    fn start_other_threads(
+        &mut self,
+        tr: &mpsc::Sender<Event>,
+        sd: &Arc<AtomicBool>,
+    ) -> crate::Result<()> {
         if self.assets_thread.is_none() {
             let tr_assets = tr.clone();
             let shutdown_signal = sd.clone();
             self.assets_thread = Some(tokio::spawn(async move {
                 events::assets::watch_assets(tr_assets, shutdown_signal).await
             }));
-        }
+        };
 
-        // TODO enable disabling helios through config
-        if self.helios_thread.is_none() {
+        if self.helios_thread.is_none() && Config::load()?.get_helios_enabled() {
             let tr = tr.clone();
             let sd = sd.clone();
             let assets_manager = Arc::clone(&self.shared_state.asset_manager);
@@ -277,6 +280,8 @@ impl App {
                 .await
             }));
         }
+
+        Ok(())
     }
 
     async fn stop_other_threads(&mut self) {
@@ -291,10 +296,10 @@ impl App {
         }
     }
 
-    fn set_online(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) {
-        self.start_other_threads(tr, sd);
-
+    fn set_online(&mut self, tr: &mpsc::Sender<Event>, sd: &Arc<AtomicBool>) -> crate::Result<()> {
         self.shared_state.online = Some(true);
+
+        self.start_other_threads(tr, sd)
     }
 
     async fn set_offline(&mut self) {
@@ -451,7 +456,7 @@ impl App {
 
             Event::PricesUpdate => {
                 // The prices have already been updated in the PriceManager store in shared_state
-                self.set_online(tr, sd);
+                self.set_online(tr, sd)?;
             }
             Event::PricesUpdateError(error) => {
                 if error.is_connect() {

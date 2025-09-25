@@ -13,6 +13,8 @@ pub struct Config {
     // TODO theme_name must be enum, which means either move themes into utils or this module in tui
     #[serde(default = "default_theme_name")]
     theme_name: String,
+    #[serde(default)]
+    helios_enabled: bool,
 }
 
 // TODO this is a temporary fix, need to have theme_name as an enum which requires a refactor
@@ -24,6 +26,7 @@ impl Default for Config {
             developer_mode: false,
             alchemy_api_key: None,
             theme_name: default_theme_name(),
+            helios_enabled: false,
         }
     }
 }
@@ -101,17 +104,24 @@ impl Config {
         &self.theme_name
     }
 
+    #[inline]
+    pub fn get_helios_enabled(&self) -> bool {
+        self.helios_enabled
+    }
+
     pub fn set_values(
         &mut self,
         alchemy_api_key: Option<String>,
         testnet_mode: bool,
         developer_mode: bool,
         theme_name: String,
+        helios_enabled: bool,
     ) -> crate::Result<()> {
         self.alchemy_api_key = alchemy_api_key;
         self.testnet_mode = testnet_mode;
         self.developer_mode = developer_mode;
         self.theme_name = theme_name;
+        self.helios_enabled = helios_enabled;
         self.save()?;
         Ok(())
     }

@@ -122,15 +122,15 @@ impl Component for CompleteSetupPage {
 
                     let display_text = form.get_text_mut(FormItem::Display);
                     *display_text = "Configuration saved".to_string();
-
-                    if form.visible_count() == 2 {
-                        handle_result.page_pops += 1;
-                    }
                 }
                 Ok(())
             },
         )?;
         handle_result.merge(r);
+
+        if self.form.valid_count() == 0 {
+            handle_result.page_pops += 1;
+        }
 
         Ok(handle_result)
     }
