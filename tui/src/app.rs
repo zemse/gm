@@ -570,10 +570,10 @@ impl Widget for &App {
                 let mut gap_area = gap_area.expand_vertical(1);
                 "┬".render(gap_area, buf);
                 for _ in 0..height_inner {
-                    gap_area = gap_area.consume_height(1).expect("should not fail");
+                    gap_area.consume_height(1);
                     "│".render(gap_area, buf);
                 }
-                gap_area = gap_area.consume_height(1).expect("should not fail");
+                gap_area.consume_height(1);
                 "┴".render(gap_area, buf);
 
                 // Render Main Menu on the Left side

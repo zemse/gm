@@ -2,11 +2,10 @@ use std::sync::{atomic::AtomicBool, mpsc, Arc};
 
 use gm_ratatui_extra::{
     act::Act,
-    extensions::RectExt,
     form::{Form, FormItemIndex, FormWidget},
 };
 use gm_utils::{config::Config, disk_storage::DiskStorageInterface};
-use ratatui::{buffer::Buffer, layout::Rect, style::Stylize, text::Line, widgets::Widget};
+use ratatui::{buffer::Buffer, layout::Rect};
 use strum::{Display, EnumIter};
 
 use super::{account::AccountPage, Page};
@@ -18,6 +17,8 @@ use crate::{
 
 #[derive(Debug, Display, PartialEq, EnumIter)]
 pub enum FormItem {
+    Heading,
+    SubHeading,
     CreateOrImportWallet,
     AlchemyApiKey,
     Save,
@@ -34,6 +35,10 @@ impl TryFrom<FormItem> for FormWidget {
     type Error = crate::Error;
     fn try_from(value: FormItem) -> crate::Result<Self> {
         let widget = match value {
+            FormItem::Heading => FormWidget::Heading("Complete Setup"),
+            FormItem::SubHeading => {
+                FormWidget::StaticText("Complete the following steps to get started:")
+            }
             FormItem::CreateOrImportWallet => FormWidget::Button {
                 label: "Create or Import Wallet",
             },
@@ -117,6 +122,10 @@ impl Component for CompleteSetupPage {
 
                     let display_text = form.get_text_mut(FormItem::Display);
                     *display_text = "Configuration saved".to_string();
+
+                    if form.visible_count() == 2 {
+                        handle_result.page_pops += 1;
+                    }
                 }
                 Ok(())
             },
@@ -130,22 +139,8 @@ impl Component for CompleteSetupPage {
     where
         Self: Sized,
     {
-        Line::from("Complete Setup").bold().render(area, buf);
-        let Some(area) = area.consume_height(2) else {
-            return area;
-        };
+        self.form.render(area, buf, &ss.theme);
 
-        if self.form.visible_count() == 0 {
-            Line::from("You have completed the setup please press ESC to return back.")
-                .render(area, buf);
-        } else {
-            "Complete the following steps to get started:".render(area, buf);
-            let Some(area) = area.consume_height(2) else {
-                return area;
-            };
-
-            self.form.render(area, buf, &ss.theme);
-        }
         area
     }
 }

@@ -103,7 +103,7 @@ impl FormWidget {
             | FormWidget::DisplayBox { text, .. }
             | FormWidget::SelectInput { text, .. } => {
                 let lines = split_string(text, (area.width - 2) as usize);
-                (3 + lines.len()) as u16
+                (2 + lines.len()) as u16
             }
 
             FormWidget::BooleanInput { value, .. } => {
@@ -111,12 +111,14 @@ impl FormWidget {
                 let lines = split_string(&value, (area.width - 2) as usize);
                 (2 + lines.len()) as u16
             }
-            FormWidget::Button { .. } => 4,
-            FormWidget::Heading(text) | FormWidget::StaticText(text) => {
-                (text.len() as u16).div_ceil(area.width) + 1
-            }
+            FormWidget::Button { .. } => 3,
+            FormWidget::Heading(_) | FormWidget::StaticText(_) => 2,
             FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
-                (text.len() as u16).div_ceil(area.width) + 3
+                if text.is_empty() {
+                    0
+                } else {
+                    (text.len() as u16).div_ceil(area.width) + 1
+                }
             }
         }
     }
@@ -178,7 +180,11 @@ impl<
     }
 
     pub fn hide_item(&mut self, idx: T) {
-        self.hide.insert(idx.index(), true);
+        let index = idx.index();
+        self.hide.insert(index, true);
+        if self.cursor == index {
+            self.advance_cursor();
+        }
     }
 
     pub fn show_item(&mut self, idx: T) {
@@ -193,13 +199,23 @@ impl<
         self.items.len() - self.hidden_count()
     }
 
-    pub fn advance_cursor(&mut self) {
-        loop {
-            self.cursor = (self.cursor + 1) % self.items.len();
-            self.update_text_cursor();
+    pub fn valid_count(&self) -> usize {
+        self.items
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| self.is_valid_cursor(*i))
+            .count()
+    }
 
-            if self.is_valid_cursor(self.cursor) {
-                break;
+    pub fn advance_cursor(&mut self) {
+        if self.valid_count() > 0 {
+            loop {
+                self.cursor = (self.cursor + 1) % self.items.len();
+                self.update_text_cursor();
+
+                if self.is_valid_cursor(self.cursor) {
+                    break;
+                }
             }
         }
     }
@@ -404,41 +420,66 @@ impl<
         Ok(result)
     }
 
-    pub fn render(&self, mut area: Rect, buf: &mut Buffer, theme: &impl Thematize)
+    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &impl Thematize)
     where
         Self: Sized,
     {
-        let full_area = area;
-        let form_height: u16 = std::cmp::max(
-            self.items.iter().fold(0, |acc, i| acc + i.height(area)),
-            full_area.height,
-        );
-        let mut virtual_buf = Buffer::empty(Rect::new(0, 0, buf.area.width, form_height));
-        let mut scroll_cursor: u16 = 0;
-        let mut scroll_cursor_item_height: u16 = 0;
         let horizontal_layout = Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]);
-        let [form_area, scroll_area] = horizontal_layout.areas(area);
-        if full_area.height < form_height {
-            area = form_area;
+        let [left_area, scroll_area] = horizontal_layout.areas(area);
+
+        // First check how much height the form will take
+        let calc_virtual_form_height = |area: Rect| {
+            self.items
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !self.hide.contains_key(i))
+                .fold(0, |acc, (_, w)| acc + w.height(area))
+        };
+
+        // By default we want to render form in the entire area
+        let mut form_area = area;
+        let mut virtual_form_height = calc_virtual_form_height(area);
+
+        // But if form is overflowing we will render it in the left area only, and recalculate virtual_form_height
+        let is_form_overflow = area.height < virtual_form_height;
+
+        if is_form_overflow {
+            form_area = left_area;
+            virtual_form_height = calc_virtual_form_height(form_area);
         }
 
+        let mut virtual_area = Rect::new(
+            area.x,
+            area.y,
+            form_area.width,
+            std::cmp::max(virtual_form_height, area.height),
+        );
+        let mut virtual_buf = Buffer::empty(virtual_area);
+
+        let mut scroll_y: u16 = 0;
+        let mut focused_item_height: u16 = 0;
+
         for (i, item) in self.items.iter().enumerate() {
+            // Skip hidden items.
             if self.hide.contains_key(&i) {
-                continue; // skip hidden items
-            }
-            if self.form_focus && self.cursor == i {
-                scroll_cursor = area.y;
-                scroll_cursor_item_height = item.height(area);
+                continue;
             }
 
+            // This will hit only once and we record the scroll position of the focused item.
+            if self.form_focus && self.cursor == i {
+                scroll_y = virtual_area.y;
+                focused_item_height = item.height(virtual_area);
+            }
+
+            // Render all form items in our virtual buffer.
             match item {
                 FormWidget::Heading(heading) => {
-                    heading.bold().render(area, &mut virtual_buf);
-                    area.y += 2;
+                    heading.bold().render(virtual_area, &mut virtual_buf);
+                    virtual_area.consume_height(2);
                 }
                 FormWidget::StaticText(text) => {
-                    text.render(area, &mut virtual_buf);
-                    area.y += 2;
+                    text.render(virtual_area, &mut virtual_buf);
+                    virtual_area.consume_height(2);
                 }
                 FormWidget::InputBox {
                     label,
@@ -461,10 +502,10 @@ impl<
                         },
                         currency: currency.as_ref(),
                     };
-                    let height_used = widget.height_used(area); // to see height based on width
+                    let height_used = widget.height_used(virtual_area);
 
-                    widget.render(area, &mut virtual_buf, &self.text_cursor, theme);
-                    area.y += height_used;
+                    widget.render(virtual_area, &mut virtual_buf, &self.text_cursor, theme);
+                    virtual_area.consume_height(height_used);
                 }
                 FormWidget::DisplayBox {
                     label,
@@ -486,10 +527,10 @@ impl<
                         },
                         currency: None,
                     };
-                    let height_used = widget.height_used(area); // to see height based on width
+                    let height_used = widget.height_used(virtual_area);
 
-                    widget.render(area, &mut virtual_buf, &self.text_cursor, theme);
-                    area.y += height_used;
+                    widget.render(virtual_area, &mut virtual_buf, &self.text_cursor, theme);
+                    virtual_area.consume_height(height_used);
                 }
                 FormWidget::BooleanInput { label, value } => {
                     let widget = InputBox {
@@ -503,10 +544,10 @@ impl<
                         empty_text: None,
                         currency: None,
                     };
-                    let height_used = widget.height_used(area); // to see height based on width
+                    let height_used = widget.height_used(virtual_area); // to see height based on width
 
-                    widget.render(area, &mut virtual_buf, &self.text_cursor, theme);
-                    area.y += height_used;
+                    widget.render(virtual_area, &mut virtual_buf, &self.text_cursor, theme);
+                    virtual_area.consume_height(height_used);
                 }
                 FormWidget::SelectInput {
                     label,
@@ -521,56 +562,56 @@ impl<
                         empty_text: *empty_text,
                         currency: None,
                     };
-                    let height_used = widget.height_used(area); // to see height based on width
+                    let height_used = widget.height_used(virtual_area); // to see height based on width
 
-                    widget.render(area, &mut virtual_buf, &self.text_cursor, theme);
-                    area.y += height_used;
+                    widget.render(virtual_area, &mut virtual_buf, &self.text_cursor, theme);
+                    virtual_area.consume_height(height_used);
                 }
                 FormWidget::Button { label } => {
                     Button {
                         focus: self.form_focus && self.cursor == i,
                         label,
                     }
-                    .render(area, &mut virtual_buf, theme);
+                    .render(virtual_area, &mut virtual_buf, theme);
 
-                    area.y += 4;
+                    virtual_area.consume_height(3);
                 }
                 FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
                     if !text.is_empty() {
-                        area.y += 1;
                         Paragraph::new(Text::raw(text))
                             .wrap(Wrap { trim: false })
-                            .render(area.margin_h(1), &mut virtual_buf);
-                        area.y += (text.len() as u16).div_ceil(area.width) + 1;
+                            .render(virtual_area, &mut virtual_buf);
+                        virtual_area
+                            .consume_height((text.len() as u16).div_ceil(virtual_area.width));
+                        virtual_area.consume_height(1);
                     }
                 }
             }
         }
 
-        if full_area.height < form_height {
-            // form is overflowing draw a scrollbar
+        // Ensure correctness, if this fails then there is inconsistency between FormWidget::height vs the above rendering code.
+        if is_form_overflow {
+            assert_eq!(virtual_area.height, 0);
+        } else {
+            assert_eq!(virtual_area.height, area.height - virtual_form_height);
+        }
+
+        if is_form_overflow {
             CustomScrollBar {
-                cursor: scroll_cursor as usize,
-                total_items: form_height as usize,
+                cursor: scroll_y as usize,
+                total_items: virtual_form_height as usize,
                 paginate: true,
             }
             .render(scroll_area, buf);
         }
 
-        let mut page = area;
-        page.x = full_area.x;
-        page.height = full_area.height;
-        page.y = full_area.y;
-        let item_overflow_top = (page.y).saturating_sub(scroll_cursor - 1);
-        let item_overflow_bottom =
-            (scroll_cursor + scroll_cursor_item_height + 1).saturating_sub(page.y + page.height);
-        page.y = page.y.saturating_sub(item_overflow_top);
-        page.y = page.y.saturating_add(item_overflow_bottom);
-
-        let visible_area = page.intersection(virtual_buf.area);
+        let mut virtual_canvas_area = form_area;
+        if is_form_overflow && scroll_y > form_area.height {
+            virtual_canvas_area.y = scroll_y + focused_item_height - form_area.height;
+        }
 
         // Only show contents that are visible, copy contents from virtual buffer to the actual buffer
-        for (src_row, dst_row) in visible_area.rows().zip(full_area.rows()) {
+        for (src_row, dst_row) in virtual_canvas_area.rows().zip(form_area.rows()) {
             for (src_col, dst_col) in src_row.columns().zip(dst_row.columns()) {
                 if let Some(dst) = buf.cell_mut((dst_col.x, dst_col.y)) {
                     if let Some(src) = virtual_buf.cell((src_col.x, src_col.y)) {
@@ -584,7 +625,7 @@ impl<
             #[allow(clippy::single_match)]
             match item {
                 FormWidget::SelectInput { popup, .. } => {
-                    popup.render(full_area, buf, theme);
+                    popup.render(area, buf, theme);
                 }
                 _ => {}
             }

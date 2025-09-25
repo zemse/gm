@@ -92,7 +92,7 @@ impl MainMenuItem {
         let mut all_options: Vec<MainMenuItem> = MainMenuItem::iter().collect();
 
         let temp_setup_page = CompleteSetupPage::new()?;
-        if temp_setup_page.form.visible_count() == 0 {
+        if temp_setup_page.form.valid_count() == 0 {
             all_options.remove(0);
         }
 

@@ -126,7 +126,6 @@ enum FormItem {
     Heading,
     UriInput,
     ConnectButton,
-    Temporary,
 }
 
 impl FormItemIndex for FormItem {
@@ -147,7 +146,6 @@ impl TryFrom<FormItem> for FormWidget {
                 currency: None,
             },
             FormItem::ConnectButton => FormWidget::Button { label: "Connect" },
-            FormItem::Temporary => FormWidget::StaticText(""), // TODO fix problem with last form element
         };
         Ok(widget)
     }

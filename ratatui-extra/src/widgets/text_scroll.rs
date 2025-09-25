@@ -95,7 +95,7 @@ impl Widget for &TextScroll {
         if total > area.height as usize {
             for line in &lines {
                 line.render(text_area, buf);
-                let Some(text_area_new) = text_area.consume_height(1) else {
+                let Some(text_area_new) = text_area.height_consumed(1) else {
                     return;
                 };
                 text_area = text_area_new;
@@ -110,7 +110,7 @@ impl Widget for &TextScroll {
         } else {
             for line in &lines {
                 line.render(text_area, buf);
-                let Some(text_area_new) = text_area.consume_height(1) else {
+                let Some(text_area_new) = text_area.height_consumed(1) else {
                     return;
                 };
                 text_area = text_area_new;

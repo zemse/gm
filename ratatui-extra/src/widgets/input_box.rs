@@ -182,20 +182,19 @@ impl InputBox<'_> {
             );
         }
 
+        if self.text.is_empty() && self.empty_text.is_some() {
+            self.empty_text.unwrap().render(inner_area, buf);
+        }
         if self.focus {
-            if self.text.is_empty() && self.empty_text.is_some() {
-                self.empty_text.unwrap().render(inner_area, buf);
-            } else {
-                Span::from("|").render(
-                    Rect {
-                        x: inner_area.x + (*text_cursor as u16) % (area.width - 2),
-                        y: inner_area.y + (*text_cursor as u16) / (area.width - 2),
-                        width: 1,
-                        height: 1,
-                    },
-                    buf,
-                );
-            }
+            Span::from("|").render(
+                Rect {
+                    x: inner_area.x + (*text_cursor as u16) % (area.width - 2),
+                    y: inner_area.y + (*text_cursor as u16) / (area.width - 2),
+                    width: 1,
+                    height: 1,
+                },
+                buf,
+            );
         }
     }
 }

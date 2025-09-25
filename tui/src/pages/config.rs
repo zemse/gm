@@ -28,8 +28,8 @@ pub enum FormItem {
     TestnetMode,
     DeveloperMode,
     Theme,
-    SaveButton,
     DisplayText,
+    SaveButton,
 }
 impl FormItemIndex for FormItem {
     fn index(self) -> usize {
