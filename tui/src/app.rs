@@ -26,7 +26,6 @@ use gm_utils::{
     assets::{Asset, AssetManager},
     config::Config,
     disk_storage::DiskStorageInterface,
-    gm_log,
     network::NetworkStore,
     price_manager::PriceManager,
 };
@@ -312,37 +311,29 @@ impl App {
     }
 
     pub async fn exit_threads(&mut self) {
-        gm_log!("App: exit_threads 1");
         if let Some(thread) = self.input_thread.take() {
             thread.join().unwrap();
         }
 
-        gm_log!("App: exit_threads 2");
-
         if let Some(thread) = self.refresh_prices_thread.take() {
             thread.await.unwrap();
         }
-        gm_log!("App: exit_threads 3");
 
         if let Some(thread) = self.assets_thread.take() {
             thread.await.unwrap();
         }
-        gm_log!("App: exit_threads 4");
 
         if let Some(thread) = self.recent_addresses_thread.take() {
             thread.await.unwrap();
         }
-        gm_log!("App: exit_threads 5");
 
         if let Some(thread) = self.helios_thread.take() {
             thread.await.unwrap();
         }
-        gm_log!("App: exit_threads 6");
 
         for page in &mut self.context {
             page.exit_threads().await;
         }
-        gm_log!("App: exit_threads 7");
     }
 
     fn reload(&mut self) -> crate::Result<()> {
