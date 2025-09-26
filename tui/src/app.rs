@@ -1,11 +1,13 @@
 #[cfg(feature = "demo")]
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use std::{
     io,
     str::FromStr,
     sync::{mpsc, Arc, RwLock, RwLockWriteGuard},
 };
 
+#[cfg(feature = "demo")]
+use crate::demo::{demo_exit_text, demo_text, demo_text_2};
 use crate::pages::{
     config::ConfigPage,
     dev_key_capture::DevKeyCapturePage,
@@ -146,34 +148,6 @@ impl App {
         })
     }
 
-    #[cfg(feature = "demo")]
-    fn demo_text() -> &'static str {
-        "Welcome to demo trial!\n\
-        \n\
-        This program is currently running on cloud (not on your computer), so some features are disabled in demo mode.\n\
-        \n\
-        Here are few things you can try:\n\
-        - Try using `walletconnect` to connect with a website (e.g. etherscan.io/verifiedSignatures).\n\
-        - Try using the `shell` to prevent passing secrets to a js script that signs a message."
-    }
-
-    #[cfg(feature = "demo")]
-    fn demo_text_2() -> &'static str {
-        "Looks like you've been exploring for a while!\n\
-        \n\
-        Install the full version of gm on your computer to: \n\
-        - Create or load your accounts\n\
-        - Manage assets and send transactions\n\
-        - Run foundry/hardhat scripts without .env files\n\
-        - TouchID on macOS\n\
-        - And more! \n\
-        \n\
-        Instructions: github.com/zemse/gm\n\
-        If you like this project, please consider starring it on github, it helps a lot.\n\
-        \n\
-        Feedback, suggestions, or questions? Feel free to DM on telegram @zemse"
-    }
-
     pub async fn run(&mut self, pre_events: Option<Vec<Event>>) -> crate::Result<()> {
         let (event_tr, event_rc) = mpsc::channel::<Event>();
         let shutdown = CancellationToken::new();
@@ -182,7 +156,7 @@ impl App {
         self.init_threads(&event_tr, &shutdown);
 
         #[cfg(feature = "demo")]
-        self.demo_popup.set_text(Self::demo_text().to_string());
+        self.demo_popup.set_text(demo_text().to_string());
 
         if let Some(events) = pre_events {
             let area = self.draw(&mut terminal).map_err(crate::Error::Draw)?;
@@ -211,6 +185,9 @@ impl App {
         self.exit_threads().await;
 
         ratatui::restore();
+
+        #[cfg(feature = "demo")]
+        println!("{}", demo_exit_text());
 
         Ok(())
     }
@@ -383,9 +360,11 @@ impl App {
 
         #[cfg(feature = "demo")]
         if let Some(demo_timer) = self.demo_timer {
-            if demo_timer.elapsed() >= Duration::from_secs(120) {
+            use crate::demo::DEMO_2_DELAY;
+
+            if demo_timer.elapsed() >= DEMO_2_DELAY {
                 self.demo_timer = None;
-                self.demo_popup.set_text(Self::demo_text_2().to_string());
+                self.demo_popup.set_text(demo_text_2().to_string());
             }
         }
 

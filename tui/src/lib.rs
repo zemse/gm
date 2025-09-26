@@ -2,6 +2,8 @@ mod error;
 pub use error::{Error, Result};
 
 mod app;
+#[cfg(feature = "demo")]
+mod demo;
 mod events;
 pub mod pages;
 mod theme;

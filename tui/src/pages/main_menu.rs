@@ -92,9 +92,15 @@ impl MainMenuItem {
     pub fn get_menu(developer_mode: bool) -> crate::Result<Vec<MainMenuItem>> {
         let mut all_options: Vec<MainMenuItem> = MainMenuItem::iter().collect();
 
-        let temp_setup_page = CompleteSetupPage::new()?;
-        if temp_setup_page.form.valid_count() == 0 {
-            all_options.remove(0);
+        #[cfg(feature = "demo")]
+        all_options.remove(0);
+
+        #[cfg(not(feature = "demo"))]
+        {
+            let temp_setup_page = CompleteSetupPage::new()?;
+            if temp_setup_page.form.valid_count() == 0 {
+                all_options.remove(0);
+            }
         }
 
         let current_account_exists = Config::current_account().is_ok();
