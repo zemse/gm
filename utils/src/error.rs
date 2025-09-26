@@ -140,12 +140,16 @@ pub enum UtilsError {
 
     #[error("Chainlink oracle returned a negative price on network {network_name}: {price}")]
     ChainlinkNegativePrice { network_name: String, price: String },
+
+    #[error("Not able to query any prices, please check internet connection")]
+    NoPrices,
 }
 
 impl UtilsError {
     pub fn is_connect(&self) -> bool {
         match self {
             Self::ReqwestFailed { inner, .. } => inner.is_connect(),
+            Self::Internet(_) => true,
             _ => false,
         }
     }

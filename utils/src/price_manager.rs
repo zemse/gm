@@ -40,17 +40,39 @@ impl PriceManager {
 
         let mut prices = Vec::new();
 
-        if let Ok(price) = Binance::get_eth_price().await {
-            prices.push(price);
-        }
+        let mut connect_err = None;
 
-        for chainlink in &self.chainlinks {
-            if let Ok(price) = chainlink.get_eth_price().await {
-                prices.push(price);
+        match Binance::get_eth_price().await {
+            Ok(price) => prices.push(price),
+            Err(e) => {
+                if e.is_connect() {
+                    connect_err = Some(e);
+                }
             }
         }
 
-        Ok(prices)
+        for chainlink in &self.chainlinks {
+            match chainlink.get_eth_price().await {
+                Ok(price) => prices.push(price),
+                Err(e) => {
+                    if e.is_connect() {
+                        connect_err = Some(e);
+                    }
+                }
+            }
+        }
+
+        // Error only if we were not able to get *any* prices. If some endpoints result in connect
+        // err, yet other endpoints help yield prices, then we consider it as ok.
+        if prices.is_empty() {
+            if let Some(connect_err) = connect_err {
+                Err(connect_err)
+            } else {
+                Err(crate::Error::NoPrices)
+            }
+        } else {
+            Ok(prices)
+        }
     }
 
     /// Get latest price in a non-blocking way

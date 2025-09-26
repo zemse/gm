@@ -77,6 +77,8 @@ impl Component for AssetsPage {
                 }
                 .render(area, buf);
             }
+        } else if shared_state.online == Some(false) {
+            "need internet access to fetch the portfolio".render(area, buf);
         } else {
             "loading assets...".render(area, buf);
         }
