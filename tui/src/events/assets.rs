@@ -5,7 +5,7 @@ use tokio_util::sync::CancellationToken;
 use super::Event;
 
 const DELAY_ZERO: Duration = Duration::from_secs(0);
-const DELAY: Duration = Duration::from_secs(30);
+const DELAY: Duration = Duration::from_secs(10);
 
 pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: CancellationToken) {
     let mut delay = Duration::from_secs(0);
