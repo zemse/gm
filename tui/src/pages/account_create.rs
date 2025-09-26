@@ -21,7 +21,10 @@ use crate::{
     events::Event,
     traits::{Actions, Component},
 };
-use gm_utils::account::{mine_wallet, AccountManager, AccountUtils};
+use gm_utils::{
+    account::{mine_wallet, AccountManager, AccountUtils},
+    config::Config,
+};
 
 #[derive(Debug, PartialEq)]
 pub enum HashRateResult {
@@ -117,7 +120,7 @@ impl Component for AccountCreatePage {
         area: Rect,
         transmitter: &mpsc::Sender<Event>,
         _shutdown_signal: &CancellationToken,
-        _shared_state: &SharedState,
+        shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let mut result = Actions::default();
 
@@ -224,6 +227,10 @@ impl Component for AccountCreatePage {
                 self.vanity_result = Some((addr, *counter, *duration));
                 self.hash_rate = HashRateResult::None;
                 self.mining = false;
+                if shared_state.current_account.is_none() {
+                    Config::set_current_account(addr)?;
+                }
+                result.reload = true;
             }
             _ => {}
         }
