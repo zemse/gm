@@ -2,6 +2,8 @@
 
 Terminal-based Ethereum accounts manager
 
+![gm screenshot](./gm-screenshot.png)
+
 ## Features
 
 - Apple keychain: securely store your keys
@@ -10,9 +12,15 @@ Terminal-based Ethereum accounts manager
 - Walletconnect: connect to dapps
 - EIP-1193 provider + shell exec: avoid .env secrets in your scripts
 
-## Installation
+## Live Demo
 
-### From package managers
+```
+ssh demo@gm-tui.com
+```
+
+Run the above command in your terminal, it connects to a EC2 instance which has gm wallet already installed so you can preview it without installing anything.
+
+## Installation
 
 ### From source
 
