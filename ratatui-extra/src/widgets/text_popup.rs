@@ -54,7 +54,7 @@ impl TextPopup {
         let text_area = Popup::inner_area(area).block_inner();
         self.text_scroll.handle_event(key_event, text_area);
 
-        if key_event.is_pressed(KeyCode::Esc) {
+        if key_event.is_pressed(KeyCode::Esc) || key_event.is_pressed(KeyCode::Enter) {
             self.clear();
         }
 
@@ -81,7 +81,7 @@ impl TextPopup {
             .style(theme.block())
             .border_type(theme.border_type())
             .title(self.title)
-            .title_bottom("press ESC to dismiss");
+            .title_bottom("press ESC or Enter to dismiss");
 
         self.text_scroll
             .render_with_block(popup_inner_area, buf, block, true);
