@@ -545,7 +545,7 @@ impl Widget for &App {
     where
         Self: Sized,
     {
-        if area.width < 30 || area.height < 10 {
+        if area.width < 30 || area.height < 20 {
             "Increase size of your terminal please".render(area, buf);
             return;
         }
