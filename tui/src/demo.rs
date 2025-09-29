@@ -6,6 +6,7 @@ pub fn demo_text() -> &'static str {
     This program is currently running on cloud server (not on your computer), so some features are disabled in demo mode.\n\
     \n\
     Here are few things you can try:\n\
+    - Create a new account (don't send any funds to it as this key will be deleted after demo session ends).\n\
     - Try using `walletconnect` to connect with a website (e.g. sign message on etherscan.io/verifiedSignatures).\n\
     - Try using the `shell` to prevent passing secrets to a js script that signs a message."
 }

@@ -66,10 +66,12 @@ impl MainMenuItem {
             | MainMenuItem::Accounts
             | MainMenuItem::WalletConnect
             | MainMenuItem::DevKeyInput
-            | MainMenuItem::Shell
             | MainMenuItem::Config => false,
 
-            MainMenuItem::Portfolio | MainMenuItem::SignMessage | MainMenuItem::SendMessage => true,
+            MainMenuItem::Portfolio
+            | MainMenuItem::SignMessage
+            | MainMenuItem::SendMessage
+            | MainMenuItem::Shell => true,
         }
     }
 
