@@ -95,7 +95,11 @@ impl<const N: usize> CustomRender<bool> for [String; N] {
 }
 
 pub trait RectExt {
+    fn width_consumed(self, width: u16) -> Option<Rect>;
+
     fn height_consumed(self, height: u16) -> Option<Rect>;
+
+    fn consume_width(&mut self, width: u16);
 
     fn consume_height(&mut self, height: u16);
 
@@ -117,6 +121,19 @@ pub trait RectExt {
 }
 
 impl RectExt for Rect {
+    fn width_consumed(self, width: u16) -> Option<Rect> {
+        if self.width >= width {
+            Some(Rect {
+                x: self.x + width,
+                y: self.y,
+                width: self.width - width,
+                height: self.height,
+            })
+        } else {
+            None
+        }
+    }
+
     fn height_consumed(self, height: u16) -> Option<Rect> {
         if self.height >= height {
             Some(Rect {
@@ -128,6 +145,12 @@ impl RectExt for Rect {
         } else {
             None
         }
+    }
+
+    fn consume_width(&mut self, width: u16) {
+        *self = self
+            .width_consumed(width)
+            .expect("consume_width failed, if your terminal width is too small, try increasing it otherwise this is a bug");
     }
 
     fn consume_height(&mut self, height: u16) {
