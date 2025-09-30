@@ -3,16 +3,15 @@ use crate::pages::network_create::NetworkCreatePage;
 use crate::pages::token_create::TokenCreatePage;
 use crate::pages::Page;
 use crate::traits::{Actions, Component};
-use crate::Event;
+use crate::AppEvent;
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::cursor::Cursor;
 use gm_ratatui_extra::select::Select;
 use gm_ratatui_extra::thematize::Thematize;
 use gm_utils::network::{Network, Token};
 use ratatui::buffer::Buffer;
-use ratatui::crossterm::event::{KeyCode, KeyEventKind};
+use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::layout::Rect;
-use ratatui::prelude::Widget;
 use std::fmt::{Display, Formatter};
 use std::sync::mpsc::Sender;
 use tokio_util::sync::CancellationToken;
@@ -72,9 +71,9 @@ impl Component for TokenPage {
 
     fn handle_event(
         &mut self,
-        event: &Event,
+        event: &AppEvent,
         _area: Rect,
-        _transmitter: &Sender<Event>,
+        _transmitter: &Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
@@ -83,50 +82,59 @@ impl Component for TokenPage {
 
         let mut handle_result = Actions::default();
         handle_result.ignore_esc();
-        if let Event::Input(key_event) = event {
-            if key_event.kind == KeyEventKind::Press {
-                #[allow(clippy::single_match)]
-                match key_event.code {
-                    KeyCode::Enter => match &self.list[self.cursor.current] {
-                        TokenSelect::Create => {
-                            let token_index = self.network.tokens.len();
-                            handle_result.page_pops = 1;
-                            handle_result.page_inserts.push(Page::TokenCreate(
-                                TokenCreatePage::new(
-                                    token_index,
-                                    self.network_index,
-                                    self.network.clone(),
-                                )?,
-                            ));
-                            handle_result.reload = true;
-                        }
+        if let AppEvent::Input(input_event) = event {
+            match input_event {
+                Event::Key(key_event) => {
+                    if key_event.kind == KeyEventKind::Press {
+                        #[allow(clippy::single_match)]
+                        match key_event.code {
+                            KeyCode::Enter => match &self.list[self.cursor.current] {
+                                TokenSelect::Create => {
+                                    let token_index = self.network.tokens.len();
+                                    handle_result.page_pops = 1;
+                                    handle_result.page_inserts.push(Page::TokenCreate(
+                                        TokenCreatePage::new(
+                                            token_index,
+                                            self.network_index,
+                                            self.network.clone(),
+                                        )?,
+                                    ));
+                                    handle_result.reload = true;
+                                }
 
-                        TokenSelect::Existing(token) => {
-                            let token_index = self
-                                .network
-                                .tokens
-                                .iter()
-                                .position(|t| t.contract_address == token.contract_address)
-                                .unwrap();
-                            handle_result.page_pops = 1;
-                            handle_result.page_inserts.push(Page::TokenCreate(
-                                TokenCreatePage::new(
-                                    token_index,
-                                    self.network_index,
-                                    self.network.clone(),
-                                )?,
-                            ));
-                            handle_result.reload = true;
+                                TokenSelect::Existing(token) => {
+                                    let token_index = self
+                                        .network
+                                        .tokens
+                                        .iter()
+                                        .position(|t| t.contract_address == token.contract_address)
+                                        .unwrap();
+                                    handle_result.page_pops = 1;
+                                    handle_result.page_inserts.push(Page::TokenCreate(
+                                        TokenCreatePage::new(
+                                            token_index,
+                                            self.network_index,
+                                            self.network.clone(),
+                                        )?,
+                                    ));
+                                    handle_result.reload = true;
+                                }
+                            },
+                            KeyCode::Esc => {
+                                handle_result.page_pops = 1;
+                                handle_result.page_inserts.push(Page::NetworkCreate(
+                                    NetworkCreatePage::new(
+                                        self.network_index,
+                                        self.network.clone(),
+                                    )?,
+                                ));
+                            }
+                            _ => {}
                         }
-                    },
-                    KeyCode::Esc => {
-                        handle_result.page_pops = 1;
-                        handle_result.page_inserts.push(Page::NetworkCreate(
-                            NetworkCreatePage::new(self.network_index, self.network.clone())?,
-                        ));
                     }
-                    _ => {}
                 }
+                Event::Mouse(_mouse_event) => {}
+                _ => {}
             }
         };
         Ok(handle_result)

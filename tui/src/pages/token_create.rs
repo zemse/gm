@@ -2,7 +2,7 @@ use crate::app::SharedState;
 use crate::pages::token::TokenPage;
 use crate::pages::Page;
 use crate::traits::{Actions, Component};
-use crate::Event;
+use crate::AppEvent;
 use alloy::primitives::Address;
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::confirm_popup::ConfirmPopup;
@@ -62,8 +62,14 @@ impl TryFrom<FormItem> for FormWidget {
                 empty_text: None,
                 currency: None,
             },
-            FormItem::SaveButton => FormWidget::Button { label: "Save" },
-            FormItem::RemoveButton => FormWidget::Button { label: "Remove" },
+            FormItem::SaveButton => FormWidget::Button {
+                label: "Save",
+                hover_focus: false,
+            },
+            FormItem::RemoveButton => FormWidget::Button {
+                label: "Remove",
+                hover_focus: false,
+            },
             FormItem::ErrorText => FormWidget::ErrorText(String::new()),
         };
         Ok(widget)
@@ -125,9 +131,9 @@ impl TokenCreatePage {
 impl Component for TokenCreatePage {
     fn handle_event(
         &mut self,
-        event: &Event,
+        event: &AppEvent,
         area: Rect,
-        _transmitter: &Sender<Event>,
+        _transmitter: &Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
@@ -156,7 +162,8 @@ impl Component for TokenCreatePage {
             handle_result.merge(r);
         }
         let r = self.form.handle_event(
-            event.key_event(),
+            event.input_event(),
+            area,
             |_, _| Ok(()),
             |label, form| {
                 if label == FormItem::SaveButton {

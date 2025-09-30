@@ -1,11 +1,7 @@
 use std::sync::mpsc;
 
 use gm_utils::config::Config;
-use ratatui::{
-    crossterm::event::{KeyCode, KeyEventKind},
-    layout::Rect,
-    widgets::Widget,
-};
+use ratatui::layout::Rect;
 use strum::{Display, EnumIter, IntoEnumIterator};
 use tokio_util::sync::CancellationToken;
 
@@ -15,16 +11,15 @@ use super::{
     send_message::SendMessagePage, sign_message::SignMessagePage, walletconnect::WalletConnectPage,
     Page,
 };
-use crate::pages::{network::NetworkPage, shell::ShellPage};
 use crate::{
     app::SharedState,
-    events::Event,
     traits::{Actions, Component},
 };
-use gm_ratatui_extra::{
-    thematize::Thematize,
-    widgets::{cursor::Cursor, select::Select},
+use crate::{
+    pages::{network::NetworkPage, shell::ShellPage},
+    AppEvent,
 };
+use gm_ratatui_extra::{select_owned::SelectOwned, widgets::cursor::Cursor};
 
 #[derive(Debug, Display, EnumIter, PartialEq)]
 pub enum MainMenuItem {
@@ -42,10 +37,10 @@ pub enum MainMenuItem {
 }
 
 impl MainMenuItem {
-    pub fn get_page(&self) -> crate::Result<Page> {
+    pub fn get_page(&self, shared_state: &SharedState) -> crate::Result<Page> {
         Ok(match self {
             MainMenuItem::CompleteSetup => Page::CompleteSetup(CompleteSetupPage::new()?),
-            MainMenuItem::Portfolio => Page::Assets(AssetsPage::default()),
+            MainMenuItem::Portfolio => Page::Assets(AssetsPage::new(shared_state.assets_read()?)?),
             MainMenuItem::Accounts => Page::Account(AccountPage::new()?),
             MainMenuItem::AddressBook => Page::AddressBook(AddressBookPage::new()?),
             MainMenuItem::Networks => Page::Network(NetworkPage::new()?),
@@ -122,66 +117,45 @@ impl MainMenuItem {
 
 #[derive(Debug)]
 pub struct MainMenuPage {
-    pub cursor: Cursor,
-    pub list: Vec<MainMenuItem>,
+    pub select: SelectOwned<MainMenuItem>,
 }
 
 impl MainMenuPage {
     pub fn new(developer_mode: bool) -> crate::Result<Self> {
         Ok(Self {
-            list: MainMenuItem::get_menu(developer_mode)?,
-            cursor: Cursor::default(),
+            select: SelectOwned {
+                focus: true,
+                list: Some(MainMenuItem::get_menu(developer_mode)?),
+                cursor: Cursor::default(),
+            },
         })
-    }
-
-    pub fn get_focussed_item(&self) -> &MainMenuItem {
-        self.list
-            .get(self.cursor.current)
-            .expect("Invalid cursor position in MainMenuPage")
-    }
-
-    pub fn set_focussed_item(&mut self, item: MainMenuItem) {
-        if let Some((index, _)) = self.list.iter().enumerate().find(|(_, i)| **i == item) {
-            self.cursor.current = index;
-        }
     }
 }
 
 impl Component for MainMenuPage {
     fn reload(&mut self, shared_state: &SharedState) -> crate::Result<()> {
         let fresh = Self::new(shared_state.developer_mode)?;
-        self.list = fresh.list;
-        if self.cursor.current >= self.list.len() {
-            self.cursor.current = self.list.len() - 1;
-        }
+        self.select.update_list(fresh.select.list);
         Ok(())
     }
 
     fn handle_event(
         &mut self,
-        event: &Event,
-        _area: Rect,
-        _transmitter: &mpsc::Sender<Event>,
+        event: &AppEvent,
+        area: Rect,
+        _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
-        _shared_state: &SharedState,
+        shared_state: &SharedState,
     ) -> crate::Result<Actions> {
-        let cursor_max = self.list.len();
-        self.cursor.handle(event.key_event(), cursor_max);
-
         let mut result = Actions::default();
-        if let Event::Input(key_event) = event {
-            if key_event.kind == KeyEventKind::Press {
-                #[allow(clippy::single_match)]
-                match key_event.code {
-                    KeyCode::Enter => {
-                        let mut page = self.list[self.cursor.current].get_page()?;
-                        page.set_focus(true);
-                        result.page_inserts.push(page);
-                    }
-                    _ => {}
-                }
-            }
-        };
+
+        self.select
+            .handle_event(event.input_event(), area, |item| {
+                let mut page = item.get_page(shared_state)?;
+                page.set_focus(true);
+                result.page_inserts.push(page);
+                Ok::<(), crate::Error>(())
+            })?;
 
         Ok(result)
     }
@@ -195,13 +169,7 @@ impl Component for MainMenuPage {
     where
         Self: Sized,
     {
-        Select {
-            list: &self.list,
-            cursor: &self.cursor,
-            focus: true,
-            focus_style: shared_state.theme.select_focused(),
-        }
-        .render(area, buf);
+        self.select.render(area, buf, &shared_state.theme);
 
         area
     }

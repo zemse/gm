@@ -17,17 +17,17 @@ use gm_ratatui_extra::{
 use gm_utils::account::AccountManager;
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{KeyCode, KeyEventKind},
+    crossterm::event::{Event, KeyCode, KeyEventKind},
     layout::{Constraint, Layout, Rect},
     widgets::{Block, Widget},
 };
 use tokio::task::JoinHandle;
 
-use crate::{app::SharedState, theme::Theme, traits::Actions, Event};
+use crate::{app::SharedState, theme::Theme, traits::Actions, AppEvent};
 
 pub fn sign_thread(
     message: &str,
-    tr: &mpsc::Sender<Event>,
+    tr: &mpsc::Sender<AppEvent>,
     shared_state: &SharedState,
 ) -> crate::Result<JoinHandle<()>> {
     let message = message.to_string();
@@ -36,9 +36,9 @@ pub fn sign_thread(
 
     Ok(tokio::spawn(async move {
         let _ = match run(message, sender_account).await {
-            Ok(sig) => tr.send(Event::SignResult(sig)),
+            Ok(sig) => tr.send(AppEvent::SignResult(sig)),
             // TODO have `run` return a scoped error so we don't have to send back string
-            Err(err) => tr.send(Event::SignError(format!("{err:?}"))),
+            Err(err) => tr.send(AppEvent::SignError(format!("{err:?}"))),
         };
 
         async fn run(message: String, sender_account: Address) -> crate::Result<Signature> {
@@ -113,7 +113,7 @@ impl SignPopup {
 
     pub fn handle_event<F>(
         &mut self,
-        (event, area, tr, ss): (&crate::Event, Rect, &mpsc::Sender<Event>, &SharedState),
+        (event, area, tr, ss): (&AppEvent, Rect, &mpsc::Sender<AppEvent>, &SharedState),
         mut on_event: F,
     ) -> crate::Result<Actions>
     where
@@ -124,42 +124,47 @@ impl SignPopup {
         self.text.handle_event(event.key_event(), area);
 
         match event {
-            Event::Input(key_event) => {
-                if key_event.kind == KeyEventKind::Press {
-                    match self.status {
-                        SignStatus::Idle => match key_event.code {
-                            KeyCode::Left => {
-                                self.button_cursor = false;
-                            }
-                            KeyCode::Right => {
-                                self.button_cursor = true;
-                            }
-                            KeyCode::Enter => {
-                                if self.button_cursor {
-                                    self.status = SignStatus::Signing;
-                                    self.sign_thread = Some(sign_thread(&self.text.text, tr, ss)?);
-                                } else {
-                                    self.close();
-                                    on_event(SignPopupEvent::Rejected)?;
+            AppEvent::Input(input_event) => match input_event {
+                Event::Key(key_event) => {
+                    if key_event.kind == KeyEventKind::Press {
+                        match self.status {
+                            SignStatus::Idle => match key_event.code {
+                                KeyCode::Left => {
+                                    self.button_cursor = false;
                                 }
-                            }
-                            KeyCode::Esc => {
-                                self.close();
-                                on_event(SignPopupEvent::EscapedBeforeSigning)?;
-                            }
-                            _ => {}
-                        },
-                        SignStatus::Signing => {}
-                        SignStatus::Done | SignStatus::Failed => {
-                            if key_event.code == KeyCode::Esc {
-                                self.close();
-                                on_event(SignPopupEvent::EscapedAfterSigning)?;
+                                KeyCode::Right => {
+                                    self.button_cursor = true;
+                                }
+                                KeyCode::Enter => {
+                                    if self.button_cursor {
+                                        self.status = SignStatus::Signing;
+                                        self.sign_thread =
+                                            Some(sign_thread(&self.text.text, tr, ss)?);
+                                    } else {
+                                        self.close();
+                                        on_event(SignPopupEvent::Rejected)?;
+                                    }
+                                }
+                                KeyCode::Esc => {
+                                    self.close();
+                                    on_event(SignPopupEvent::EscapedBeforeSigning)?;
+                                }
+                                _ => {}
+                            },
+                            SignStatus::Signing => {}
+                            SignStatus::Done | SignStatus::Failed => {
+                                if key_event.code == KeyCode::Esc {
+                                    self.close();
+                                    on_event(SignPopupEvent::EscapedAfterSigning)?;
+                                }
                             }
                         }
                     }
                 }
-            }
-            Event::SignResult(signature) => {
+                Event::Mouse(_mouse_event) => {}
+                _ => {}
+            },
+            AppEvent::SignResult(signature) => {
                 on_event(SignPopupEvent::Signed(*signature))?;
                 self.status = SignStatus::Done;
 
@@ -167,7 +172,7 @@ impl SignPopup {
                     thread.abort();
                 }
             }
-            Event::SignError(_) => {
+            AppEvent::SignError(_) => {
                 self.status = SignStatus::Failed;
             }
             _ => {}

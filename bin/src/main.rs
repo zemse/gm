@@ -26,7 +26,9 @@ async fn main() -> gm_tui::Result<()> {
                     wc.set_uri(&uri);
                 }
 
-                main_menu.set_focussed_item(MainMenuItem::WalletConnect);
+                main_menu
+                    .select
+                    .set_focussed_item(MainMenuItem::WalletConnect);
                 tui_app.insert_page(Page::WalletConnect(wc));
             }
 
@@ -39,9 +41,9 @@ async fn main() -> gm_tui::Result<()> {
                     let (input, cursor) = run_page.get_user_input_mut().expect("not in input mode");
                     *input = cmd.join(" ");
                     *cursor = input.len();
-                    pre_events = Some(vec![gm_tui::Event::INPUT_KEY_ENTER]);
+                    pre_events = Some(vec![gm_tui::AppEvent::INPUT_KEY_ENTER]);
                 }
-                main_menu.set_focussed_item(MainMenuItem::Shell);
+                main_menu.select.set_focussed_item(MainMenuItem::Shell);
                 tui_app.insert_page(Page::Shell(run_page));
             }
 

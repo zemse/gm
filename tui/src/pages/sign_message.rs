@@ -8,8 +8,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
-    events::Event,
     traits::{Actions, Component},
+    AppEvent,
 };
 use gm_utils::account::AccountManager;
 
@@ -43,6 +43,7 @@ impl TryFrom<FormItem> for FormWidget {
             },
             FormItem::SignMessageButton => FormWidget::Button {
                 label: "Sign Message",
+                hover_focus: false,
             },
             FormItem::Signature => FormWidget::DisplayText(String::new()),
         };
@@ -65,14 +66,15 @@ impl Component for SignMessagePage {
 
     fn handle_event(
         &mut self,
-        event: &Event,
-        _area: Rect,
-        _transmitter: &mpsc::Sender<Event>,
+        event: &AppEvent,
+        area: Rect,
+        _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         self.form.handle_event(
-            event.key_event(),
+            event.input_event(),
+            area,
             |_, _| Ok(()),
             |item, form| {
                 if item == FormItem::SignMessageButton

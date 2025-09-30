@@ -1,7 +1,7 @@
 use std::{collections::HashMap, marker::PhantomData};
 
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
-use ratatui::layout::{Constraint, Layout};
+use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, MouseEventKind};
+use ratatui::layout::{Constraint, Layout, Position};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -13,16 +13,22 @@ use strum::IntoEnumIterator;
 
 use super::{button::Button, input_box::InputBox};
 use crate::act::Act;
-use crate::extensions::{RectExt, WidgetHeight};
+use crate::extensions::{EventExt, MouseEventExt, RectExt, WidgetHeight};
 use crate::widgets::scroll_bar::CustomScrollBar;
 use crate::{thematize::Thematize, widgets::filter_select_popup::FilterSelectPopup};
 use gm_utils::text::split_string;
+
+enum CursorAction {
+    Prev,
+    Next,
+    None,
+}
 
 pub trait FormItemIndex {
     fn index(self) -> usize;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum FormWidget {
     Heading(&'static str),
     StaticText(&'static str),
@@ -49,6 +55,7 @@ pub enum FormWidget {
     },
     Button {
         label: &'static str,
+        hover_focus: bool,
     },
     DisplayText(String),
     ErrorText(String),
@@ -60,7 +67,7 @@ impl FormWidget {
             FormWidget::InputBox { label, .. } => Some(label),
             FormWidget::DisplayBox { label, .. } => Some(label),
             FormWidget::BooleanInput { label, .. } => Some(label),
-            FormWidget::Button { label } => Some(label),
+            FormWidget::Button { label, .. } => Some(label),
             FormWidget::SelectInput { label, .. } => Some(label),
             FormWidget::Heading(_)
             | FormWidget::StaticText(_)
@@ -122,6 +129,13 @@ impl FormWidget {
             }
         }
     }
+
+    pub fn width(&self, area: Rect) -> u16 {
+        match self {
+            FormWidget::Button { label, .. } => Button::area(label, area).width,
+            _ => area.width,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -129,8 +143,9 @@ pub struct Form<
     T: IntoEnumIterator + ToString + FormItemIndex + TryInto<FormWidget, Error = E>,
     E: From<crate::error::RatatuiExtraError>,
 > {
-    pub cursor: usize,
-    pub text_cursor: usize,
+    cursor: usize,
+    text_cursor: usize,
+    scroll_y: u16,
     pub form_focus: bool,
     pub items: Vec<FormWidget>,
     pub hide: HashMap<usize, bool>,
@@ -150,6 +165,7 @@ impl<
         let mut form = Self {
             cursor: 0,
             text_cursor: 0,
+            scroll_y: 0,
             form_focus: true,
             items: T::iter()
                 .map(|item| item.try_into())
@@ -231,6 +247,58 @@ impl<
         }
     }
 
+    fn handle_cursor(&mut self, area: Rect, cursor_action: CursorAction) {
+        let (form_area, _, _) = self.get_form_area(area);
+
+        match cursor_action {
+            CursorAction::Prev => {
+                self.retreat_cursor();
+            }
+            CursorAction::Next => {
+                self.advance_cursor();
+            }
+            CursorAction::None => {}
+        };
+
+        let next_cursor = self.cursor;
+
+        let mut height_before_next_item = 0;
+        let mut current_item_height = 0;
+        for (i, item) in self.items.iter().enumerate() {
+            if self.hide.contains_key(&i) {
+                continue;
+            }
+
+            let height = item.height(form_area);
+
+            if i < next_cursor {
+                height_before_next_item += height;
+            } else if i == next_cursor {
+                current_item_height = height;
+            }
+        }
+
+        if Some(next_cursor) == self.first_valid_cursor() {
+            // scroll to top
+            self.scroll_y = 0;
+        } else if self.scroll_y <= height_before_next_item
+            && self.scroll_y + form_area.height > height_before_next_item + current_item_height
+        {
+            // do nothing, item is already in view
+        } else if self.scroll_y > height_before_next_item {
+            // scroll up to show the item at the top
+            self.scroll_y = height_before_next_item;
+        } else if self.scroll_y + form_area.height <= height_before_next_item + current_item_height
+        {
+            // scroll down to show the item at the bottom
+            if height_before_next_item + current_item_height > form_area.height {
+                self.scroll_y = height_before_next_item + current_item_height - form_area.height;
+            } else {
+                self.scroll_y = 0;
+            }
+        }
+    }
+
     pub fn update_text_cursor(&mut self) {
         self.text_cursor = self.items[self.cursor].max_cursor();
     }
@@ -308,6 +376,17 @@ impl<
         self.cursor == idx.index()
     }
 
+    pub fn is_button_idx(&self, idx: usize) -> bool {
+        matches!(self.items[idx], FormWidget::Button { .. })
+    }
+
+    pub fn get_button_hover_mut_idx(&mut self, idx: usize) -> &mut bool {
+        match &mut self.items[idx] {
+            FormWidget::Button { hover_focus, .. } => hover_focus,
+            _ => unreachable!(),
+        }
+    }
+
     pub fn is_button_focused(&self) -> bool {
         matches!(self.items[self.cursor], FormWidget::Button { .. })
     }
@@ -334,7 +413,8 @@ impl<
 
     pub fn handle_event<A, F1, F2>(
         &mut self,
-        key_event: Option<&KeyEvent>,
+        input_event: Option<&Event>,
+        area: Rect,
         mut on_value_change: F2,
         mut on_button_press: F1,
     ) -> Result<A, E>
@@ -345,40 +425,89 @@ impl<
     {
         let mut result = A::default();
 
-        if let Some(key_event) = key_event {
-            if key_event.kind == KeyEventKind::Press {
-                if !self.is_some_popup_open() {
-                    match key_event.code {
-                        KeyCode::Up => {
-                            self.retreat_cursor();
-                        }
-                        KeyCode::Down | KeyCode::Tab => {
-                            self.advance_cursor();
-                        }
-                        KeyCode::Enter => {
-                            if !self.is_button_focused() && !self.is_select_focused() {
-                                self.advance_cursor();
+        if let Some(input_event) = input_event {
+            match input_event {
+                Event::Key(key_event) => {
+                    if key_event.kind == KeyEventKind::Press && !self.is_some_popup_open() {
+                        match key_event.code {
+                            KeyCode::Up => {
+                                self.handle_cursor(area, CursorAction::Prev);
                             }
-                        }
+                            KeyCode::Down | KeyCode::Tab => {
+                                self.handle_cursor(area, CursorAction::Next);
+                            }
+                            KeyCode::Enter => {
+                                if !self.is_button_focused() && !self.is_select_focused() {
+                                    self.handle_cursor(area, CursorAction::Next);
+                                }
+                            }
 
-                        _ => {}
+                            _ => {}
+                        }
                     }
                 }
+                Event::Mouse(mouse_event) => {
+                    if area.contains(mouse_event.position()) {
+                        if mouse_event.is_left_click() {
+                            if let Some(i) = self.get_clicked_item(area, mouse_event.position()) {
+                                if self.is_valid_cursor(i) {
+                                    self.cursor = i;
+                                    self.update_text_cursor();
+                                    self.handle_cursor(area, CursorAction::None);
+                                }
+                            }
+                        } else if mouse_event.is(MouseEventKind::ScrollUp) {
+                            if self.scroll_y > 0 {
+                                self.scroll_y = self.scroll_y.saturating_sub(1);
+                            }
+                        } else if mouse_event.is(MouseEventKind::ScrollDown) {
+                            let (form_area, _, virtual_form_height) = self.get_form_area(area);
+                            if self.scroll_y + form_area.height < virtual_form_height {
+                                self.scroll_y = self.scroll_y.saturating_add(1);
+                            }
+                        } else if mouse_event.is(MouseEventKind::Moved) {
+                            let item_idx = self.get_clicked_item(area, mouse_event.position());
+                            if item_idx.is_some_and(|idx| self.is_button_idx(idx)) {
+                                *self.get_button_hover_mut_idx(item_idx.unwrap()) = true;
+                            } else {
+                                for i in 0..self.items.len() {
+                                    if self.is_button_idx(i) {
+                                        *self.get_button_hover_mut_idx(i) = false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
 
+            if input_event.is_mouse_left_click() || input_event.is_key_press() {
                 let value_before = self.items[self.cursor].to_value();
 
+                let item_area = self.get_area_for_item(area, self.cursor);
                 match &mut self.items[self.cursor] {
                     FormWidget::InputBox { text, .. } => {
-                        InputBox::handle_event(Some(key_event), text, &mut self.text_cursor);
+                        InputBox::handle_event(
+                            Some(input_event),
+                            item_area,
+                            text,
+                            &mut self.text_cursor,
+                        );
                     }
                     FormWidget::DisplayBox { .. } => {
                         // we don't have to handle this as parent component will do it
                     }
                     FormWidget::BooleanInput { value, .. } => {
-                        if matches!(
-                            key_event.code,
-                            KeyCode::Char(_) | KeyCode::Left | KeyCode::Right | KeyCode::Backspace
-                        ) {
+                        if input_event.key_event().is_some_and(|key_event| {
+                            matches!(
+                                key_event.code,
+                                KeyCode::Char(_)
+                                    | KeyCode::Left
+                                    | KeyCode::Right
+                                    | KeyCode::Backspace
+                            )
+                        }) {
                             *value = !*value;
                             self.text_cursor = value.to_string().len();
                         }
@@ -386,26 +515,33 @@ impl<
                     FormWidget::SelectInput { text, popup, .. } => {
                         let is_open = popup.is_open();
 
-                        let popup_result = popup.handle_event(Some(key_event), |selected| {
-                            *text = selected.clone();
-                            self.text_cursor = selected.len();
-                            Ok(())
-                        })?;
+                        let popup_result =
+                            popup.handle_event(input_event.key_event(), |selected| {
+                                *text = selected.clone();
+                                self.text_cursor = selected.len();
+                                Ok(())
+                            })?;
                         result.merge(popup_result);
 
                         if !is_open {
-                            match key_event.code {
-                                // Press any key to open the popup
-                                KeyCode::Backspace | KeyCode::Char(_) | KeyCode::Enter => {
-                                    popup.open();
+                            if let Some(key_event) = input_event.key_event() {
+                                match key_event.code {
+                                    // Press any key to open the popup
+                                    KeyCode::Backspace | KeyCode::Char(_) | KeyCode::Enter => {
+                                        popup.open();
+                                    }
+                                    _ => {}
                                 }
-                                _ => {}
                             }
                         }
                     }
-                    FormWidget::Button { .. } => {
-                        if matches!(key_event.code, KeyCode::Enter) {
-                            on_button_press(self.current_label_enum()?, self)?
+                    FormWidget::Button { label, .. } => {
+                        if input_event.is_mouse_left_click()
+                            || input_event.is_key_pressed(KeyCode::Enter)
+                        {
+                            Button::handle_event(input_event, item_area, label, || {
+                                on_button_press(self.current_label_enum()?, self)
+                            })?;
                         }
                     }
                     _ => {}
@@ -417,36 +553,103 @@ impl<
                 }
             }
         }
+
         Ok(result)
+    }
+
+    fn calc_virtual_form_height(&self, area: Rect) -> u16 {
+        self.items
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !self.hide.contains_key(i))
+            .fold(0, |acc, (_, w)| acc + w.height(area))
+    }
+
+    /// Returns -> (form_area, is_form_overflow, virtual_form_height)
+    fn get_form_area(&self, area: Rect) -> (Rect, bool, u16) {
+        let virtual_form_height = self.calc_virtual_form_height(area);
+        let is_form_overflow = area.height < virtual_form_height;
+        if is_form_overflow {
+            let [left_area, _] = Self::areas(area);
+            (left_area, true, virtual_form_height)
+        } else {
+            (area, false, virtual_form_height)
+        }
+    }
+
+    fn first_valid_cursor(&self) -> Option<usize> {
+        (0..self.items.len()).find(|&i| self.is_valid_cursor(i))
+    }
+
+    fn get_clicked_item(&self, area: Rect, position: Position) -> Option<usize> {
+        let (form_area, _, _) = self.get_form_area(area);
+
+        let clicked_x = position.x.saturating_sub(form_area.x);
+        let clicked_y = self.scroll_y + position.y.saturating_sub(form_area.y);
+
+        let mut scroll_y = 0;
+        for (i, item) in self.items.iter().enumerate() {
+            // Skip hidden items.
+            if self.hide.contains_key(&i) {
+                continue;
+            }
+
+            let item_width = item.width(area);
+            let item_height = item.height(area);
+            if clicked_y >= scroll_y && clicked_y < scroll_y + item_height && clicked_x < item_width
+            {
+                return Some(i);
+            }
+            scroll_y += item_height;
+        }
+
+        None
+    }
+
+    fn get_area_for_item(&self, area: Rect, idx: usize) -> Rect {
+        let (form_area, _, _) = self.get_form_area(area);
+
+        let mut item_virtual_y = 0;
+
+        let mut item_height = None;
+
+        for (i, item) in self.items.iter().enumerate() {
+            if self.hide.contains_key(&i) {
+                continue;
+            }
+
+            let h = item.height(form_area);
+
+            if i == idx {
+                item_height = Some(h);
+                break;
+            }
+            item_virtual_y += h;
+        }
+
+        let item_height = item_height.expect("item_height should be Some");
+
+        let mut item_area = form_area
+            .height_consumed(item_virtual_y - self.scroll_y)
+            .expect("not able to consume height");
+
+        item_area.height = item_height;
+        item_area
+    }
+
+    fn areas(area: Rect) -> [Rect; 2] {
+        let [form_area, scroll_area] =
+            Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]).areas(area);
+        [form_area, scroll_area]
     }
 
     pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &impl Thematize)
     where
         Self: Sized,
     {
-        let horizontal_layout = Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]);
-        let [left_area, scroll_area] = horizontal_layout.areas(area);
-
-        // First check how much height the form will take
-        let calc_virtual_form_height = |area: Rect| {
-            self.items
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| !self.hide.contains_key(i))
-                .fold(0, |acc, (_, w)| acc + w.height(area))
-        };
-
-        // By default we want to render form in the entire area
-        let mut form_area = area;
-        let mut virtual_form_height = calc_virtual_form_height(area);
-
-        // But if form is overflowing we will render it in the left area only, and recalculate virtual_form_height
-        let is_form_overflow = area.height < virtual_form_height;
-
-        if is_form_overflow {
-            form_area = left_area;
-            virtual_form_height = calc_virtual_form_height(form_area);
-        }
+        // In case there are few form elements, we don't need a scroll bar, in that case area == form_area.
+        // However if form overflows the visible area, we need to reserve scroll bar area.
+        let (form_area, is_form_overflow, virtual_form_height) = self.get_form_area(area);
 
         let mut virtual_area = Rect::new(
             area.x,
@@ -456,30 +659,21 @@ impl<
         );
         let mut virtual_buf = Buffer::empty(virtual_area);
 
-        let mut scroll_y: u16 = 0;
-        let mut focused_item_height: u16 = 0;
-
         for (i, item) in self.items.iter().enumerate() {
             // Skip hidden items.
             if self.hide.contains_key(&i) {
                 continue;
             }
 
-            // This will hit only once and we record the scroll position of the focused item.
-            if self.form_focus && self.cursor == i {
-                scroll_y = virtual_area.y;
-                focused_item_height = item.height(virtual_area);
-            }
-
             // Render all form items in our virtual buffer.
             match item {
                 FormWidget::Heading(heading) => {
                     heading.bold().render(virtual_area, &mut virtual_buf);
-                    virtual_area.consume_height(2);
+                    virtual_area.consume_height(item.height(virtual_area));
                 }
                 FormWidget::StaticText(text) => {
                     text.render(virtual_area, &mut virtual_buf);
-                    virtual_area.consume_height(2);
+                    virtual_area.consume_height(item.height(virtual_area));
                 }
                 FormWidget::InputBox {
                     label,
@@ -567,23 +761,22 @@ impl<
                     widget.render(virtual_area, &mut virtual_buf, &self.text_cursor, theme);
                     virtual_area.consume_height(height_used);
                 }
-                FormWidget::Button { label } => {
+                FormWidget::Button { label, hover_focus } => {
                     Button {
-                        focus: self.form_focus && self.cursor == i,
+                        focus: self.form_focus && (self.cursor == i || *hover_focus),
                         label,
                     }
                     .render(virtual_area, &mut virtual_buf, theme);
 
-                    virtual_area.consume_height(3);
+                    virtual_area.consume_height(item.height(virtual_area));
                 }
                 FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
                     if !text.is_empty() {
                         Paragraph::new(Text::raw(text))
                             .wrap(Wrap { trim: false })
                             .render(virtual_area, &mut virtual_buf);
-                        virtual_area
-                            .consume_height((text.len() as u16).div_ceil(virtual_area.width));
-                        virtual_area.consume_height(1);
+
+                        virtual_area.consume_height(item.height(virtual_area));
                     }
                 }
             }
@@ -597,17 +790,19 @@ impl<
         }
 
         if is_form_overflow {
+            let [_, scroll_area] = Self::areas(area);
             CustomScrollBar {
-                cursor: scroll_y as usize,
-                total_items: virtual_form_height as usize,
-                paginate: true,
+                // Due to resize, self.scroll_y might be out of bounds, so we clamp it.
+                cursor: self.scroll_y.min(virtual_form_height - area.height) as usize,
+                total_items: (virtual_form_height - area.height + 1) as usize,
+                paginate: false,
             }
             .render(scroll_area, buf);
         }
 
         let mut virtual_canvas_area = form_area;
-        if is_form_overflow && scroll_y > form_area.height {
-            virtual_canvas_area.y = scroll_y + focused_item_height - form_area.height;
+        if is_form_overflow {
+            virtual_canvas_area.y = area.y + self.scroll_y;
         }
 
         // Only show contents that are visible, copy contents from virtual buffer to the actual buffer

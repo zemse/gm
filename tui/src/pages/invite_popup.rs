@@ -5,14 +5,14 @@ use alloy::primitives::Address;
 use gm_ratatui_extra::{act::Act, extensions::CustomRender, popup::Popup, thematize::Thematize};
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{KeyCode, KeyEventKind},
+    crossterm::event::{Event, KeyCode, KeyEventKind},
     layout::Rect,
     widgets::{Block, Widget},
 };
 use serde_json::json;
 use tokio::task::JoinHandle;
 
-use crate::{app::SharedState, error::FmtError, traits::Actions, Event};
+use crate::{app::SharedState, error::FmtError, traits::Actions, AppEvent};
 
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub enum InviteCodeValidity {
@@ -36,7 +36,7 @@ const BASE_URL: &str = "https://invites.gm-tui.com";
 
 pub fn start_check_thread(
     invite_code: &str,
-    tr: &mpsc::Sender<Event>,
+    tr: &mpsc::Sender<AppEvent>,
 ) -> crate::Result<JoinHandle<()>> {
     let tr = tr.clone();
     let invite_code = invite_code.to_string();
@@ -53,13 +53,13 @@ pub fn start_check_thread(
                 _ => InviteCodeValidity::Invalid,
             };
 
-            let _ = tr.send(Event::InviteCodeValidity(validity));
+            let _ = tr.send(AppEvent::InviteCodeValidity(validity));
             Ok(())
         }
         .await;
 
         if let Err(e) = res {
-            let _ = tr.send(Event::InviteError(e.fmt_err("InviteCheckError")));
+            let _ = tr.send(AppEvent::InviteError(e.fmt_err("InviteCheckError")));
         }
     }))
 }
@@ -67,13 +67,13 @@ pub fn start_check_thread(
 pub fn start_claim_thread(
     invite_code: &str,
     claim_address: Address,
-    tr: &mpsc::Sender<Event>,
+    tr: &mpsc::Sender<AppEvent>,
 ) -> crate::Result<JoinHandle<()>> {
     let tr = tr.clone();
     let invite_code = invite_code.to_string();
     Ok(tokio::spawn(async move {
         let res: crate::Result<()> = async {
-            let _ = tr.send(Event::InviteCodeClaimStatus(
+            let _ = tr.send(AppEvent::InviteCodeClaimStatus(
                 InviteCodeClaimStatus::Claiming,
             ));
 
@@ -83,17 +83,19 @@ pub fn start_claim_thread(
                 .await?;
 
             if out.len() > 10 {
-                let _ = tr.send(Event::InviteCodeClaimStatus(InviteCodeClaimStatus::Success));
-                let _ = tr.send(Event::InviteCodeClaimStatus(InviteCodeClaimStatus::Failed(
-                    "failed".to_string(),
-                )));
+                let _ = tr.send(AppEvent::InviteCodeClaimStatus(
+                    InviteCodeClaimStatus::Success,
+                ));
+                let _ = tr.send(AppEvent::InviteCodeClaimStatus(
+                    InviteCodeClaimStatus::Failed("failed".to_string()),
+                ));
             }
             Ok(())
         }
         .await;
 
         if let Err(e) = res {
-            let _ = tr.send(Event::InviteError(e.fmt_err("InviteCheckError")));
+            let _ = tr.send(AppEvent::InviteError(e.fmt_err("InviteCheckError")));
         }
     }))
 }
@@ -138,8 +140,8 @@ impl InvitePopup {
 
     pub fn handle_event(
         &mut self,
-        event: &Event,
-        tr: &mpsc::Sender<Event>,
+        event: &AppEvent,
+        tr: &mpsc::Sender<AppEvent>,
         ss: &SharedState,
     ) -> crate::Result<Actions> {
         let mut result = Actions::default();
@@ -152,35 +154,39 @@ impl InvitePopup {
         }
 
         match event {
-            Event::Input(key_event) => {
-                if key_event.kind == KeyEventKind::Press {
-                    match key_event.code {
-                        KeyCode::Enter => {
-                            if self.validity == InviteCodeValidity::Valid
-                                && self.claim_status == InviteCodeClaimStatus::Idle
-                            {
-                                if let Some(invite_code) = self.invite_code.as_ref() {
-                                    let claim_thread = start_claim_thread(
-                                        invite_code,
-                                        ss.try_current_account()?,
-                                        tr,
-                                    )?;
-                                    self.claim_thread = Some(claim_thread);
+            AppEvent::Input(input_event) => match input_event {
+                Event::Key(key_event) => {
+                    if key_event.kind == KeyEventKind::Press {
+                        match key_event.code {
+                            KeyCode::Enter => {
+                                if self.validity == InviteCodeValidity::Valid
+                                    && self.claim_status == InviteCodeClaimStatus::Idle
+                                {
+                                    if let Some(invite_code) = self.invite_code.as_ref() {
+                                        let claim_thread = start_claim_thread(
+                                            invite_code,
+                                            ss.try_current_account()?,
+                                            tr,
+                                        )?;
+                                        self.claim_thread = Some(claim_thread);
+                                    }
                                 }
                             }
+                            KeyCode::Esc => {
+                                self.close();
+                                result.ignore_esc();
+                            }
+                            _ => {}
                         }
-                        KeyCode::Esc => {
-                            self.close();
-                            result.ignore_esc();
-                        }
-                        _ => {}
                     }
                 }
-            }
-            Event::InviteCodeValidity(validity) => {
+                Event::Mouse(_mouse_event) => {}
+                _ => {}
+            },
+            AppEvent::InviteCodeValidity(validity) => {
                 self.validity = *validity;
             }
-            Event::InviteCodeClaimStatus(status) => {
+            AppEvent::InviteCodeClaimStatus(status) => {
                 self.claim_status = status.clone();
             }
             _ => {}

@@ -1,6 +1,7 @@
 use ratatui::{layout::Offset, widgets::Widget};
 
 pub struct CustomScrollBar {
+    // Cursor range must be 0 to total_items - 1
     pub cursor: usize,
     pub total_items: usize,
     pub paginate: bool,
@@ -11,25 +12,32 @@ impl Widget for CustomScrollBar {
     where
         Self: Sized,
     {
+        if self.cursor >= self.total_items {
+            panic!(
+                "CustomScrollBar out-of-range error: cursor {} must be less than total_items {}",
+                self.cursor, self.total_items
+            );
+        }
+
         let max_height = area.height as usize;
         let num_pages = if self.paginate {
             self.total_items.div_ceil(max_height)
         } else if self.total_items > max_height {
             std::cmp::min(self.total_items - max_height + 1, max_height)
         } else {
-            1
+            self.total_items
         };
         let current_page = if self.paginate {
             self.cursor / max_height
         } else if self.total_items > max_height {
-            let scaled_cursor = self.cursor * num_pages / (self.total_items - max_height);
+            let scaled_cursor = self.cursor * num_pages / self.total_items;
             if scaled_cursor > 0 {
-                scaled_cursor - 1
+                std::cmp::min(scaled_cursor, num_pages - 1)
             } else {
                 0
             }
         } else {
-            0
+            self.cursor
         };
 
         let top = (0..current_page)

@@ -1,11 +1,15 @@
 use ratatui::{
-    crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
-    layout::{Offset, Rect},
+    crossterm::event::{Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind},
+    layout::{Offset, Position, Rect},
+    style::Modifier,
     text::Span,
     widgets::{Block, Widget},
 };
 
-use crate::{extensions::WidgetHeight, thematize::Thematize};
+use crate::{
+    extensions::{MouseEventExt, RectExt, WidgetHeight},
+    thematize::Thematize,
+};
 
 use gm_utils::text::split_string;
 
@@ -62,76 +66,101 @@ pub struct InputBox<'a> {
 
 impl InputBox<'_> {
     pub fn handle_event(
-        key_event: Option<&KeyEvent>,
+        input_event: Option<&Event>,
+        area: Rect,
         text_input: &mut String,
         text_cursor: &mut usize,
     ) -> bool {
-        if let Some(key_event) = key_event {
-            match key_event.code {
-                KeyCode::Left => {
-                    if key_event.modifiers == KeyModifiers::ALT {
-                        option_left(text_input, text_cursor);
-                    } else if *text_cursor > 0 {
-                        *text_cursor -= 1
+        if let Some(input_event) = input_event {
+            match input_event {
+                Event::Key(key_event) => match key_event.code {
+                    KeyCode::Left => {
+                        if key_event.modifiers == KeyModifiers::ALT {
+                            option_left(text_input, text_cursor);
+                        } else if *text_cursor > 0 {
+                            *text_cursor -= 1
+                        }
+                        return true;
                     }
-                    return true;
-                }
-                KeyCode::Right => {
-                    if key_event.modifiers == KeyModifiers::ALT {
-                        option_right(text_input, text_cursor);
-                    } else if *text_cursor < text_input.len() {
-                        *text_cursor += 1
+                    KeyCode::Right => {
+                        if key_event.modifiers == KeyModifiers::ALT {
+                            option_right(text_input, text_cursor);
+                        } else if *text_cursor < text_input.len() {
+                            *text_cursor += 1
+                        }
+                        return true;
                     }
-                    return true;
-                }
-                KeyCode::Char(char) => {
-                    // Handle space key on empty state
-                    if text_input.is_empty() && char == ' ' {
-                        // Ignore leading spaces
+                    KeyCode::Char(char) => {
+                        // Handle space key on empty state
+                        if text_input.is_empty() && char == ' ' {
+                            // Ignore leading spaces
+                        }
+                        // Handle command + delete on macOS
+                        else if char == 'u' && key_event.modifiers == KeyModifiers::CONTROL {
+                            let (_, right) = text_input.split_at(*text_cursor);
+                            *text_input = right.to_string();
+                            *text_cursor = 0;
+                        }
+                        // Handle command + left on macOS
+                        else if char == 'a' && key_event.modifiers == KeyModifiers::CONTROL {
+                            *text_cursor = 0;
+                        }
+                        // Handle command + right on macOS
+                        else if char == 'e' && key_event.modifiers == KeyModifiers::CONTROL {
+                            *text_cursor = text_input.len();
+                        }
+                        // Handle option + delete on macOS
+                        else if char == 'w' && key_event.modifiers == KeyModifiers::CONTROL {
+                            option_delete(text_input, text_cursor);
+                        }
+                        // option + Left
+                        else if char == 'b' && key_event.modifiers == KeyModifiers::ALT {
+                            option_left(text_input, text_cursor);
+                        }
+                        // option + Right
+                        else if char == 'f' && key_event.modifiers == KeyModifiers::ALT {
+                            option_right(text_input, text_cursor);
+                        }
+                        // Simple char press
+                        else if key_event.modifiers == KeyModifiers::NONE
+                            || key_event.modifiers == KeyModifiers::SHIFT
+                        {
+                            text_input.insert(*text_cursor, char);
+                            *text_cursor += 1;
+                        }
+                        return true;
                     }
-                    // Handle command + delete on macOS
-                    else if char == 'u' && key_event.modifiers == KeyModifiers::CONTROL {
-                        let (_, right) = text_input.split_at(*text_cursor);
-                        *text_input = right.to_string();
-                        *text_cursor = 0;
+                    KeyCode::Backspace => {
+                        if key_event.modifiers == KeyModifiers::ALT {
+                            option_delete(text_input, text_cursor);
+                        } else if *text_cursor > 0 {
+                            *text_cursor -= 1;
+                            text_input.remove(*text_cursor);
+                        }
+                        return true;
                     }
-                    // Handle command + left on macOS
-                    else if char == 'a' && key_event.modifiers == KeyModifiers::CONTROL {
-                        *text_cursor = 0;
+                    _ => {}
+                },
+                Event::Mouse(mouse_event) => {
+                    if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
+                        let lines = split_string(text_input, (area.width - 2) as usize);
+                        let area_text = Rect {
+                            x: area.x,
+                            y: area.y,
+                            width: area.width,
+                            height: (2 + lines.len()) as u16,
+                        }
+                        .block_inner();
+                        if area_text.contains(mouse_event.position()) {
+                            let relative_x =
+                                mouse_event.column.saturating_sub(area_text.x) as usize;
+                            let relative_y = mouse_event.row.saturating_sub(area_text.y) as usize;
+                            let new_cursor = relative_x + relative_y * (area.width - 2) as usize;
+
+                            *text_cursor = new_cursor.min(text_input.len());
+                            return true;
+                        }
                     }
-                    // Handle command + right on macOS
-                    else if char == 'e' && key_event.modifiers == KeyModifiers::CONTROL {
-                        *text_cursor = text_input.len();
-                    }
-                    // Handle option + delete on macOS
-                    else if char == 'w' && key_event.modifiers == KeyModifiers::CONTROL {
-                        option_delete(text_input, text_cursor);
-                    }
-                    // option + Left
-                    else if char == 'b' && key_event.modifiers == KeyModifiers::ALT {
-                        option_left(text_input, text_cursor);
-                    }
-                    // option + Right
-                    else if char == 'f' && key_event.modifiers == KeyModifiers::ALT {
-                        option_right(text_input, text_cursor);
-                    }
-                    // Simple char press
-                    else if key_event.modifiers == KeyModifiers::NONE
-                        || key_event.modifiers == KeyModifiers::SHIFT
-                    {
-                        text_input.insert(*text_cursor, char);
-                        *text_cursor += 1;
-                    }
-                    return true;
-                }
-                KeyCode::Backspace => {
-                    if key_event.modifiers == KeyModifiers::ALT {
-                        option_delete(text_input, text_cursor);
-                    } else if *text_cursor > 0 {
-                        *text_cursor -= 1;
-                        text_input.remove(*text_cursor);
-                    }
-                    return true;
                 }
                 _ => {}
             }
@@ -188,15 +217,19 @@ impl InputBox<'_> {
             self.empty_text.unwrap().render(inner_area, buf);
         }
         if self.focus {
-            Span::from("|").render(
-                Rect {
-                    x: inner_area.x + (*text_cursor as u16) % (area.width - 2),
-                    y: inner_area.y + (*text_cursor as u16) / (area.width - 2),
-                    width: 1,
-                    height: 1,
-                },
-                buf,
-            );
+            let cx = inner_area.x + (*text_cursor as u16) % (area.width - 2);
+            let cy = inner_area.y + (*text_cursor as u16) / (area.width - 2);
+
+            let Some(cell) = buf.cell_mut(Position::new(cx, cy)) else {
+                return;
+            };
+
+            if cell.symbol().is_empty() {
+                cell.set_symbol(" ");
+            }
+
+            let cur_style = cell.style();
+            cell.set_style(cur_style.add_modifier(Modifier::REVERSED));
         }
     }
 }

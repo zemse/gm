@@ -6,11 +6,14 @@ use std::{
 
 use alloy::primitives::{address, Address};
 use gm_ratatui_extra::{
-    act::Act, confirm_popup::ConfirmPopup, extensions::RectExt, thematize::Thematize,
+    act::Act,
+    confirm_popup::ConfirmPopup,
+    extensions::{MouseEventExt, RectExt},
+    thematize::Thematize,
 };
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::KeyCode,
+    crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind},
     layout::Rect,
     style::{Modifier, Style, Stylize},
     text::{Line, Span},
@@ -20,7 +23,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
-    events::Event,
+    events::AppEvent,
     traits::{Actions, Component},
 };
 use gm_utils::{
@@ -125,9 +128,9 @@ impl Component for AccountCreatePage {
 
     fn handle_event(
         &mut self,
-        event: &Event,
+        event: &AppEvent,
         area: Rect,
-        transmitter: &mpsc::Sender<Event>,
+        transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         shared_state: &SharedState,
     ) -> crate::Result<Actions> {
@@ -149,101 +152,136 @@ impl Component for AccountCreatePage {
 
         let cursor_max = self.mask.len();
         match event {
-            Event::Input(key_event) => {
+            AppEvent::Input(input_event) => {
                 match self.stage {
                     Stage::Input => {
-                        match key_event.code {
-                            KeyCode::Right => {
-                                self.cursor = (self.cursor + 1) % cursor_max;
-                            }
-                            KeyCode::Left => {
-                                self.cursor = (self.cursor + cursor_max - 1) % cursor_max;
-                            }
-                            KeyCode::Char(c) => match c {
-                                '0'..='9' => {
-                                    self.mask[self.cursor] = Some(c as u8 - b'0');
-                                    if self.cursor < cursor_max - 1 {
-                                        self.cursor += 1;
+                        match input_event {
+                            Event::Key(key_event) => {
+                                match key_event.code {
+                                    KeyCode::Right => {
+                                        self.cursor = (self.cursor + 1) % cursor_max;
                                     }
-                                }
-                                'a'..='f' => {
-                                    self.mask[self.cursor] = Some(c as u8 - b'a' + 10);
-                                    if self.cursor < cursor_max - 1 {
-                                        self.cursor += 1;
+                                    KeyCode::Left => {
+                                        self.cursor = (self.cursor + cursor_max - 1) % cursor_max;
                                     }
-                                }
-                                'A'..='F' => {
-                                    self.mask[self.cursor] = Some(c as u8 - b'A' + 10);
-                                    if self.cursor < cursor_max - 1 {
-                                        self.cursor += 1;
-                                    }
-                                }
-                                _ => {}
-                            },
-                            KeyCode::Backspace => {
-                                if self.cursor == 0
-                                    || (self.cursor == cursor_max - 1
-                                        && self.mask[self.cursor].is_some())
-                                {
-                                    self.mask[self.cursor] = None;
-                                } else if self.cursor > 0 {
-                                    self.mask[self.cursor - 1] = None;
-                                    self.cursor -= 1;
-                                }
-                            }
-                            KeyCode::Enter => {
-                                if self.is_mask_empty() {
-                                    let addr = AccountManager::create_mnemonic_wallet()?;
-                                    self.mnemonic_result = Some(addr);
-                                    self.stage = Stage::Result;
-                                } else {
-                                    self.started_mining_at = Instant::now();
-                                    let tr = transmitter.clone();
-                                    let (mask_a, mask_b) = self.mask_a_b();
-                                    let exit_signal = self.exit_signal.clone();
-                                    let vanity_thread = thread::spawn(move || {
-                                        let result = mine_wallet(mask_a, mask_b, None, exit_signal);
-                                        if let Ok((Some(key), counter, duration)) = result {
-                                            tr.send(Event::VanityResult(key, counter, duration))
-                                                .unwrap();
+                                    KeyCode::Char(c) => match c {
+                                        '0'..='9' => {
+                                            self.mask[self.cursor] = Some(c as u8 - b'0');
+                                            if self.cursor < cursor_max - 1 {
+                                                self.cursor += 1;
+                                            }
                                         }
-                                    });
-                                    self.vanity_thread = Some(vanity_thread);
-                                    self.stage = Stage::Mining;
+                                        'a'..='f' => {
+                                            self.mask[self.cursor] = Some(c as u8 - b'a' + 10);
+                                            if self.cursor < cursor_max - 1 {
+                                                self.cursor += 1;
+                                            }
+                                        }
+                                        'A'..='F' => {
+                                            self.mask[self.cursor] = Some(c as u8 - b'A' + 10);
+                                            if self.cursor < cursor_max - 1 {
+                                                self.cursor += 1;
+                                            }
+                                        }
+                                        _ => {}
+                                    },
+                                    KeyCode::Backspace => {
+                                        if self.cursor == 0
+                                            || (self.cursor == cursor_max - 1
+                                                && self.mask[self.cursor].is_some())
+                                        {
+                                            self.mask[self.cursor] = None;
+                                        } else if self.cursor > 0 {
+                                            self.mask[self.cursor - 1] = None;
+                                            self.cursor -= 1;
+                                        }
+                                    }
+                                    KeyCode::Enter => {
+                                        if self.is_mask_empty() {
+                                            let addr = AccountManager::create_mnemonic_wallet()?;
+                                            self.mnemonic_result = Some(addr);
+                                            self.stage = Stage::Result;
+                                        } else {
+                                            self.started_mining_at = Instant::now();
+                                            let tr = transmitter.clone();
+                                            let (mask_a, mask_b) = self.mask_a_b();
+                                            let exit_signal = self.exit_signal.clone();
+                                            let vanity_thread = thread::spawn(move || {
+                                                let result =
+                                                    mine_wallet(mask_a, mask_b, None, exit_signal);
+                                                if let Ok((Some(key), counter, duration)) = result {
+                                                    tr.send(AppEvent::VanityResult(
+                                                        key, counter, duration,
+                                                    ))
+                                                    .unwrap();
+                                                }
+                                            });
+                                            self.vanity_thread = Some(vanity_thread);
+                                            self.stage = Stage::Mining;
+                                        }
+                                    }
+                                    KeyCode::Esc => {
+                                        // When context goes back to previous page, it should reload state
+                                        result.reload = true;
+                                    }
+                                    _ => {}
                                 }
                             }
-                            KeyCode::Esc => {
-                                // When context goes back to previous page, it should reload state
-                                result.reload = true;
+                            Event::Mouse(mouse_event) => {
+                                if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
+                                    if let Some(mask_area) = area
+                                        .height_consumed(5)
+                                        .and_then(|area| area.width_consumed(2))
+                                        .map(|area| area.change_width(40))
+                                        .map(|area| area.change_height(1))
+                                    {
+                                        if mask_area.contains(mouse_event.position()) {
+                                            let i = (mouse_event.column as usize)
+                                                .saturating_sub(mask_area.x as usize);
+                                            self.cursor = i;
+                                        }
+                                    }
+                                }
                             }
                             _ => {}
                         }
                     }
                     Stage::Mining => {
-                        if key_event.code == KeyCode::Esc {
-                            result.ignore_esc();
-                            self.exit_popup.open();
+                        if let Event::Key(key_event) = input_event {
+                            if key_event.code == KeyCode::Esc {
+                                result.ignore_esc();
+                                self.exit_popup.open();
+                            }
                         }
                     }
-                    Stage::Result => match key_event.code {
-                        KeyCode::Esc => {
-                            result.reload = true;
-                        }
-                        KeyCode::Enter => {
-                            result.reload = true;
-                            result.page_pops += 1;
+                    Stage::Result => match input_event {
+                        Event::Key(key_event) => match key_event.code {
+                            KeyCode::Esc => {
+                                result.reload = true;
+                            }
+                            KeyCode::Enter => {
+                                result.reload = true;
+                                result.page_pops += 1;
+                            }
+                            _ => {}
+                        },
+                        Event::Mouse(mouse_event) => {
+                            if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
+                                result.reload = true;
+                                result.page_pops += 1;
+                            }
                         }
                         _ => {}
                     },
                 }
             }
-            Event::HashRateResult(hash_rate) => {
+            AppEvent::HashRateResult(hash_rate) => {
                 self.hash_rate = HashRateResult::Some(*hash_rate as usize);
             }
-            Event::HashRateError(error) => {
+            AppEvent::HashRateError(error) => {
                 self.hash_rate = HashRateResult::Error(error.clone());
             }
-            Event::VanityResult(key, counter, duration) => {
+            AppEvent::VanityResult(key, counter, duration) => {
                 let addr = Address::from_private_key(key);
                 AccountManager::store_private_key(&key.to_bytes(), addr)?;
                 self.vanity_result = Some((addr, *counter, *duration));
@@ -273,10 +311,10 @@ impl Component for AccountCreatePage {
                 match result {
                     Ok((_, counter, duration)) => {
                         let hash_rate = counter as f64 / duration.as_secs_f64();
-                        tr.send(Event::HashRateResult(hash_rate)).unwrap();
+                        tr.send(AppEvent::HashRateResult(hash_rate)).unwrap();
                     }
                     Err(e) => {
-                        tr.send(Event::HashRateError(e.to_string())).unwrap();
+                        tr.send(AppEvent::HashRateError(e.to_string())).unwrap();
                     }
                 }
             });
@@ -333,17 +371,20 @@ impl Component for AccountCreatePage {
                     "Press enter to generate address instantly".to_string()
                 } else if let HashRateResult::Some(hash_rate) = self.hash_rate {
                     let count = self.mask_count();
-                    let est_attempts = 16_usize.pow(count as u32);
-                    let est_time = est_attempts as f64 / hash_rate as f64;
-                    let est_time = Duration::from_secs(est_time as u64);
+                    if let Some(est_attempts) = 16_u128.checked_pow(count as u32) {
+                        let est_time = est_attempts as f64 / hash_rate as f64;
+                        let est_time = Duration::from_secs(est_time as u64);
 
-                    if est_time.as_secs() > 0 {
-                        format!(
-                            "Estimated to take {}, press enter to generate your vanity address",
-                            humantime::format_duration(est_time)
-                        )
+                        if est_time.as_secs() > 0 {
+                            format!(
+                                "Estimated to take {}, press enter to generate your vanity address",
+                                humantime::format_duration(est_time)
+                            )
+                        } else {
+                            "Press enter to generate your vanity address instantly".to_string()
+                        }
                     } else {
-                        "Press enter to generate your vanity address instantly".to_string()
+                        "Mask is too big, failed to estimate time".to_string()
                     }
                 } else {
                     "Press enter to generate address, it may take a while".to_string()

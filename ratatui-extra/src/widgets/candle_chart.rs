@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use chrono::{DateTime, Local, TimeZone};
+use ratatui::crossterm;
 use ratatui::widgets::Widget;
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent, KeyEventKind},

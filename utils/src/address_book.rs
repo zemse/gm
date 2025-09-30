@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::disk_storage::{DiskStorageInterface, FileFormat};
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct AddressBookStore {
     entries: Vec<AddressBookEntry>,
 }
@@ -15,7 +15,7 @@ impl DiskStorageInterface for AddressBookStore {
     const FORMAT: FileFormat = FileFormat::YAML;
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
 pub struct AddressBookEntry {
     pub name: String,
     pub address: Address,

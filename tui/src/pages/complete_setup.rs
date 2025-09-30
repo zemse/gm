@@ -12,8 +12,8 @@ use tokio_util::sync::CancellationToken;
 use super::{account::AccountPage, Page};
 use crate::{
     app::SharedState,
-    events::Event,
     traits::{Actions, Component},
+    AppEvent,
 };
 
 #[derive(Debug, Display, PartialEq, EnumIter)]
@@ -42,6 +42,7 @@ impl TryFrom<FormItem> for FormWidget {
             }
             FormItem::CreateOrImportWallet => FormWidget::Button {
                 label: "Create or Import Wallet",
+                hover_focus: false,
             },
             FormItem::AlchemyApiKey => FormWidget::InputBox {
                 label: "Alchemy API Key",
@@ -49,7 +50,10 @@ impl TryFrom<FormItem> for FormWidget {
                 empty_text: Some("Please get an Alchemy API key from https://www.alchemy.com/"),
                 currency: None,
             },
-            FormItem::Save => FormWidget::Button { label: "Save" },
+            FormItem::Save => FormWidget::Button {
+                label: "Save",
+                hover_focus: false,
+            },
             FormItem::Display => FormWidget::DisplayText(String::new()),
         };
         Ok(widget)
@@ -96,9 +100,9 @@ impl Component for CompleteSetupPage {
 
     fn handle_event(
         &mut self,
-        event: &Event,
-        _area: Rect,
-        transmitter: &mpsc::Sender<Event>,
+        event: &AppEvent,
+        area: Rect,
+        transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
@@ -108,7 +112,8 @@ impl Component for CompleteSetupPage {
         let mut handle_result = Actions::default();
 
         let r = self.form.handle_event(
-            event.key_event(),
+            event.input_event(),
+            area,
             |_, _| Ok(()),
             |label, form| {
                 if label == FormItem::CreateOrImportWallet {
@@ -119,7 +124,7 @@ impl Component for CompleteSetupPage {
                     handle_result.reload = true;
 
                     Config::set_alchemy_api_key(form.get_text(FormItem::AlchemyApiKey).clone())?;
-                    transmitter.send(Event::ConfigUpdate)?;
+                    transmitter.send(AppEvent::ConfigUpdate)?;
 
                     let display_text = form.get_text_mut(FormItem::Display);
                     *display_text = "Configuration saved".to_string();

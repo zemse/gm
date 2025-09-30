@@ -4,6 +4,8 @@ use alloy::{primitives::Address, rpc::types::TransactionRequest};
 use serde_json::Value;
 use walletconnect_sdk::wc_message::WcMessage;
 
+use crate::AppEvent;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]
@@ -129,9 +131,10 @@ pub enum Error {
     RequestAsksForDifferentAddress { asked: Address, current: Address },
 
     #[error(transparent)]
-    ParseFloatError(Box<std::num::ParseFloatError>),
+    IoError(#[from] std::io::Error),
+
     #[error(transparent)]
-    IoError(Box<std::io::Error>),
+    ParseFloatError(Box<std::num::ParseFloatError>),
     #[error(transparent)]
     FromHexError(alloy::hex::FromHexError),
     #[error("Alloy Ecdsa: {0}")]
@@ -145,7 +148,7 @@ pub enum Error {
     #[error("Mpsc Recv Error: {0}")]
     MpscRecvError(Box<std::sync::mpsc::RecvError>),
     #[error("Mpsc Send Error: {0}")]
-    MpscSendError(Box<std::sync::mpsc::SendError<crate::Event>>),
+    MpscSendError(Box<std::sync::mpsc::SendError<AppEvent>>),
     #[error("Mpsc Send Error 2: {0}")]
     MpscSendError2(Box<std::sync::mpsc::SendError<crate::pages::walletconnect::WcEvent>>),
     #[error("Alloy Local Signer Error: {0}")]
@@ -207,8 +210,8 @@ impl From<std::sync::mpsc::RecvError> for Error {
     }
 }
 
-impl From<std::sync::mpsc::SendError<crate::Event>> for Error {
-    fn from(e: std::sync::mpsc::SendError<crate::Event>) -> Self {
+impl From<std::sync::mpsc::SendError<AppEvent>> for Error {
+    fn from(e: std::sync::mpsc::SendError<AppEvent>) -> Self {
         Error::MpscSendError(Box::new(e))
     }
 }

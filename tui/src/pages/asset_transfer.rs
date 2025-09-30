@@ -1,11 +1,8 @@
 use crate::app::SharedState;
 use crate::pages::tx_popup::TxPopup;
+use crate::traits::{Actions, Component};
 use crate::widgets::{address_book_popup, assets_popup, AddressBookPopup, AssetsPopup};
-use crate::Result;
-use crate::{
-    events::Event,
-    traits::{Actions, Component},
-};
+use crate::{AppEvent, Result};
 use alloy::primitives::utils::parse_units;
 use alloy::primitives::{Bytes, U256};
 use alloy::rpc::types::TransactionRequest;
@@ -58,7 +55,10 @@ impl TryFrom<FormItem> for FormWidget {
                 currency: None,
             },
             FormItem::ErrorText => FormWidget::ErrorText(String::new()),
-            FormItem::TransferButton => FormWidget::Button { label: "Transfer" },
+            FormItem::TransferButton => FormWidget::Button {
+                label: "Transfer",
+                hover_focus: false,
+            },
         };
         Ok(widget)
     }
@@ -111,9 +111,9 @@ impl Component for AssetTransferPage {
 
     fn handle_event(
         &mut self,
-        event: &Event,
+        event: &AppEvent,
         area: ratatui::prelude::Rect,
-        tr: &mpsc::Sender<Event>,
+        tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
         ss: &SharedState,
     ) -> Result<Actions> {
@@ -179,7 +179,8 @@ impl Component for AssetTransferPage {
                 result.ignore_esc();
             } else {
                 let r = self.form.handle_event(
-                    event.key_event(),
+                    event.input_event(),
+                    area,
                     |_, _| Ok(()),
                     |label, form| {
                         if label == FormItem::TransferButton {

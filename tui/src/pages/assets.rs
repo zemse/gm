@@ -1,62 +1,58 @@
 use std::sync::mpsc;
 
-use gm_ratatui_extra::{cursor::Cursor, select::Select, thematize::Thematize};
-use ratatui::{buffer::Buffer, crossterm::event::KeyCode, layout::Rect, widgets::Widget};
+use gm_ratatui_extra::select_owned::SelectOwned;
+use gm_utils::assets::Asset;
+use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
-    events::Event,
     traits::{Actions, Component},
+    AppEvent,
 };
 
 use super::{asset_transfer::AssetTransferPage, Page};
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct AssetsPage {
-    cursor: Cursor,
-    focus: bool,
+    select: SelectOwned<Asset>,
+}
+
+impl AssetsPage {
+    pub fn new(assets: Option<Vec<Asset>>) -> crate::Result<Self> {
+        Ok(Self {
+            select: SelectOwned::new(assets),
+        })
+    }
 }
 
 impl Component for AssetsPage {
     fn set_focus(&mut self, focus: bool) {
-        self.focus = focus;
+        self.select.focus = focus;
     }
 
     fn handle_event(
         &mut self,
-        event: &Event,
-        _area: Rect,
-        _transmitter: &mpsc::Sender<Event>,
+        event: &AppEvent,
+        area: Rect,
+        _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let assets = shared_state.assets_read()?;
 
-        self.cursor.handle(
-            event.key_event(),
-            assets.as_ref().map(|a| a.len()).unwrap_or(1),
-        );
+        if let AppEvent::AssetsUpdate(_, _) = event {
+            self.select.update_list(assets);
+        }
 
         let mut handle_result = Actions::default();
-
-        #[allow(clippy::single_match)]
-        match event {
-            Event::Input(key_event) => match key_event.code {
-                KeyCode::Enter =>
-                {
-                    #[allow(clippy::field_reassign_with_default)]
-                    if let Some(assets) = assets.as_ref() {
-                        handle_result.page_inserts.push(Page::AssetTransfer(
-                            AssetTransferPage::new(&assets[self.cursor.current])?,
-                        ));
-                    }
-                }
-
-                _ => {}
-            },
-            _ => {}
-        }
+        self.select
+            .handle_event(event.input_event(), area, |asset| {
+                handle_result
+                    .page_inserts
+                    .push(Page::AssetTransfer(AssetTransferPage::new(asset)?));
+                Ok::<(), crate::Error>(())
+            })?;
 
         Ok(handle_result)
     }
@@ -65,17 +61,11 @@ impl Component for AssetsPage {
     where
         Self: Sized,
     {
-        if let Some(list) = shared_state.assets_read().ok().flatten().as_ref() {
+        if let Some(list) = self.select.list.as_ref() {
             if list.is_empty() {
                 "no assets on the address".render(area, buf);
             } else {
-                Select {
-                    list,
-                    cursor: &self.cursor,
-                    focus: self.focus,
-                    focus_style: shared_state.theme.select_focused(),
-                }
-                .render(area, buf);
+                self.select.render(area, buf, &shared_state.theme);
             }
         } else if shared_state.online == Some(false) {
             "need internet access to fetch the portfolio".render(area, buf);

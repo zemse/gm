@@ -11,4 +11,4 @@ mod traits;
 mod widgets;
 
 pub use app::App;
-pub use events::Event;
+pub use events::AppEvent;

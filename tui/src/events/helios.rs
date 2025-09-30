@@ -14,7 +14,6 @@ use helios_ethereum::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::Event;
 use gm_utils::{
     assets::{AssetManager, LightClientVerification, TokenAddress},
     config::Config,
@@ -22,8 +21,10 @@ use gm_utils::{
     network::Network,
 };
 
+use crate::AppEvent;
+
 pub async fn helios_thread(
-    transmitter: &Sender<Event>,
+    transmitter: &Sender<AppEvent>,
     shutdown_signal: &CancellationToken,
     asset_manager: Arc<RwLock<AssetManager>>,
 ) -> crate::Result<()> {
@@ -76,7 +77,7 @@ pub async fn helios_thread(
 
 async fn run_interval(
     wait_for: Duration,
-    transmitter: &Sender<Event>,
+    transmitter: &Sender<AppEvent>,
     asset_manager: &Arc<RwLock<AssetManager>>,
     eth_client: &EthereumClient,
 ) -> crate::Result<()> {
@@ -119,7 +120,7 @@ async fn run_interval(
             }
         };
 
-        let _ = transmitter.send(Event::HeliosUpdate {
+        let _ = transmitter.send(AppEvent::HeliosUpdate {
             account: owner,
             network: asset.r#type.network.clone(),
             token_address: token_address.clone(),

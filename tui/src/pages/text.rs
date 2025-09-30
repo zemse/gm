@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     app::SharedState,
     traits::{Actions, Component},
-    Event,
+    AppEvent,
 };
 
 #[derive(Debug)]
@@ -28,9 +28,9 @@ impl TextPage {
 impl Component for TextPage {
     fn handle_event(
         &mut self,
-        _event: &Event,
+        _event: &AppEvent,
         _area: Rect,
-        _transmitter: &Sender<Event>,
+        _transmitter: &Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {

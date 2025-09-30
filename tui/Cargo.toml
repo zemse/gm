@@ -28,7 +28,7 @@ alloy = { workspace = true }
 walletconnect-sdk = { workspace = true }
 
 #tui
-crossterm = { workspace = true }
+# crossterm = { workspace = true }
 ratatui = { workspace = true }
 
 # misc

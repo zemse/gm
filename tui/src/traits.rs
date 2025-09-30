@@ -4,9 +4,9 @@ use gm_ratatui_extra::{act::Act, thematize::Thematize};
 use ratatui::widgets::{Block, Widget};
 use tokio_util::sync::CancellationToken;
 
-use crate::app::SharedState;
+use crate::{app::SharedState, AppEvent};
 
-use super::{events::Event, pages::Page};
+use super::pages::Page;
 
 // TODO change the name of this struct and trait, something like trait PostHandleEvent
 #[derive(Default, Debug)]
@@ -51,10 +51,6 @@ pub trait Component {
         Ok(())
     }
 
-    fn text_input_mut(&mut self) -> Option<&mut String> {
-        None
-    }
-
     async fn exit_threads(&mut self) {}
 
     fn set_focus(&mut self, _focus: bool) {}
@@ -64,9 +60,9 @@ pub trait Component {
     /// `event` is mutable to allow taking ownership of inner data when needed.
     fn handle_event(
         &mut self,
-        event: &Event,
+        event: &AppEvent,
         area: ratatui::prelude::Rect,
-        transmitter: &mpsc::Sender<Event>,
+        transmitter: &mpsc::Sender<AppEvent>,
         shutdown_signal: &CancellationToken,
         shared_state: &SharedState,
     ) -> crate::Result<Actions>;

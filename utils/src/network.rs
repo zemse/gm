@@ -14,7 +14,7 @@ use crate::{
 
 #[skip_serializing_none]
 #[serde_as]
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Network {
     pub name: String,
@@ -43,7 +43,7 @@ fn is_false(b: &bool) -> bool {
     !*b
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Token {
     pub name: String,
     pub symbol: String,

@@ -2,6 +2,8 @@ use std::fmt::Display;
 
 use super::cursor::Cursor;
 use super::scroll_bar::CustomScrollBar;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
 use ratatui::text::Text;
 use ratatui::{
     layout::{Constraint, Layout},
@@ -18,14 +20,14 @@ pub struct Select<'a, T: Display> {
     pub focus_style: Style,
 }
 
-impl<T: Display> Widget for Select<'_, T> {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
-        Self: Sized,
-    {
+impl<T: Display> Select<'_, T> {
+    pub fn display_item(
+        &self,
+        area: Rect,
+    ) -> (Vec<ListItem<'_>>, Vec<usize>, usize, usize, usize, usize) {
         let capacity = area.height as usize;
         let horizontal_layout = Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]);
-        let [list_area, scroll_area] = horizontal_layout.areas(area);
+        let [list_area, _] = horizontal_layout.areas(area);
 
         let mut list_height = 0;
         let mut temp_rows = 0;
@@ -34,9 +36,10 @@ impl<T: Display> Widget for Select<'_, T> {
         let mut prev_start_index = 0;
         let mut end_index = self.list.len() - 1;
         let mut found = false;
+        let mut item_heights = vec![];
 
-        let mut current_page = 0;
-        let mut total_pages = 1;
+        let mut current_page: usize = 0;
+        let mut total_pages: usize = 1;
         let render_item = |(i, member): (usize, &T)| {
             let text = &format!("{member}");
             let wrapped_text = textwrap::wrap(
@@ -49,6 +52,7 @@ impl<T: Display> Widget for Select<'_, T> {
                 .wrap_algorithm(WrapAlgorithm::FirstFit),
             );
             list_height += wrapped_text.len();
+            item_heights.push(wrapped_text.len());
             if !found {
                 temp_rows += wrapped_text.len();
             }
@@ -82,6 +86,7 @@ impl<T: Display> Widget for Select<'_, T> {
             } else {
                 Style::default()
             };
+
             ListItem::new(content).style(style)
         };
         let render_items = self
@@ -90,7 +95,29 @@ impl<T: Display> Widget for Select<'_, T> {
             .enumerate()
             .map(render_item)
             .collect::<Vec<ListItem>>();
-        let display_items = render_items[start_index..=end_index].to_vec();
+        (
+            render_items[start_index..=end_index].to_vec(),
+            item_heights[start_index..=end_index].to_vec(),
+            start_index,
+            list_height,
+            current_page,
+            total_pages,
+        )
+    }
+
+    pub fn render(self, area: Rect, buf: &mut Buffer)
+    where
+        Self: Sized,
+    {
+        if self.list.is_empty() {
+            return;
+        }
+
+        let capacity = area.height as usize;
+        let horizontal_layout = Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]);
+        let [list_area, scroll_area] = horizontal_layout.areas(area);
+
+        let (display_items, _, _, list_height, current_page, total_pages) = self.display_item(area);
 
         if capacity < list_height {
             List::new(display_items).render(list_area, buf);

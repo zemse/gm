@@ -1,7 +1,7 @@
 use crate::{
     app::SharedState,
-    events::Event,
     traits::{Actions, Component},
+    AppEvent,
 };
 use gm_ratatui_extra::{
     act::Act,
@@ -12,6 +12,7 @@ use gm_utils::{
     alloy::StringExt,
     disk_storage::DiskStorageInterface,
 };
+use ratatui::layout::Rect;
 use std::sync::mpsc;
 use strum::{Display, EnumIter};
 use tokio_util::sync::CancellationToken;
@@ -46,7 +47,10 @@ impl TryFrom<FormItem> for FormWidget {
                 empty_text: None,
                 currency: None,
             },
-            FormItem::SaveButton => FormWidget::Button { label: "Save" },
+            FormItem::SaveButton => FormWidget::Button {
+                label: "Save",
+                hover_focus: false,
+            },
             FormItem::ErrorText => FormWidget::ErrorText(String::new()),
         };
         Ok(widget)
@@ -75,16 +79,17 @@ impl AddressBookDisplayPage {
 impl Component for AddressBookDisplayPage {
     fn handle_event(
         &mut self,
-        event: &Event,
-        _area: ratatui::prelude::Rect,
-        _transmitter: &mpsc::Sender<Event>,
+        event: &AppEvent,
+        area: Rect,
+        _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let mut handle_result = Actions::default();
 
         let r = self.form.handle_event(
-            event.key_event(),
+            event.input_event(),
+            area,
             |_, _| Ok(()),
             |label, form| {
                 if label == FormItem::SaveButton {

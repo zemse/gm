@@ -29,7 +29,7 @@ use gm_rpc_proxy::{
 use gm_utils::{disk_storage::DiskStorageInterface, network::NetworkStore};
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{KeyCode, KeyModifiers},
+    crossterm::event::{Event, KeyCode, KeyModifiers},
     layout::Rect,
     widgets::Widget,
 };
@@ -45,7 +45,7 @@ use crate::{
         tx_popup::TxPopup,
     },
     traits::{Actions, Component},
-    Event,
+    AppEvent,
 };
 
 #[derive(Debug)]
@@ -159,7 +159,11 @@ impl ShellPage {
             .join("\n")
     }
 
-    fn create_server_threads(&mut self, tr: &Sender<Event>, ss: &SharedState) -> crate::Result<()> {
+    fn create_server_threads(
+        &mut self,
+        tr: &Sender<AppEvent>,
+        ss: &SharedState,
+    ) -> crate::Result<()> {
         let secret = hex::encode(random_bytes32());
         let networks = NetworkStore::load()?.networks;
 
@@ -192,7 +196,7 @@ impl ShellPage {
                             let (oneshot_tr, oneshot_rv) =
                                 oneshot::channel::<ResponsePayload<Value>>();
 
-                            let _ = tr.send(Event::ShellUpdate(ShellUpdate::RpcProxyRequest(
+                            let _ = tr.send(AppEvent::ShellUpdate(ShellUpdate::RpcProxyRequest(
                                 RefCell::new(Some(UserRequest {
                                     params: UserRequestParams::SendTransaction(
                                         serde_json::from_value(
@@ -211,7 +215,7 @@ impl ShellPage {
                             let (oneshot_tr, oneshot_rv) =
                                 oneshot::channel::<ResponsePayload<Value>>();
 
-                            let _ = tr.send(Event::ShellUpdate(ShellUpdate::RpcProxyRequest(
+                            let _ = tr.send(AppEvent::ShellUpdate(ShellUpdate::RpcProxyRequest(
                                 RefCell::new(Some(UserRequest {
                                     params: UserRequestParams::SignMessage(
                                         serde_json::from_value(
@@ -233,9 +237,9 @@ impl ShellPage {
                 )
                 .await;
                 if let Err(e) = result {
-                    let _ = tr_clone.send(Event::ShellUpdate(ShellUpdate::RpcProxyThreadCrashed(
-                        RefCell::new(Some((e, network_name))),
-                    )));
+                    let _ = tr_clone.send(AppEvent::ShellUpdate(
+                        ShellUpdate::RpcProxyThreadCrashed(RefCell::new(Some((e, network_name)))),
+                    ));
                 }
             }));
 
@@ -295,9 +299,9 @@ impl Component for ShellPage {
 
     fn handle_event(
         &mut self,
-        event: &Event,
+        event: &AppEvent,
         area: Rect,
-        tr: &Sender<crate::Event>,
+        tr: &Sender<AppEvent>,
         _: &CancellationToken,
         ss: &SharedState,
     ) -> crate::Result<Actions> {
@@ -315,159 +319,189 @@ impl Component for ShellPage {
 
         #[allow(clippy::single_match)]
         match event {
-            Event::Input(key_event) => {
-                let mut scroll_to_bottom = false;
+            AppEvent::Input(input_event) => {
+                match input_event {
+                    Event::Key(key_event) => {
+                        let mut scroll_to_bottom = false;
 
-                if let Some((text_input, text_cursor)) = self.get_user_input_mut() {
-                    scroll_to_bottom =
-                    // Keyboard handling for input
-                        InputBox::handle_event(Some(key_event), text_input, text_cursor);
+                        if let Some((text_input, text_cursor)) = self.get_user_input_mut() {
+                            // Keyboard handling for input
+                            scroll_to_bottom = InputBox::handle_event(
+                                Some(input_event),
+                                area,
+                                text_input,
+                                text_cursor,
+                            );
 
-                    // Additional handling on top of InputBox
-                    match key_event.code {
-                        KeyCode::Char(c) => {
-                            if c == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
-                                self.cmd_lines.push(ShellLine::StdOut(
-                                    "Press ctrl+c again to exit".to_string(),
-                                ));
-                                self.cmd_lines.push(ShellLine::UserInput(String::new()));
-                                self.text_cursor = 0;
-                                self.prevent_ctrlc_exit = false;
-                            } else {
-                                self.prevent_ctrlc_exit = true;
-                            }
-                        }
-                        KeyCode::Enter => {
-                            scroll_to_bottom = true;
-
-                            let text_input = text_input.clone();
-                            if text_input.trim().is_empty() {
-                                self.cmd_lines.push(ShellLine::UserInput(String::new()));
-                                self.text_cursor = 0;
-                            } else {
-                                self.kill_signal.cancel();
-                                let mut child = Command::new("sh")
-                                    .arg("-c")
-                                    .arg(text_input)
-                                    // .env("CLICOLOR", "1")
-                                    // .env("CLICOLOR_FORCE", "1")
-                                    .envs(
-                                        self.env_vars
-                                            .as_ref()
-                                            .ok_or(crate::Error::ShellEnvVarsNotSet)?,
-                                    )
-                                    .stdin(Stdio::piped())
-                                    .stdout(Stdio::piped())
-                                    .stderr(Stdio::piped())
-                                    .spawn()
-                                    .map_err(crate::Error::SpawnFailed)?;
-
-                                self.stdin = child.stdin.take();
-                                let stdout = child
-                                    .stdout
-                                    .take()
-                                    .ok_or(crate::Error::StdoutNotAvailable)?;
-                                let stderr = child
-                                    .stderr
-                                    .take()
-                                    .ok_or(crate::Error::StderrNotAvailable)?;
-
-                                let tr_stdout = tr.clone();
-                                self.stdout_thread = Some(thread::spawn(move || {
-                                    let reader = BufReader::new(stdout);
-                                    for line in reader.lines() {
-                                        match line {
-                                            Ok(s) => {
-                                                let _ = tr_stdout.send(Event::ShellUpdate(
-                                                    ShellUpdate::StdOut(s),
-                                                ));
-                                            }
-                                            Err(e) => {
-                                                let _ = tr_stdout.send(Event::ShellUpdate(
-                                                    ShellUpdate::StdOut_Error(e),
-                                                ));
-                                            }
-                                        }
+                            // Additional handling on top of InputBox
+                            match key_event.code {
+                                KeyCode::Char(c) => {
+                                    if c == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
+                                        self.cmd_lines.push(ShellLine::StdOut(
+                                            "Press ctrl+c again to exit".to_string(),
+                                        ));
+                                        self.cmd_lines.push(ShellLine::UserInput(String::new()));
+                                        self.text_cursor = 0;
+                                        self.prevent_ctrlc_exit = false;
+                                    } else {
+                                        self.prevent_ctrlc_exit = true;
                                     }
-                                }));
+                                }
+                                KeyCode::Enter => {
+                                    scroll_to_bottom = true;
 
-                                let tr_stderr = tr.clone();
-                                self.stderr_thread = Some(thread::spawn(move || {
-                                    let reader = BufReader::new(stderr);
-                                    for line in reader.lines() {
-                                        match line {
-                                            Ok(s) => {
-                                                let _ = tr_stderr.send(Event::ShellUpdate(
-                                                    ShellUpdate::StdErr(s),
-                                                ));
-                                            }
-                                            Err(e) => {
-                                                let _ = tr_stderr.send(Event::ShellUpdate(
-                                                    ShellUpdate::StdErr_Error(e),
-                                                ));
-                                            }
-                                        }
-                                    }
-                                }));
+                                    let text_input = text_input.clone();
+                                    if text_input.trim().is_empty() {
+                                        self.cmd_lines.push(ShellLine::UserInput(String::new()));
+                                        self.text_cursor = 0;
+                                    } else {
+                                        self.kill_signal.cancel();
+                                        let mut child = Command::new("sh")
+                                            .arg("-c")
+                                            .arg(text_input)
+                                            // .env("CLICOLOR", "1")
+                                            // .env("CLICOLOR_FORCE", "1")
+                                            .envs(
+                                                self.env_vars
+                                                    .as_ref()
+                                                    .ok_or(crate::Error::ShellEnvVarsNotSet)?,
+                                            )
+                                            .stdin(Stdio::piped())
+                                            .stdout(Stdio::piped())
+                                            .stderr(Stdio::piped())
+                                            .spawn()
+                                            .map_err(crate::Error::SpawnFailed)?;
 
-                                let tr_stderr = tr.clone();
-                                let kill_signal = self.kill_signal.clone();
-                                self.wait_thread = Some(thread::spawn(move || {
-                                    while !kill_signal.is_cancelled() {
-                                        if let Ok(status) = child.try_wait() {
-                                            match status {
-                                                Some(s) => {
-                                                    let _ = tr_stderr.send(Event::ShellUpdate(
-                                                        ShellUpdate::Wait(s),
+                                        self.stdin = child.stdin.take();
+                                        let stdout = child
+                                            .stdout
+                                            .take()
+                                            .ok_or(crate::Error::StdoutNotAvailable)?;
+                                        let stderr = child
+                                            .stderr
+                                            .take()
+                                            .ok_or(crate::Error::StderrNotAvailable)?;
+
+                                        let tr_stdout = tr.clone();
+                                        self.stdout_thread = Some(thread::spawn(move || {
+                                            let reader = BufReader::new(stdout);
+                                            for line in reader.lines() {
+                                                match line {
+                                                    Ok(s) => {
+                                                        let _ =
+                                                            tr_stdout.send(AppEvent::ShellUpdate(
+                                                                ShellUpdate::StdOut(s),
+                                                            ));
+                                                    }
+                                                    Err(e) => {
+                                                        let _ =
+                                                            tr_stdout.send(AppEvent::ShellUpdate(
+                                                                ShellUpdate::StdOut_Error(e),
+                                                            ));
+                                                    }
+                                                }
+                                            }
+                                        }));
+
+                                        let tr_stderr = tr.clone();
+                                        self.stderr_thread = Some(thread::spawn(move || {
+                                            let reader = BufReader::new(stderr);
+                                            for line in reader.lines() {
+                                                match line {
+                                                    Ok(s) => {
+                                                        let _ =
+                                                            tr_stderr.send(AppEvent::ShellUpdate(
+                                                                ShellUpdate::StdErr(s),
+                                                            ));
+                                                    }
+                                                    Err(e) => {
+                                                        let _ =
+                                                            tr_stderr.send(AppEvent::ShellUpdate(
+                                                                ShellUpdate::StdErr_Error(e),
+                                                            ));
+                                                    }
+                                                }
+                                            }
+                                        }));
+
+                                        let tr_stderr = tr.clone();
+                                        let kill_signal = self.kill_signal.clone();
+                                        self.wait_thread = Some(thread::spawn(move || {
+                                            while !kill_signal.is_cancelled() {
+                                                if let Ok(status) = child.try_wait() {
+                                                    match status {
+                                                        Some(s) => {
+                                                            let _ = tr_stderr.send(
+                                                                AppEvent::ShellUpdate(
+                                                                    ShellUpdate::Wait(s),
+                                                                ),
+                                                            );
+                                                        }
+                                                        None => {}
+                                                    }
+                                                    thread::sleep(
+                                                        std::time::Duration::from_millis(100),
+                                                    );
+                                                }
+                                            }
+                                            match child.kill() {
+                                                Ok(_) => {}
+                                                Err(e) => {
+                                                    let _ = tr_stderr.send(AppEvent::ShellUpdate(
+                                                        ShellUpdate::Kill_Error(e),
                                                     ));
                                                 }
-                                                None => {}
                                             }
-                                            thread::sleep(std::time::Duration::from_millis(100));
-                                        }
+                                        }));
                                     }
-                                    match child.kill() {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            let _ = tr_stderr.send(Event::ShellUpdate(
-                                                ShellUpdate::Kill_Error(e),
-                                            ));
-                                        }
+                                }
+                                _ => {
+                                    self.prevent_ctrlc_exit = true;
+                                }
+                            }
+                        } else if let Some(stdin) = &mut self.stdin {
+                            match key_event.code {
+                                KeyCode::Char(c) => {
+                                    if c == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
+                                        self.exit_shell_threads_sync();
+                                        self.cmd_lines.push(ShellLine::UserInput(String::new()));
+                                    } else {
+                                        write!(stdin, "{c}")
+                                            .map_err(crate::Error::StdinWriteFailed)?;
                                     }
-                                }));
+                                }
+                                KeyCode::Enter => {
+                                    writeln!(stdin).map_err(crate::Error::StdinWriteFailed)?;
+                                }
+                                KeyCode::Backspace => {
+                                    write!(stdin, "\x7f")
+                                        .map_err(crate::Error::StdinWriteFailed)?;
+                                }
+                                _ => {}
                             }
                         }
-                        _ => {
-                            self.prevent_ctrlc_exit = true;
-                        }
-                    }
-                } else if let Some(stdin) = &mut self.stdin {
-                    match key_event.code {
-                        KeyCode::Char(c) => {
-                            if c == 'c' && key_event.modifiers == KeyModifiers::CONTROL {
-                                self.exit_shell_threads_sync();
-                                self.cmd_lines.push(ShellLine::UserInput(String::new()));
-                            } else {
-                                write!(stdin, "{c}").map_err(crate::Error::StdinWriteFailed)?;
-                            }
-                        }
-                        KeyCode::Enter => {
-                            writeln!(stdin).map_err(crate::Error::StdinWriteFailed)?;
-                        }
-                        KeyCode::Backspace => {
-                            write!(stdin, "\x7f").map_err(crate::Error::StdinWriteFailed)?;
-                        }
-                        _ => {}
-                    }
-                }
 
-                self.display.text = self.full_text();
-                if scroll_to_bottom {
-                    self.display
-                        .scroll_to_bottom(area.width as usize, area.height as usize);
+                        self.display.text = self.full_text();
+                        if scroll_to_bottom {
+                            self.display
+                                .scroll_to_bottom(area.width as usize, area.height as usize);
+                        }
+                    }
+                    Event::Mouse(_mouse_event) => {
+                        if let Some((text_input, text_cursor)) = self.get_user_input_mut() {
+                            // Mouse handling for input
+                            let _ = InputBox::handle_event(
+                                Some(input_event),
+                                area,
+                                text_input,
+                                text_cursor,
+                            );
+                        }
+                    }
+                    _ => {}
                 }
             }
-            Event::ShellUpdate(update) => {
+            AppEvent::ShellUpdate(update) => {
                 match update {
                     ShellUpdate::StdOut(stdout) => {
                         self.cmd_lines.push(ShellLine::StdOut(stdout.clone()));

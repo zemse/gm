@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use gm_ratatui_extra::input_box::InputBox;
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::KeyCode,
+    crossterm::event::{Event, KeyCode},
     layout::{Offset, Rect},
     widgets::Widget,
 };
@@ -11,8 +11,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
-    events::Event,
     traits::{Actions, Component},
+    AppEvent,
 };
 use gm_utils::account::AccountManager;
 
@@ -28,15 +28,22 @@ pub struct AccountImportPage {
 impl Component for AccountImportPage {
     fn handle_event(
         &mut self,
-        event: &Event,
-        _area: Rect,
-        _transmitter: &mpsc::Sender<Event>,
+        event: &AppEvent,
+        area: Rect,
+        _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
         let mut result = Actions::default();
 
-        if let Event::Input(key_event) = event {
+        InputBox::handle_event(
+            event.input_event(),
+            area,
+            &mut self.input,
+            &mut self.text_cursor,
+        );
+
+        if let AppEvent::Input(input_event) = event {
             if self.display.is_some() {
                 if self.success {
                     result.page_pops = 1;
@@ -47,27 +54,25 @@ impl Component for AccountImportPage {
                 return Ok(result);
             }
 
-            match key_event.code {
-                KeyCode::Char(char) => {
-                    self.input.push(char);
-                }
-                KeyCode::Backspace => {
-                    self.input.pop();
-                }
-                KeyCode::Enter => {
-                    let import_result = AccountManager::import_mnemonic_wallet(&self.input)
-                        .or_else(|_| AccountManager::import_private_key(&self.input));
+            match input_event {
+                Event::Key(key_event) => {
+                    if key_event.code == KeyCode::Enter {
+                        let import_result = AccountManager::import_mnemonic_wallet(&self.input)
+                            .or_else(|_| AccountManager::import_private_key(&self.input));
 
-                    match import_result {
-                        Ok(address) => {
-                            self.display = Some(format!("Successfully imported wallet: {address}"));
-                            self.success = true;
-                        }
-                        Err(err) => {
-                            self.display = Some(format!("Error importing wallet: {err}"));
+                        match import_result {
+                            Ok(address) => {
+                                self.display =
+                                    Some(format!("Successfully imported wallet: {address}"));
+                                self.success = true;
+                            }
+                            Err(err) => {
+                                self.display = Some(format!("Error importing wallet: {err}"));
+                            }
                         }
                     }
                 }
+                Event::Mouse(_) => {}
                 _ => {}
             }
         }

@@ -4,12 +4,12 @@ use gm_utils::config::Config;
 use std::{collections::HashSet, sync::mpsc::Sender, time::Duration};
 use tokio_util::sync::CancellationToken;
 
-use super::Event;
+use crate::AppEvent;
 
 const DELAY: Duration = Duration::from_secs(30);
 
 pub async fn watch_recent_addresses(
-    transmitter: Sender<Event>,
+    transmitter: Sender<AppEvent>,
     shutdown_signal: CancellationToken,
 ) {
     let mut delay = Duration::from_secs(0);
@@ -20,13 +20,13 @@ pub async fn watch_recent_addresses(
                 let _ = match result {
                     Ok(Some(addresses)) => {
                         delay = DELAY; // default duration
-                        transmitter.send(Event::RecentAddressesUpdate(addresses))
+                        transmitter.send(AppEvent::RecentAddressesUpdate(addresses))
                     },
                     Ok(None) => Ok(()),
                     Err(error) => {
                         delay += DELAY;
                         delay *= 2; // exponential backoff in case api fails
-                        transmitter.send(Event::RecentAddressesUpdateError(error))
+                        transmitter.send(AppEvent::RecentAddressesUpdateError(error))
                     },
                 };
             }

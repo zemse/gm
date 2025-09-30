@@ -2,12 +2,12 @@ use gm_utils::assets::get_all_assets;
 use std::{sync::mpsc::Sender, time::Duration};
 use tokio_util::sync::CancellationToken;
 
-use super::Event;
+use crate::AppEvent;
 
 const DELAY_ZERO: Duration = Duration::from_secs(0);
 const DELAY: Duration = Duration::from_secs(10);
 
-pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: CancellationToken) {
+pub async fn watch_assets(transmitter: Sender<AppEvent>, shutdown_signal: CancellationToken) {
     let mut delay = Duration::from_secs(0);
 
     loop {
@@ -16,7 +16,7 @@ pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Cancellat
                 let _ = match result {
                     Ok((wallet_address, assets)) => {
                         delay = DELAY; // default duration
-                        transmitter.send(Event::AssetsUpdate(wallet_address, assets))
+                        transmitter.send(AppEvent::AssetsUpdate(wallet_address, assets))
                     }
                     Err(error) => {
                         let silence_error = matches!(
@@ -29,7 +29,7 @@ pub async fn watch_assets(transmitter: Sender<Event>, shutdown_signal: Cancellat
                         } else {
                             delay *= 2; // exponential backoff in case api fails
                         }
-                        transmitter.send(Event::AssetsUpdateError(error, silence_error))
+                        transmitter.send(AppEvent::AssetsUpdateError(error, silence_error))
                     }
                 };
             }

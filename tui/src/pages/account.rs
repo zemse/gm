@@ -2,26 +2,21 @@ use std::{fmt::Display, sync::mpsc};
 
 use crate::{
     app::SharedState,
-    events::Event,
     traits::{Actions, Component},
+    AppEvent,
 };
 use alloy::primitives::Address;
-use gm_ratatui_extra::{cursor::Cursor, select::Select, thematize::Thematize};
+use gm_ratatui_extra::select_owned::SelectOwned;
 use gm_utils::{
     account::{AccountManager, AccountUtils},
     config::Config,
 };
-use ratatui::{
-    buffer::Buffer,
-    crossterm::event::{KeyCode, KeyEventKind},
-    layout::Rect,
-    widgets::Widget,
-};
+use ratatui::{buffer::Buffer, layout::Rect};
 use tokio_util::sync::CancellationToken;
 
 use super::{account_create::AccountCreatePage, account_import::AccountImportPage, Page};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum AccountSelect {
     Create,
     Import,
@@ -40,9 +35,7 @@ impl Display for AccountSelect {
 
 #[derive(Debug)]
 pub struct AccountPage {
-    cursor: Cursor,
-    focus: bool,
-    list: Vec<AccountSelect>,
+    select: SelectOwned<AccountSelect>,
 }
 
 impl AccountPage {
@@ -54,63 +47,55 @@ impl AccountPage {
                 .map(AccountSelect::Existing)
                 .collect::<Vec<_>>(),
         );
-        Ok(Self {
-            cursor: Cursor::default(),
-            focus: true,
-            list,
+        Ok(AccountPage {
+            select: SelectOwned::new(Some(list)),
         })
     }
 }
 
 impl Component for AccountPage {
     fn set_focus(&mut self, focus: bool) {
-        self.focus = focus;
+        self.select.focus = focus;
     }
 
     fn reload(&mut self, _ss: &SharedState) -> crate::Result<()> {
         let fresh = Self::new()?;
-        self.list = fresh.list;
+        self.select.list = fresh.select.list;
         Ok(())
     }
 
     fn handle_event(
         &mut self,
-        event: &Event,
+        event: &AppEvent,
         _area: Rect,
-        transmitter: &mpsc::Sender<Event>,
+        transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
-        let cursor_max = self.list.len();
-        self.cursor.handle(event.key_event(), cursor_max);
-
         let mut result = Actions::default();
-        if let Event::Input(key_event) = event {
-            if key_event.kind == KeyEventKind::Press {
-                #[allow(clippy::single_match)]
-                match key_event.code {
-                    KeyCode::Enter => match &self.list[self.cursor.current] {
-                        AccountSelect::Create => {
-                            result
-                                .page_inserts
-                                .push(Page::AccountCreate(AccountCreatePage::default()));
-                        }
-                        AccountSelect::Import => {
-                            result
-                                .page_inserts
-                                .push(Page::AccountImport(AccountImportPage::default()));
-                        }
-                        AccountSelect::Existing(address) => {
-                            Config::set_current_account(*address)?;
-                            transmitter.send(Event::AccountChange(*address))?;
-                            transmitter.send(Event::ConfigUpdate)?;
-                            result.page_pops = 1;
-                        }
-                    },
-                    _ => {}
+
+        self.select
+            .handle_event(event.input_event(), _area, |account_select| {
+                match account_select {
+                    AccountSelect::Create => {
+                        result
+                            .page_inserts
+                            .push(Page::AccountCreate(AccountCreatePage::default()));
+                    }
+                    AccountSelect::Import => {
+                        result
+                            .page_inserts
+                            .push(Page::AccountImport(AccountImportPage::default()));
+                    }
+                    AccountSelect::Existing(address) => {
+                        Config::set_current_account(*address)?;
+                        transmitter.send(AppEvent::AccountChange(*address))?;
+                        transmitter.send(AppEvent::ConfigUpdate)?;
+                        result.page_pops = 1;
+                    }
                 }
-            }
-        };
+                Ok::<(), crate::Error>(())
+            })?;
 
         Ok(result)
     }
@@ -119,13 +104,7 @@ impl Component for AccountPage {
     where
         Self: Sized,
     {
-        Select {
-            list: &self.list,
-            cursor: &self.cursor,
-            focus: self.focus,
-            focus_style: shared_state.theme.select_focused(),
-        }
-        .render(area, buf);
+        self.select.render(area, buf, &shared_state.theme);
         area
     }
 }

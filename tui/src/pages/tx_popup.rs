@@ -20,7 +20,7 @@ use gm_ratatui_extra::{
 };
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{KeyCode, KeyEventKind},
+    crossterm::event::{Event, KeyCode, KeyEventKind},
     layout::{Constraint, Layout, Rect},
     widgets::{Block, Widget},
 };
@@ -28,7 +28,7 @@ use serde_json::Value;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::{app::SharedState, error::FmtError, theme::Theme, traits::Actions, Event};
+use crate::{app::SharedState, error::FmtError, theme::Theme, traits::Actions, AppEvent};
 use gm_utils::{account::AccountManager, network::Network};
 
 #[derive(Clone, Default, Debug, PartialEq)]
@@ -113,9 +113,9 @@ impl TxPopup {
     pub fn handle_event<F1, F2, F3, F4, F5>(
         &mut self,
         (event, area, tr, sd, ss): (
-            &crate::Event,
+            &AppEvent,
             Rect,
-            &mpsc::Sender<Event>,
+            &mpsc::Sender<AppEvent>,
             &CancellationToken,
             &SharedState,
         ),
@@ -140,56 +140,60 @@ impl TxPopup {
         );
 
         match event {
-            Event::Input(key_event) => {
-                if key_event.kind == KeyEventKind::Press {
-                    match &self.status {
-                        TxStatus::NotSent => match key_event.code {
-                            KeyCode::Left => {
-                                self.button_cursor = false;
-                            }
-                            KeyCode::Right => {
-                                self.button_cursor = true;
-                            }
-                            KeyCode::Enter => {
-                                if self.button_cursor {
-                                    self.send_tx_thread = Some(send_tx_thread(
-                                        &self.tx_req,
-                                        &self.network,
-                                        tr,
-                                        sd,
-                                        ss,
-                                    )?);
-                                    self.status = TxStatus::Signing;
-                                } else {
-                                    self.close();
-                                    on_cancel()?;
+            AppEvent::Input(input_event) => match input_event {
+                Event::Key(key_event) => {
+                    if key_event.kind == KeyEventKind::Press {
+                        match &self.status {
+                            TxStatus::NotSent => match key_event.code {
+                                KeyCode::Left => {
+                                    self.button_cursor = false;
                                 }
-                            }
-                            KeyCode::Esc => {
-                                self.close();
-                                on_esc()?;
-                            }
-                            _ => {}
-                        },
-                        TxStatus::Signing
-                        | TxStatus::JsonRpcError { .. }
-                        | TxStatus::Pending(_)
-                        | TxStatus::Confirmed(_)
-                        | TxStatus::Failed(_) =>
-                        {
-                            #[allow(clippy::single_match)]
-                            match key_event.code {
+                                KeyCode::Right => {
+                                    self.button_cursor = true;
+                                }
+                                KeyCode::Enter => {
+                                    if self.button_cursor {
+                                        self.send_tx_thread = Some(send_tx_thread(
+                                            &self.tx_req,
+                                            &self.network,
+                                            tr,
+                                            sd,
+                                            ss,
+                                        )?);
+                                        self.status = TxStatus::Signing;
+                                    } else {
+                                        self.close();
+                                        on_cancel()?;
+                                    }
+                                }
                                 KeyCode::Esc => {
                                     self.close();
                                     on_esc()?;
                                 }
                                 _ => {}
+                            },
+                            TxStatus::Signing
+                            | TxStatus::JsonRpcError { .. }
+                            | TxStatus::Pending(_)
+                            | TxStatus::Confirmed(_)
+                            | TxStatus::Failed(_) =>
+                            {
+                                #[allow(clippy::single_match)]
+                                match key_event.code {
+                                    KeyCode::Esc => {
+                                        self.close();
+                                        on_esc()?;
+                                    }
+                                    _ => {}
+                                }
                             }
                         }
                     }
                 }
-            }
-            Event::TxUpdate(status) => {
+                Event::Mouse(_mouse_event) => {}
+                _ => {}
+            },
+            AppEvent::TxUpdate(status) => {
                 self.status = status.clone();
 
                 match status {
@@ -210,7 +214,7 @@ impl TxPopup {
                     _ => {}
                 }
             }
-            Event::TxError(_) => self.reset(),
+            AppEvent::TxError(_) => self.reset(),
             _ => {}
         }
         result.ignore_esc();
@@ -304,7 +308,7 @@ pub enum SendTxResult {
 pub fn send_tx_thread(
     tx_req: &TransactionRequest,
     network: &Network,
-    tr: &mpsc::Sender<Event>,
+    tr: &mpsc::Sender<AppEvent>,
     shutdown_signal: &CancellationToken,
     shared_state: &SharedState,
 ) -> crate::Result<JoinHandle<()>> {
@@ -315,7 +319,7 @@ pub fn send_tx_thread(
     let tx_req = tx_req.clone();
     Ok(tokio::spawn(async move {
         let _ = match run(sender_account, network, tx_req, shutdown_signal).await {
-            Ok(send_result) => tr.send(Event::TxUpdate(match send_result {
+            Ok(send_result) => tr.send(AppEvent::TxUpdate(match send_result {
                 SendTxResult::Submitted(hash) => TxStatus::Pending(hash),
                 SendTxResult::JsonRpcError(error_payload) => TxStatus::JsonRpcError {
                     message: error_payload.message.to_string(),
@@ -329,7 +333,7 @@ pub fn send_tx_thread(
                     }),
                 },
             })),
-            Err(err) => tr.send(Event::TxError(err.fmt_err("TxSubmitError"))),
+            Err(err) => tr.send(AppEvent::TxError(err.fmt_err("TxSubmitError"))),
         };
 
         async fn run(
@@ -427,7 +431,7 @@ pub fn send_tx_thread(
 
 pub fn watch_tx_thread(
     network: &Network,
-    tr: &mpsc::Sender<Event>,
+    tr: &mpsc::Sender<AppEvent>,
     shutdown_signal: &CancellationToken,
     tx_hash: FixedBytes<32>,
 ) -> crate::Result<JoinHandle<()>> {
@@ -442,7 +446,7 @@ pub fn watch_tx_thread(
                     match result {
                         Ok(result) => {
                             if let Some(result) = result {
-                                let _ = tr.send(Event::TxUpdate(if result.status() {
+                                let _ = tr.send(AppEvent::TxUpdate(if result.status() {
                                     TxStatus::Confirmed(tx_hash)
                                 } else {
                                     TxStatus::Failed(tx_hash)
@@ -451,7 +455,7 @@ pub fn watch_tx_thread(
                             }
                         }
                         Err(e) => {
-                            let _ = tr.send(Event::TxError(
+                            let _ = tr.send(AppEvent::TxError(
                                 crate::Error::from(e).fmt_err("TxStatusError"),
                             ));
                         }

@@ -14,7 +14,7 @@ use gm_ratatui_extra::{
     thematize::Thematize,
 };
 use ratatui::{
-    crossterm::event::KeyCode,
+    crossterm::event::{Event, KeyCode},
     layout::Rect,
     text::Text,
     widgets::{Paragraph, Widget, Wrap},
@@ -38,7 +38,7 @@ use crate::{
         tx_popup::TxPopup,
     },
     traits::{Actions, Component},
-    Event,
+    AppEvent,
 };
 use gm_utils::network::Network;
 
@@ -142,7 +142,10 @@ impl TryFrom<FormItem> for FormWidget {
                 empty_text: Some("Paste Walletconnect URI from dapp"),
                 currency: None,
             },
-            FormItem::ConnectButton => FormWidget::Button { label: "Connect" },
+            FormItem::ConnectButton => FormWidget::Button {
+                label: "Connect",
+                hover_focus: false,
+            },
         };
         Ok(widget)
     }
@@ -277,9 +280,9 @@ impl Component for WalletConnectPage {
 
     fn handle_event(
         &mut self,
-        event: &Event,
+        event: &AppEvent,
         area: Rect,
-        tr: &mpsc::Sender<Event>,
+        tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
         ss: &SharedState,
     ) -> crate::Result<crate::traits::Actions> {
@@ -293,7 +296,7 @@ impl Component for WalletConnectPage {
 
         // First handle the WalletConnect specific events regardless of what's there on the UI
         match event {
-            Event::WalletConnectMessage(_addr, msg) => {
+            AppEvent::WalletConnectMessage(_addr, msg) => {
                 match &msg.data {
                     WcData::SessionPing => {
                         if let Some(tr_2) = self.tr_2.as_ref() {
@@ -313,7 +316,7 @@ impl Component for WalletConnectPage {
                     _ => return Err(crate::Error::MethodUnhandled(msg.clone())),
                 };
             }
-            Event::WalletConnectStatus(status) => {
+            AppEvent::WalletConnectStatus(status) => {
                 self.status = status.clone();
                 if let Some((_, proposal)) = status.proposal() {
                     let proposal = proposal
@@ -326,7 +329,7 @@ impl Component for WalletConnectPage {
                     self.confirm_popup.open();
                 }
             }
-            Event::WalletConnectError(_, _) => {
+            AppEvent::WalletConnectError(_, _) => {
                 self.status = WalletConnectStatus::Idle;
             }
             _ => {}
@@ -364,7 +367,7 @@ impl Component for WalletConnectPage {
                         .0
                         .clone();
 
-                    let _ = tr.send(Event::WalletConnectStatus(
+                    let _ = tr.send(AppEvent::WalletConnectStatus(
                         WalletConnectStatus::SessionSettleInProgress,
                     ));
 
@@ -376,32 +379,33 @@ impl Component for WalletConnectPage {
                         self.watch_thread = Some(tokio::spawn(async move {
                             let mut pairing = pairing_clone;
                             let Ok(msgs) = pairing.approve_with_session_settle(addr).await else {
-                                let _ = tr.send(Event::WalletConnectStatus(
+                                let _ = tr.send(AppEvent::WalletConnectStatus(
                                     WalletConnectStatus::SessionSettleFailed,
                                 ));
                                 return;
                             };
 
-                            let _ = tr.send(Event::WalletConnectStatus(
+                            let _ = tr.send(AppEvent::WalletConnectStatus(
                                 WalletConnectStatus::SessionSettleDone,
                             ));
 
                             for msg in msgs {
-                                let _ = tr.send(Event::WalletConnectMessage(addr, Box::new(msg)));
+                                let _ =
+                                    tr.send(AppEvent::WalletConnectMessage(addr, Box::new(msg)));
                             }
 
                             while !shutdown_signal.is_cancelled() {
                                 match pairing.watch_messages(Topic::Derived, None).await {
                                     Ok(messages) => {
                                         for msg in messages {
-                                            let _ = tr.send(Event::WalletConnectMessage(
+                                            let _ = tr.send(AppEvent::WalletConnectMessage(
                                                 addr,
                                                 Box::new(msg),
                                             ));
                                         }
                                     }
                                     Err(error) => {
-                                        let _ = tr.send(Event::WalletConnectError(
+                                        let _ = tr.send(AppEvent::WalletConnectError(
                                             addr,
                                             format!("Error during watch messages {error:?}"),
                                         ));
@@ -439,7 +443,7 @@ impl Component for WalletConnectPage {
                                     {
                                         Ok(_) => {}
                                         Err(error) => tr
-                                            .send(Event::WalletConnectError(
+                                            .send(AppEvent::WalletConnectError(
                                                 addr,
                                                 format!("{error:?}"),
                                             ))
@@ -453,7 +457,7 @@ impl Component for WalletConnectPage {
                     Ok(())
                 },
                 || {
-                    let _ = tr.send(Event::WalletConnectStatus(
+                    let _ = tr.send(AppEvent::WalletConnectStatus(
                         WalletConnectStatus::SessionSettleCancelled,
                     ));
                     Ok(())
@@ -583,7 +587,8 @@ impl Component for WalletConnectPage {
             handle_result.merge(r);
         } else if self.status == WalletConnectStatus::Idle {
             let r = self.form.handle_event(
-                event.key_event(),
+                event.input_event(),
+                area,
                 |_, _| Ok(()),
                 |item, form| {
                     if item == FormItem::ConnectButton {
@@ -609,20 +614,20 @@ impl Component for WalletConnectPage {
                         );
 
                         tokio::spawn(async move {
-                            let _ = tr.send(Event::WalletConnectStatus(
+                            let _ = tr.send(AppEvent::WalletConnectStatus(
                                 WalletConnectStatus::Initializing,
                             ));
 
                             match conn.init_pairing(&uri_input).await {
                                 Ok((pairing, proposal)) => {
-                                    let _ = tr.send(Event::WalletConnectStatus(
+                                    let _ = tr.send(AppEvent::WalletConnectStatus(
                                         WalletConnectStatus::ProposalReceived(Box::new((
                                             pairing, proposal,
                                         ))),
                                     ));
                                 }
                                 Err(error) => {
-                                    let _ = tr.send(Event::WalletConnectError(
+                                    let _ = tr.send(AppEvent::WalletConnectError(
                                         current_account,
                                         format!("{error:?}"),
                                     ));
@@ -638,12 +643,14 @@ impl Component for WalletConnectPage {
             self.cursor
                 .handle(event.key_event(), self.session_requests.len());
 
-            if let Event::Input(key_event) = event {
-                #[allow(clippy::single_match)]
-                match key_event.code {
-                    KeyCode::Enter => {
-                        self.open_request_at_cursor()?;
+            if let AppEvent::Input(input_event) = event {
+                match input_event {
+                    Event::Key(key_event) => {
+                        if key_event.code == KeyCode::Enter {
+                            self.open_request_at_cursor()?;
+                        }
                     }
+                    Event::Mouse(_mouse_event) => {}
                     _ => {}
                 }
             }
@@ -654,16 +661,22 @@ impl Component for WalletConnectPage {
         }
 
         // Special handling for ESC key, Ask user if they really want to exit
-        if let Event::Input(key_event) = event {
-            if key_event.code == KeyCode::Esc
-                && self.status != WalletConnectStatus::Idle
-                && !self.confirm_popup.is_open()
-                && !self.exit_popup.is_open()
-                && !self.tx_popup.is_open()
-                && !self.sign_popup.is_open()
-                && !any_popup_open_before
-            {
-                self.exit_popup.open();
+        if let AppEvent::Input(input_event) = event {
+            match input_event {
+                Event::Key(key_event) => {
+                    if key_event.code == KeyCode::Esc
+                        && self.status != WalletConnectStatus::Idle
+                        && !self.confirm_popup.is_open()
+                        && !self.exit_popup.is_open()
+                        && !self.tx_popup.is_open()
+                        && !self.sign_popup.is_open()
+                        && !any_popup_open_before
+                    {
+                        self.exit_popup.open();
+                    }
+                }
+                Event::Mouse(_mouse_event) => {}
+                _ => {}
             }
         }
 

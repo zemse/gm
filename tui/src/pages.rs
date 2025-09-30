@@ -26,7 +26,7 @@ use crate::{
         token::TokenPage, token_create::TokenCreatePage,
     },
     traits::{Actions, Component},
-    Event,
+    AppEvent,
 };
 
 pub mod account;
@@ -112,7 +112,7 @@ impl Page {
 
     pub fn main_menu_focused_item(&self) -> Option<&MainMenuItem> {
         match self {
-            Page::MainMenu(page) => Some(page.get_focussed_item()),
+            Page::MainMenu(main_menu) => main_menu.select.get_focussed_item(),
             _ => None,
         }
     }
@@ -236,9 +236,9 @@ impl Component for Page {
 
     fn handle_event(
         &mut self,
-        event: &Event,
+        event: &AppEvent,
         area: ratatui::prelude::Rect,
-        tr: &mpsc::Sender<Event>,
+        tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
         ss: &SharedState,
     ) -> crate::Result<Actions> {

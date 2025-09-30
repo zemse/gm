@@ -1,24 +1,30 @@
 #[cfg(feature = "demo")]
 use std::time::Instant;
 use std::{
-    io,
+    io::{self, stdout},
     str::FromStr,
     sync::{mpsc, Arc, RwLock, RwLockWriteGuard},
 };
 
 #[cfg(feature = "demo")]
 use crate::demo::{demo_exit_text, demo_text, demo_text_2};
-use crate::pages::{
-    config::ConfigPage,
-    dev_key_capture::DevKeyCapturePage,
-    footer::Footer,
-    invite_popup::InvitePopup,
-    main_menu::{MainMenuItem, MainMenuPage},
-    shell::ShellPage,
-    text::TextPage,
-    title::Title,
-    trade::TradePage,
-    Page,
+use crate::{
+    events::{
+        assets::watch_assets, input::watch_input_events, recent_addresses::watch_recent_addresses,
+    },
+    pages::{
+        config::ConfigPage,
+        dev_key_capture::DevKeyCapturePage,
+        footer::Footer,
+        invite_popup::InvitePopup,
+        main_menu::{MainMenuItem, MainMenuPage},
+        shell::ShellPage,
+        text::TextPage,
+        title::Title,
+        trade::TradePage,
+        Page,
+    },
+    AppEvent,
 };
 use alloy::primitives::Address;
 use gm_ratatui_extra::{
@@ -31,7 +37,10 @@ use gm_utils::{
     network::NetworkStore,
     price_manager::PriceManager,
 };
-use ratatui::crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
+use ratatui::crossterm::{
+    event::{DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers},
+    execute,
+};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
@@ -40,10 +49,7 @@ use ratatui::{
 };
 use tokio_util::sync::CancellationToken;
 
-use super::{
-    events::{self, Event},
-    traits::{Actions, Component},
-};
+use super::traits::{Actions, Component};
 use crate::{
     error::FmtError,
     events::helios::helios_thread,
@@ -148,10 +154,11 @@ impl App {
         })
     }
 
-    pub async fn run(&mut self, pre_events: Option<Vec<Event>>) -> crate::Result<()> {
-        let (event_tr, event_rc) = mpsc::channel::<Event>();
+    pub async fn run(&mut self, pre_events: Option<Vec<AppEvent>>) -> crate::Result<()> {
+        let (event_tr, event_rc) = mpsc::channel::<AppEvent>();
         let shutdown = CancellationToken::new();
         let mut terminal = ratatui::init();
+        execute!(stdout(), EnableMouseCapture)?;
 
         self.init_threads(&event_tr, &shutdown);
 
@@ -185,6 +192,7 @@ impl App {
         self.exit_threads().await;
 
         ratatui::restore();
+        execute!(stdout(), DisableMouseCapture)?;
 
         #[cfg(feature = "demo")]
         println!("{}", demo_exit_text());
@@ -199,11 +207,11 @@ impl App {
         Ok(completed_frame.area)
     }
 
-    fn init_threads(&mut self, tr: &mpsc::Sender<Event>, sd: &CancellationToken) {
+    fn init_threads(&mut self, tr: &mpsc::Sender<AppEvent>, sd: &CancellationToken) {
         let tr_input = tr.clone();
         let shutdown_signal = sd.clone();
         self.input_thread = Some(std::thread::spawn(move || {
-            events::input::watch_input_events(tr_input, shutdown_signal);
+            watch_input_events(tr_input, shutdown_signal);
         }));
 
         let tr_eth_price = tr.clone();
@@ -213,8 +221,8 @@ impl App {
                 shutdown_signal,
                 move |res| {
                     let _ = match res {
-                        Ok(()) => tr_eth_price.send(Event::PricesUpdate),
-                        Err(e) => tr_eth_price.send(Event::PricesUpdateError(e)),
+                        Ok(()) => tr_eth_price.send(AppEvent::PricesUpdate),
+                        Err(e) => tr_eth_price.send(AppEvent::PricesUpdateError(e)),
                     };
                 },
             ));
@@ -222,14 +230,14 @@ impl App {
 
     fn start_other_threads(
         &mut self,
-        tr: &mpsc::Sender<Event>,
+        tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
     ) -> crate::Result<()> {
         if self.assets_thread.is_none() {
             let tr_assets = tr.clone();
             let shutdown_signal = sd.clone();
             self.assets_thread = Some(tokio::spawn(async move {
-                events::assets::watch_assets(tr_assets, shutdown_signal).await
+                watch_assets(tr_assets, shutdown_signal).await
             }));
         };
 
@@ -239,7 +247,7 @@ impl App {
             let assets_manager = Arc::clone(&self.shared_state.asset_manager);
             self.helios_thread = Some(tokio::spawn(async move {
                 if let Err(e) = helios_thread(&tr, &sd, assets_manager).await {
-                    let _ = tr.send(Event::HeliosError(e.fmt_err("HeliosError")));
+                    let _ = tr.send(AppEvent::HeliosError(e.fmt_err("HeliosError")));
                 }
             }));
         }
@@ -248,11 +256,7 @@ impl App {
             let tr_recent_addresses = tr.clone();
             let shutdown_signal = sd.clone();
             self.recent_addresses_thread = Some(tokio::spawn(async move {
-                events::recent_addresses::watch_recent_addresses(
-                    tr_recent_addresses,
-                    shutdown_signal,
-                )
-                .await
+                watch_recent_addresses(tr_recent_addresses, shutdown_signal).await
             }));
         }
 
@@ -273,7 +277,7 @@ impl App {
 
     fn set_online(
         &mut self,
-        tr: &mpsc::Sender<Event>,
+        tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
     ) -> crate::Result<()> {
         self.shared_state.online = Some(true);
@@ -351,9 +355,9 @@ impl App {
 
     async fn handle_event(
         &mut self,
-        event: super::events::Event,
+        event: AppEvent,
         area: Rect,
-        tr: &mpsc::Sender<Event>,
+        tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
     ) -> crate::Result<()> {
         let [_, body_area, _] = self.get_areas(area);
@@ -373,6 +377,91 @@ impl App {
         #[cfg(not(feature = "demo"))]
         let demo_popup_shown = false;
 
+        // Update state based on events
+        match &event {
+            AppEvent::AccountChange(address) => {
+                self.shared_state.current_account = Some(*address);
+            }
+
+            AppEvent::ConfigUpdate => {
+                self.reload()?;
+            }
+
+            AppEvent::PricesUpdate => {
+                // The prices have already been updated in the PriceManager store in shared_state
+                self.set_online(tr, sd)?;
+            }
+            AppEvent::PricesUpdateError(error) => {
+                if error.is_connect() {
+                    // ETH Price is the main API for understanding if we are connected to internet
+                    self.set_offline().await;
+                } else {
+                    self.fatal_error_popup.set_text(error.to_string());
+                }
+            }
+
+            // Assets API
+            AppEvent::AssetsUpdate(wallet_address, assets) => {
+                self.shared_state
+                    .assets_mut()?
+                    // TODO use Option RefCell here to avoid clone
+                    .update_assets(*wallet_address, assets.clone())?;
+            }
+            AppEvent::AssetsUpdateError(error, silence_error) => {
+                if !silence_error {
+                    self.fatal_error_popup.set_text(error.to_string());
+                }
+            }
+
+            AppEvent::HeliosUpdate {
+                account,
+                network,
+                token_address,
+                status,
+            } => {
+                self.shared_state
+                    .asset_manager
+                    .write()
+                    .map_err(|_| crate::Error::Poisoned("HeliosUpdate".to_string()))?
+                    .update_light_client_verification(
+                        *account,
+                        // TODO use Option RefCell here to avoid clone
+                        network.clone(),
+                        token_address.clone(),
+                        status.clone(),
+                    );
+            }
+            AppEvent::HeliosError(error) => {
+                self.fatal_error_popup.set_text(error.clone());
+            }
+
+            AppEvent::RecentAddressesUpdate(addresses) => {
+                self.shared_state.recent_addresses = Some(addresses.clone());
+            }
+            AppEvent::RecentAddressesUpdateError(error) => {
+                self.fatal_error_popup.set_text(error.to_string());
+            }
+
+            // Candles API
+            AppEvent::CandlesUpdateError(error) => {
+                self.fatal_error_popup.set_text(error.to_string());
+            }
+
+            // Transaction API
+            AppEvent::TxError(error) => self.fatal_error_popup.set_text(error.clone()),
+
+            AppEvent::WalletConnectError(_, error) => {
+                self.fatal_error_popup.set_text(error.clone());
+            }
+
+            AppEvent::InviteError(error) => {
+                self.fatal_error_popup.set_text(error.clone());
+            }
+
+            _ => {}
+        }
+
+        // Handle the event in the relavent component
         let result = if self.fatal_error_popup.is_shown() {
             self.fatal_error_popup
                 .handle_event::<Actions>(event.key_event(), area)
@@ -387,131 +476,69 @@ impl App {
                 .handle_event::<Actions>(event.key_event(), area)
         } else if self.context.last().is_some() {
             let page = self.context.last_mut().unwrap();
-            page.handle_event(&event, body_area.block_inner(), tr, sd, &self.shared_state)?
+            let page_area = if page.is_main_menu() {
+                let [left_area, _, _] = Layout::horizontal([
+                    Constraint::Length(13),
+                    Constraint::Length(1),
+                    Constraint::Min(2),
+                ])
+                .areas(body_area.block_inner());
+                left_area
+            } else {
+                body_area.block_inner()
+            };
+            page.handle_event(&event, page_area, tr, sd, &self.shared_state)?
         } else {
             Actions::default()
         };
 
         let (ignore_esc, ignore_ctrlc) = self.process_result(result).await?;
 
+        // Context is empty (due to pressing ESC)
         if self.context.is_empty() {
             self.exit = true;
         }
 
-        match event {
-            Event::Input(key_event) => {
-                // check if we should exit on 'q' press
-                if key_event.kind == KeyEventKind::Press {
-                    #[allow(clippy::single_match)]
-                    match key_event.code {
-                        KeyCode::Char(char) => {
-                            // TODO can we quit using q as well?
-                            // if char == 'q' && self.navigation.text_input().is_none() {
-                            //     self.exit = true;
-                            // }
-                            if char == 'c'
-                                && key_event.modifiers == KeyModifiers::CONTROL
-                                && !ignore_ctrlc
-                            {
+        // Global key handling
+        if let AppEvent::Input(Event::Key(key_event)) = event {
+            // check if we should exit on 'q' press
+            if key_event.kind == KeyEventKind::Press {
+                #[allow(clippy::single_match)]
+                match key_event.code {
+                    KeyCode::Char(char) => {
+                        // TODO can we quit using q as well?
+                        // if char == 'q' && self.navigation.text_input().is_none() {
+                        //     self.exit = true;
+                        // }
+                        if char == 'c'
+                            && key_event.modifiers == KeyModifiers::CONTROL
+                            && !ignore_ctrlc
+                        {
+                            self.exit = true;
+                        }
+                        if char == 'r' && key_event.modifiers == KeyModifiers::CONTROL {
+                            self.fatal_error_popup.set_text("test error".to_string());
+                        }
+                        if char == 't' && key_event.modifiers == KeyModifiers::CONTROL {
+                            self.context.push(Page::Trade(TradePage::default()));
+                        }
+                    }
+                    KeyCode::Esc => {
+                        if self.fatal_error_popup.is_shown() {
+                            self.fatal_error_popup.clear();
+                        } else if !ignore_esc {
+                            let page = self.context.pop();
+                            if let Some(mut page) = page {
+                                page.exit_threads().await;
+                            }
+                            if self.context.is_empty() {
                                 self.exit = true;
                             }
-                            if char == 'r' && key_event.modifiers == KeyModifiers::CONTROL {
-                                self.fatal_error_popup.set_text("test error".to_string());
-                            }
-                            if char == 't' && key_event.modifiers == KeyModifiers::CONTROL {
-                                self.context.push(Page::Trade(TradePage::default()));
-                            }
                         }
-                        KeyCode::Esc => {
-                            if self.fatal_error_popup.is_shown() {
-                                self.fatal_error_popup.clear();
-                            } else if !ignore_esc {
-                                let page = self.context.pop();
-                                if let Some(mut page) = page {
-                                    page.exit_threads().await;
-                                }
-                                if self.context.is_empty() {
-                                    self.exit = true;
-                                }
-                            }
-                        }
-                        _ => {}
                     }
+                    _ => {}
                 }
             }
-
-            Event::AccountChange(address) => {
-                self.shared_state.current_account = Some(address);
-            }
-
-            Event::ConfigUpdate => {
-                self.reload()?;
-            }
-
-            Event::PricesUpdate => {
-                // The prices have already been updated in the PriceManager store in shared_state
-                self.set_online(tr, sd)?;
-            }
-            Event::PricesUpdateError(error) => {
-                if error.is_connect() {
-                    // ETH Price is the main API for understanding if we are connected to internet
-                    self.set_offline().await;
-                } else {
-                    self.fatal_error_popup.set_text(error.to_string());
-                }
-            }
-
-            // Assets API
-            Event::AssetsUpdate(wallet_address, assets) => {
-                self.shared_state
-                    .assets_mut()?
-                    .update_assets(wallet_address, assets)?;
-            }
-            Event::AssetsUpdateError(error, silence_error) => {
-                if !silence_error {
-                    self.fatal_error_popup.set_text(error.to_string());
-                }
-            }
-
-            Event::HeliosUpdate {
-                account,
-                network,
-                token_address,
-                status,
-            } => {
-                self.shared_state
-                    .asset_manager
-                    .write()
-                    .map_err(|_| crate::Error::Poisoned("HeliosUpdate".to_string()))?
-                    .update_light_client_verification(account, network, token_address, status);
-            }
-            Event::HeliosError(error) => {
-                self.fatal_error_popup.set_text(error);
-            }
-
-            Event::RecentAddressesUpdate(addresses) => {
-                self.shared_state.recent_addresses = Some(addresses);
-            }
-            Event::RecentAddressesUpdateError(error) => {
-                self.fatal_error_popup.set_text(error.to_string());
-            }
-
-            // Candles API
-            Event::CandlesUpdateError(error) => {
-                self.fatal_error_popup.set_text(error.to_string());
-            }
-
-            // Transaction API
-            Event::TxError(error) => self.fatal_error_popup.set_text(error),
-
-            Event::WalletConnectError(_, error) => {
-                self.fatal_error_popup.set_text(error);
-            }
-
-            Event::InviteError(error) => {
-                self.fatal_error_popup.set_text(error);
-            }
-            _ => {}
         };
 
         Ok(())
@@ -588,7 +615,7 @@ impl Widget for &App {
                 let dummy_page = match main_menu_item {
                     MainMenuItem::Portfolio => {
                         let mut preview_page = main_menu_item
-                            .get_page()
+                            .get_page(&self.shared_state)
                             .expect("main_menu_item.get_page() failed");
                         preview_page.set_focus(false);
                         preview_page
@@ -614,7 +641,7 @@ impl Widget for &App {
                     }
                     MainMenuItem::WalletConnect => {
                         let mut preview_page = main_menu_item
-                            .get_page()
+                            .get_page(&self.shared_state)
                             .expect("main_menu_item.get_page() failed");
                         preview_page.set_focus(false);
                         preview_page

@@ -5,7 +5,9 @@ use alloy::{
     signers::{k256::ecdsa::SigningKey, Signature},
 };
 use gm_ratatui_extra::candle_chart::{Candle, Interval};
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+use ratatui::crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
+};
 use walletconnect_sdk::wc_message::WcMessage;
 
 use gm_utils::{
@@ -26,8 +28,8 @@ pub mod input;
 pub mod recent_addresses;
 
 #[derive(Debug)]
-pub enum Event {
-    Input(KeyEvent),
+pub enum AppEvent {
+    Input(Event),
 
     AccountChange(Address),
     ConfigUpdate,
@@ -73,20 +75,20 @@ pub enum Event {
     ShellUpdate(ShellUpdate),
 }
 
-impl Event {
-    pub const INPUT_KEY_ENTER: Event = Event::Input(KeyEvent {
+impl AppEvent {
+    pub const INPUT_KEY_ENTER: AppEvent = AppEvent::Input(Event::Key(KeyEvent {
         code: KeyCode::Enter,
         modifiers: KeyModifiers::NONE,
         kind: KeyEventKind::Press,
         state: KeyEventState::NONE,
-    });
+    }));
 
     pub fn fmt(&self) -> String {
         format!("{self:?}")
     }
 
     pub fn is_input(&self) -> bool {
-        matches!(self, Event::Input(_))
+        matches!(self, AppEvent::Input(_))
     }
 
     pub fn is_space_or_enter_pressed(&self) -> bool {
@@ -97,19 +99,23 @@ impl Event {
         if let Some(ch) = char {
             matches!(
                 self,
-                Event::Input(KeyEvent {
-                    kind: KeyEventKind::Press,
-                    code: KeyCode::Char(c),
-                    ..
-                }) if *c == ch
+                AppEvent::Input(
+                    Event::Key(
+                        KeyEvent {
+                            kind: KeyEventKind::Press,
+                            code: KeyCode::Char(c),
+                            ..
+                        }
+                    )
+                ) if *c == ch,
             )
         } else {
             matches!(
                 self,
-                Event::Input(KeyEvent {
+                AppEvent::Input(Event::Key(KeyEvent {
                     kind: KeyEventKind::Press,
                     ..
-                })
+                }))
             )
         }
     }
@@ -117,20 +123,27 @@ impl Event {
     pub fn is_key_pressed(&self, key: KeyCode) -> bool {
         matches!(
             self,
-            Event::Input(KeyEvent {
+            AppEvent::Input(
+                Event::Key(KeyEvent {
                 kind: KeyEventKind::Press,
                 code,
                 modifiers: KeyModifiers::NONE,
                 ..
-            }) if *code == key
+            })) if *code == key,
         )
     }
 
+    pub fn input_event(&self) -> Option<&Event> {
+        match self {
+            AppEvent::Input(event) => Some(event),
+            _ => None,
+        }
+    }
+
     pub fn key_event(&self) -> Option<&KeyEvent> {
-        if let Event::Input(key_event) = self {
-            Some(key_event)
-        } else {
-            None
+        match self {
+            AppEvent::Input(Event::Key(key_event)) => Some(key_event),
+            _ => None,
         }
     }
 }

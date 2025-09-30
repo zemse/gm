@@ -1,10 +1,7 @@
 use crate::app::SharedState;
 use crate::pages::tx_popup::TxPopup;
+use crate::traits::{Actions, Component};
 use crate::widgets::{address_book_popup, networks_popup, AddressBookPopup, NetworksPopup};
-use crate::{
-    events::Event,
-    traits::{Actions, Component},
-};
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::form::{Form, FormWidget};
 use gm_ratatui_extra::thematize::Thematize;
@@ -15,7 +12,7 @@ use gm_utils::network::{Network, NetworkStore};
 use tokio_util::sync::CancellationToken;
 
 use super::address_book::AddressBookMenuItem;
-use crate::Result;
+use crate::{AppEvent, Result};
 
 use alloy::primitives::Bytes;
 use alloy::rpc::types::{TransactionInput, TransactionRequest};
@@ -60,6 +57,7 @@ impl TryFrom<FormItem> for FormWidget {
             },
             FormItem::SendMessageButton => FormWidget::Button {
                 label: "Send Message",
+                hover_focus: false,
             },
         };
         Ok(widget)
@@ -92,9 +90,9 @@ impl Component for SendMessagePage {
 
     fn handle_event(
         &mut self,
-        event: &Event,
+        event: &AppEvent,
         area: Rect,
-        tr: &mpsc::Sender<Event>,
+        tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
         ss: &SharedState,
     ) -> Result<Actions> {
@@ -102,7 +100,7 @@ impl Component for SendMessagePage {
 
         #[allow(clippy::single_match)]
         match event {
-            Event::ConfigUpdate => {
+            AppEvent::ConfigUpdate => {
                 let network_name = self.form.get_text(FormItem::Network);
                 let network_store = NetworkStore::load()?;
                 let network = network_store
@@ -164,7 +162,8 @@ impl Component for SendMessagePage {
                     .set_items(Some(NetworkStore::load()?.filter(ss.testnet_mode)));
             } else {
                 let r = self.form.handle_event(
-                    event.key_event(),
+                    event.input_event(),
+                    area,
                     |_, _| Ok(()),
                     |label, form| {
                         if label == FormItem::SendMessageButton {

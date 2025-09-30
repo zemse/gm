@@ -1,6 +1,6 @@
 use gm_ratatui_extra::candle_chart::{Candle, CandleChart, Interval};
 use ratatui::{
-    crossterm::event::{KeyCode, KeyEventKind},
+    crossterm::event::{Event, KeyCode, KeyEventKind},
     widgets::Widget,
 };
 use std::str::FromStr;
@@ -8,11 +8,8 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::app::SharedState;
-use crate::{
-    traits::{Actions, Component},
-    Event,
-};
+use crate::traits::{Actions, Component};
+use crate::{app::SharedState, AppEvent};
 
 #[derive(Default, Debug)]
 pub struct TradePage {
@@ -31,50 +28,58 @@ impl Component for TradePage {
 
     fn handle_event(
         &mut self,
-        event: &crate::Event,
+        event: &AppEvent,
         _area: ratatui::prelude::Rect,
-        transmitter: &std::sync::mpsc::Sender<crate::Event>,
+        transmitter: &std::sync::mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<crate::traits::Actions> {
         match event {
-            Event::Input(key_event) => {
-                if let Some(candle_chart) = &mut self.candle_chart {
-                    candle_chart.handle_event(key_event);
-                }
+            AppEvent::Input(input_event) => {
+                match input_event {
+                    Event::Key(key_event) => {
+                        if let Some(candle_chart) = &mut self.candle_chart {
+                            candle_chart.handle_event(key_event);
+                        }
 
-                if key_event.kind == KeyEventKind::Press {
-                    match key_event.code {
-                        KeyCode::Char(num)
-                            if i32::from_str(&num.to_string()).is_ok()
-                                && (1..=5).contains(&i32::from_str(&num.to_string()).unwrap()) =>
-                        {
-                            let interval = match num {
-                                '1' => Interval::OneSecond,
-                                '2' => Interval::FifteenMinutes,
-                                '3' => Interval::OneHour,
-                                '4' => Interval::OneWeek,
-                                '5' => Interval::OneMonth,
-                                _ => Interval::OneSecond,
-                            };
-                            if interval != self.interval {
-                                // Do an API call and get the candles for the right interval
+                        if key_event.kind == KeyEventKind::Press {
+                            match key_event.code {
+                                KeyCode::Char(num)
+                                    if i32::from_str(&num.to_string()).is_ok()
+                                        && (1..=5).contains(
+                                            &i32::from_str(&num.to_string()).unwrap(),
+                                        ) =>
+                                {
+                                    let interval = match num {
+                                        '1' => Interval::OneSecond,
+                                        '2' => Interval::FifteenMinutes,
+                                        '3' => Interval::OneHour,
+                                        '4' => Interval::OneWeek,
+                                        '5' => Interval::OneMonth,
+                                        _ => Interval::OneSecond,
+                                    };
+                                    if interval != self.interval {
+                                        // Do an API call and get the candles for the right interval
 
-                                // Close the previous thread if it exists
-                                if let Some(thread) = self.api_thread.take() {
-                                    thread.abort();
+                                        // Close the previous thread if it exists
+                                        if let Some(thread) = self.api_thread.take() {
+                                            thread.abort();
+                                        }
+
+                                        // Start a new thread to fetch the candles
+                                        self.api_thread =
+                                            Some(start_api_thread(interval, transmitter, None));
+                                    }
                                 }
-
-                                // Start a new thread to fetch the candles
-                                self.api_thread =
-                                    Some(start_api_thread(interval, transmitter, None));
+                                _ => {}
                             }
                         }
-                        _ => {}
                     }
+                    Event::Mouse(_mouse_event) => {}
+                    _ => {}
                 }
             }
-            Event::CandlesUpdate(candles, interval) => {
+            AppEvent::CandlesUpdate(candles, interval) => {
                 if self.candle_chart.is_none() {
                     self.candle_chart = Some(CandleChart::default())
                 }
@@ -121,7 +126,7 @@ impl Component for TradePage {
 /// query_duration - the duration for which to re-query the API.
 fn start_api_thread(
     interval: Interval,
-    transmitter: &std::sync::mpsc::Sender<Event>,
+    transmitter: &std::sync::mpsc::Sender<AppEvent>,
     query_duration: Option<Duration>,
 ) -> tokio::task::JoinHandle<()> {
     let tr = transmitter.clone();
@@ -168,10 +173,10 @@ fn start_api_thread(
                 Ok(parsed) => {
                     let candles: Vec<Candle> =
                         parsed.into_iter().map(|kline| kline.into()).collect();
-                    let _ = tr.send(Event::CandlesUpdate(candles, interval));
+                    let _ = tr.send(AppEvent::CandlesUpdate(candles, interval));
                 }
                 Err(err) => {
-                    let _ = tr.send(Event::CandlesUpdateError(err));
+                    let _ = tr.send(AppEvent::CandlesUpdateError(err));
                 }
             }
 

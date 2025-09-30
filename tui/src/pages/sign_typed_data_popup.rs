@@ -16,19 +16,19 @@ use gm_ratatui_extra::{
 };
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{KeyCode, KeyEventKind},
+    crossterm::event::{Event, KeyCode, KeyEventKind},
     layout::{Constraint, Layout, Rect},
     widgets::{Block, Widget},
 };
 use serde_json::Value;
 use tokio::task::JoinHandle;
 
-use crate::{app::SharedState, error::FmtError, theme::Theme, traits::Actions, Event};
+use crate::{app::SharedState, error::FmtError, theme::Theme, traits::Actions, AppEvent};
 use gm_utils::{account::AccountManager, serde::SerdeResponseParse};
 
 fn spawn_sign_thread(
     digest: B256,
-    tr: &mpsc::Sender<Event>,
+    tr: &mpsc::Sender<AppEvent>,
     shared_state: &SharedState,
 ) -> crate::Result<JoinHandle<()>> {
     let tr = tr.clone();
@@ -38,8 +38,8 @@ fn spawn_sign_thread(
 
     Ok(tokio::spawn(async move {
         let _ = match run(digest, sender_account).await {
-            Ok(sig) => tr.send(Event::SignResult(sig)),
-            Err(err) => tr.send(Event::SignError(err.fmt_err("SignError"))),
+            Ok(sig) => tr.send(AppEvent::SignResult(sig)),
+            Err(err) => tr.send(AppEvent::SignError(err.fmt_err("SignError"))),
         };
 
         async fn run(digest: B256, sender_account: Address) -> crate::Result<Signature> {
@@ -134,7 +134,7 @@ impl SignTypedDataPopup {
 
     pub fn handle_event<F1, F3, F4>(
         &mut self,
-        (event, area, tr, ss): (&crate::Event, Rect, &mpsc::Sender<Event>, &SharedState),
+        (event, area, tr, ss): (&AppEvent, Rect, &mpsc::Sender<AppEvent>, &SharedState),
         mut on_signature: F1,
         mut on_cancel: F3,
         mut on_esc: F4,
@@ -152,45 +152,52 @@ impl SignTypedDataPopup {
             self.display.handle_event(event.key_event(), area);
 
             match event {
-                Event::Input(key_event) if key_event.kind == KeyEventKind::Press => {
-                    match self.status {
-                        SignStatus::Idle => match key_event.code {
-                            KeyCode::Left => {
-                                self.button_cursor = false;
-                            }
-                            KeyCode::Right => {
-                                self.button_cursor = true;
-                            }
-                            KeyCode::Enter => {
-                                if self.button_cursor {
-                                    let typed_data = (&self.typed_data_json)
-                                        .serde_parse_custom::<TypedData>()?;
-                                    let digest = typed_data
-                                        .eip712_signing_hash()
-                                        .map_err(crate::Error::Eip712Error)?;
-                                    self.status = SignStatus::Signing;
-                                    self.sign_thread = Some(spawn_sign_thread(digest, tr, ss)?);
-                                } else {
-                                    self.close();
-                                    on_cancel()?;
+                AppEvent::Input(input_event) => match input_event {
+                    Event::Key(key_event) => {
+                        if key_event.kind == KeyEventKind::Press {
+                            match self.status {
+                                SignStatus::Idle => match key_event.code {
+                                    KeyCode::Left => {
+                                        self.button_cursor = false;
+                                    }
+                                    KeyCode::Right => {
+                                        self.button_cursor = true;
+                                    }
+                                    KeyCode::Enter => {
+                                        if self.button_cursor {
+                                            let typed_data = (&self.typed_data_json)
+                                                .serde_parse_custom::<TypedData>()?;
+                                            let digest = typed_data
+                                                .eip712_signing_hash()
+                                                .map_err(crate::Error::Eip712Error)?;
+                                            self.status = SignStatus::Signing;
+                                            self.sign_thread =
+                                                Some(spawn_sign_thread(digest, tr, ss)?);
+                                        } else {
+                                            self.close();
+                                            on_cancel()?;
+                                        }
+                                    }
+                                    KeyCode::Esc => {
+                                        self.close();
+                                        on_esc()?;
+                                    }
+                                    _ => {}
+                                },
+                                SignStatus::Signing => {}
+                                SignStatus::Done | SignStatus::Failed => {
+                                    if key_event.code == KeyCode::Esc {
+                                        self.close();
+                                        on_esc()?;
+                                    }
                                 }
-                            }
-                            KeyCode::Esc => {
-                                self.close();
-                                on_esc()?;
-                            }
-                            _ => {}
-                        },
-                        SignStatus::Signing => {}
-                        SignStatus::Done | SignStatus::Failed => {
-                            if key_event.code == KeyCode::Esc {
-                                self.close();
-                                on_esc()?;
                             }
                         }
                     }
-                }
-                Event::SignResult(signature) => {
+                    Event::Mouse(_mouse_event) => {}
+                    _ => {}
+                },
+                AppEvent::SignResult(signature) => {
                     on_signature(signature)?;
                     self.status = SignStatus::Done;
 
@@ -198,7 +205,7 @@ impl SignTypedDataPopup {
                         thread.abort();
                     }
                 }
-                Event::SignError(_) => {
+                AppEvent::SignError(_) => {
                     self.status = SignStatus::Failed;
                 }
                 _ => {}

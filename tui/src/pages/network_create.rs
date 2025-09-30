@@ -1,21 +1,20 @@
+use crate::app::SharedState;
+use crate::pages::token::TokenPage;
+use crate::pages::Page;
+use crate::traits::{Actions, Component};
+use crate::AppEvent;
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::confirm_popup::ConfirmPopup;
 use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
 use gm_ratatui_extra::thematize::Thematize;
 use gm_utils::disk_storage::DiskStorageInterface;
+use gm_utils::network::{Network, NetworkStore, Token};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::ops::Not;
 use std::sync::mpsc::Sender;
-use tokio_util::sync::CancellationToken;
-
-use crate::app::SharedState;
-use crate::pages::token::TokenPage;
-use crate::pages::Page;
-use crate::traits::{Actions, Component};
-use crate::Event;
-use gm_utils::network::{Network, NetworkStore, Token};
 use strum::{Display, EnumIter};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Display, EnumIter, PartialEq)]
 pub enum FormItem {
@@ -138,9 +137,18 @@ impl TryFrom<FormItem> for FormWidget {
                 empty_text: None,
                 currency: None,
             },
-            FormItem::TokensButton => FormWidget::Button { label: "Tokens" },
-            FormItem::SaveButton => FormWidget::Button { label: "Save" },
-            FormItem::RemoveButton => FormWidget::Button { label: "Remove" },
+            FormItem::TokensButton => FormWidget::Button {
+                label: "Tokens",
+                hover_focus: false,
+            },
+            FormItem::SaveButton => FormWidget::Button {
+                label: "Save",
+                hover_focus: false,
+            },
+            FormItem::RemoveButton => FormWidget::Button {
+                label: "Remove",
+                hover_focus: false,
+            },
             FormItem::ErrorText => FormWidget::ErrorText(String::new()),
         };
         Ok(widget)
@@ -303,9 +311,9 @@ impl NetworkCreatePage {
 impl Component for NetworkCreatePage {
     fn handle_event(
         &mut self,
-        event: &Event,
+        event: &AppEvent,
         area: Rect,
-        _transmitter: &Sender<Event>,
+        _transmitter: &Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
@@ -329,7 +337,8 @@ impl Component for NetworkCreatePage {
             handle_result.merge(r);
         }
         let r = self.form.handle_event(
-            event.key_event(),
+            event.input_event(),
+            area,
             |_, _| Ok(()),
             |label, form| {
                 match label {

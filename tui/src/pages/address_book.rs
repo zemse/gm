@@ -1,17 +1,14 @@
 use std::{fmt::Display, sync::mpsc};
 
 use alloy::primitives::Address;
-use gm_ratatui_extra::{cursor::Cursor, filter_select::FilterSelect, thematize::Thematize};
-use ratatui::{
-    crossterm::event::{KeyCode, KeyEventKind},
-    widgets::Widget,
-};
+use gm_ratatui_extra::filter_select_owned::FilterSelectOwned;
+use ratatui::layout::Rect;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
-    events::Event,
     traits::{Actions, Component},
+    AppEvent,
 };
 use gm_utils::{
     account::{AccountManager, AccountUtils},
@@ -23,7 +20,7 @@ use super::{
     address_book_create::AddressBookCreatePage, address_book_display::AddressBookDisplayPage, Page,
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum AddressBookMenuItem {
     Create,
     View(AddressBookEntry),
@@ -109,100 +106,67 @@ impl AddressBookMenuItem {
 
 #[derive(Debug)]
 pub struct AddressBookPage {
-    full_list: Vec<AddressBookMenuItem>,
-    search_string: String,
-    cursor: Cursor,
-    focus: bool,
+    filter_select: FilterSelectOwned<AddressBookMenuItem>,
 }
 
 impl AddressBookPage {
     pub fn new() -> crate::Result<Self> {
-        Ok(Self {
-            full_list: AddressBookMenuItem::get_menu(true, None)?,
-            search_string: String::new(),
-            cursor: Cursor::default(),
-            focus: true,
-        })
+        let filter_select =
+            FilterSelectOwned::new(Some(AddressBookMenuItem::get_menu(true, None)?));
+
+        Ok(Self { filter_select })
     }
 }
 
 impl Component for AddressBookPage {
     fn set_focus(&mut self, focus: bool) {
-        self.focus = focus;
+        self.filter_select.select.focus = focus;
     }
 
     fn reload(&mut self, _ss: &SharedState) -> crate::Result<()> {
         let fresh = Self::new()?;
-        self.full_list = fresh.full_list;
+        self.filter_select.set_items(fresh.filter_select.full_list);
         Ok(())
-    }
-
-    fn text_input_mut(&mut self) -> Option<&mut String> {
-        Some(&mut self.search_string)
     }
 
     fn handle_event(
         &mut self,
-        event: &Event,
-        _area: ratatui::prelude::Rect,
-        _transmitter: &mpsc::Sender<Event>,
+        event: &AppEvent,
+        area: Rect,
+        _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
-        let list: Vec<&AddressBookMenuItem> = self
-            .full_list
-            .iter()
-            .filter(|entry| format!("{entry}").contains(self.search_string.as_str()))
-            .collect();
-
-        let cursor_max = list.len();
-        self.cursor.handle(event.key_event(), cursor_max);
-
         let mut result = Actions::default();
-        if let Event::Input(key_event) = event {
-            if key_event.kind == KeyEventKind::Press {
-                match key_event.code {
-                    KeyCode::Char(char) => {
-                        if let Some(text_input) = self.text_input_mut() {
-                            text_input.push(char);
-                        }
+
+        self.filter_select
+            .handle_event(event.input_event(), area, |ab_menu_item| {
+                result.page_inserts.push(match ab_menu_item.as_ref() {
+                    AddressBookMenuItem::Create => Page::AddressBookCreate(
+                        AddressBookCreatePage::new(String::new(), String::new())?,
+                    ),
+                    AddressBookMenuItem::View(entry) => {
+                        let (id, entry) = AddressBookStore::load()?
+                            .find(&None, &Some(entry.address), &Some(&entry.name))?
+                            .ok_or(crate::Error::AddressBookEntryNotFound(
+                                entry.address,
+                                entry.name.clone(),
+                            ))?;
+                        Page::AddressBookDisplay(AddressBookDisplayPage::new(
+                            id,
+                            entry.name,
+                            entry.address.to_string(),
+                        )?)
                     }
-                    KeyCode::Backspace => {
-                        if let Some(text_input) = self.text_input_mut() {
-                            text_input.pop();
-                        }
-                    }
-                    KeyCode::Enter => result.page_inserts.push(match &list[self.cursor.current] {
-                        AddressBookMenuItem::Create => Page::AddressBookCreate(
-                            AddressBookCreatePage::new(String::new(), String::new())?,
-                        ),
-                        AddressBookMenuItem::View(entry) => {
-                            let (id, entry) = AddressBookStore::load()?
-                                .find(&None, &Some(entry.address), &Some(&entry.name))?
-                                .ok_or(crate::Error::AddressBookEntryNotFound(
-                                    entry.address,
-                                    entry.name.clone(),
-                                ))?;
-                            Page::AddressBookDisplay(AddressBookDisplayPage::new(
-                                id,
-                                entry.name,
-                                entry.address.to_string(),
-                            )?)
-                        }
-                        AddressBookMenuItem::UnnamedOwned(address) => Page::AddressBookCreate(
-                            AddressBookCreatePage::new(String::new(), address.to_string())?,
-                        ),
-                        AddressBookMenuItem::RecentlyInteracted(address) => {
-                            Page::AddressBookCreate(AddressBookCreatePage::new(
-                                String::new(),
-                                address.to_string(),
-                            )?)
-                        }
-                    }),
-                    _ => {}
-                }
-            }
-        }
+                    AddressBookMenuItem::UnnamedOwned(address) => Page::AddressBookCreate(
+                        AddressBookCreatePage::new(String::new(), address.to_string())?,
+                    ),
+                    AddressBookMenuItem::RecentlyInteracted(address) => Page::AddressBookCreate(
+                        AddressBookCreatePage::new(String::new(), address.to_string())?,
+                    ),
+                });
+                Ok::<(), crate::Error>(())
+            })?;
 
         Ok(result)
     }
@@ -216,14 +180,7 @@ impl Component for AddressBookPage {
     where
         Self: Sized,
     {
-        FilterSelect {
-            full_list: &self.full_list,
-            cursor: &self.cursor,
-            search_string: &self.search_string,
-            focus: self.focus,
-            focus_style: shared_state.theme.select_focused(),
-        }
-        .render(area, buf);
+        self.filter_select.render(area, buf, &shared_state.theme);
         area
     }
 }

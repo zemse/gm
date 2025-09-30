@@ -1,8 +1,11 @@
 use gm_utils::text::split_string;
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
-    layout::Rect,
+    crossterm::event::{
+        Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent,
+        MouseEventKind,
+    },
+    layout::{Position, Rect},
     widgets::{Block, Widget},
 };
 
@@ -103,7 +106,9 @@ pub trait RectExt {
 
     fn consume_height(&mut self, height: u16);
 
-    fn change_height(self, height: u16) -> Rect;
+    fn change_height(self, new_height: u16) -> Rect;
+
+    fn change_width(self, new_width: u16) -> Rect;
 
     fn margin_h(self, m: u16) -> Rect;
 
@@ -159,12 +164,20 @@ impl RectExt for Rect {
             .expect("consume_height failed, if your terminal height is too small, try increasing it otherwise this is a bug");
     }
 
-    fn change_height(self, height: u16) -> Rect {
+    fn change_height(self, new_height: u16) -> Rect {
         Rect {
             x: self.x,
             y: self.y,
             width: self.width,
-            height,
+            height: new_height,
+        }
+    }
+    fn change_width(self, new_width: u16) -> Rect {
+        Rect {
+            x: self.x,
+            y: self.y,
+            width: new_width,
+            height: self.height,
         }
     }
 
@@ -232,20 +245,125 @@ impl RectExt for Rect {
     }
 }
 
+pub trait EventExt {
+    fn is_key_press(&self) -> bool;
+
+    fn is_mouse_left_click_or_hover(&self) -> bool;
+
+    fn is_mouse_left_click(&self) -> bool;
+
+    fn is_mouse_hover(&self) -> bool;
+
+    fn key_event(&self) -> Option<&KeyEvent>;
+
+    fn is_key_pressed(&self, key: KeyCode) -> bool;
+}
+
+impl EventExt for Event {
+    fn is_key_press(&self) -> bool {
+        matches!(
+            self,
+            Event::Key(KeyEvent {
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::NONE,
+                ..
+            })
+        )
+    }
+
+    fn is_mouse_left_click_or_hover(&self) -> bool {
+        matches!(
+            self,
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Moved,
+                ..
+            })
+        )
+    }
+
+    fn is_mouse_left_click(&self) -> bool {
+        matches!(
+            self,
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                ..
+            })
+        )
+    }
+
+    fn is_mouse_hover(&self) -> bool {
+        matches!(
+            self,
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Moved,
+                ..
+            })
+        )
+    }
+
+    fn key_event(&self) -> Option<&KeyEvent> {
+        if let Event::Key(key_event) = self {
+            Some(key_event)
+        } else {
+            None
+        }
+    }
+
+    fn is_key_pressed(&self, key: KeyCode) -> bool {
+        self.key_event()
+            .is_some_and(|ke| ke.kind == KeyEventKind::Press && ke.code == key)
+    }
+}
+
 pub trait KeyEventExt {
     fn is_pressed(&self, key: KeyCode) -> bool;
 }
 
 impl KeyEventExt for Option<&KeyEvent> {
     fn is_pressed(&self, key: KeyCode) -> bool {
+        self.map(|key_event| key_event.is_pressed(key))
+            .unwrap_or(false)
+    }
+}
+
+impl KeyEventExt for &KeyEvent {
+    fn is_pressed(&self, key: KeyCode) -> bool {
         matches!(
             self,
-            Some(KeyEvent {
+            KeyEvent {
                 kind: KeyEventKind::Press,
                 code,
                 modifiers: KeyModifiers::NONE,
                 ..
-            }) if *code == key
+            } if *code == key
         )
+    }
+}
+
+pub trait MouseEventExt {
+    fn is_left_click(&self) -> bool;
+
+    fn is(&self, kind: MouseEventKind) -> bool;
+
+    fn position(&self) -> Position;
+}
+
+impl MouseEventExt for MouseEvent {
+    #[inline]
+    fn is_left_click(&self) -> bool {
+        matches!(self.kind, MouseEventKind::Down(MouseButton::Left))
+    }
+
+    #[inline]
+    fn is(&self, kind: MouseEventKind) -> bool {
+        self.kind == kind
+    }
+
+    #[inline]
+    fn position(&self) -> Position {
+        Position {
+            x: self.column,
+            y: self.row,
+        }
     }
 }

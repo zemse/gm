@@ -7,9 +7,9 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
-    events::Event,
     theme::{self, ThemeName},
     traits::{Actions, Component},
+    AppEvent,
 };
 use gm_ratatui_extra::{
     act::Act,
@@ -64,7 +64,10 @@ impl TryFrom<FormItem> for FormWidget {
                 label: "Enable Helios (requires restart)",
                 value: false,
             },
-            FormItem::SaveButton => FormWidget::Button { label: "Save" },
+            FormItem::SaveButton => FormWidget::Button {
+                label: "Save",
+                hover_focus: false,
+            },
             FormItem::DisplayText => FormWidget::DisplayText(String::new()),
         };
         Ok(widget)
@@ -103,9 +106,9 @@ impl Component for ConfigPage {
 
     fn handle_event(
         &mut self,
-        event: &Event,
-        _area: Rect,
-        _transmitter: &mpsc::Sender<Event>,
+        event: &AppEvent,
+        area: Rect,
+        _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<Actions> {
@@ -115,7 +118,8 @@ impl Component for ConfigPage {
         let mut handle_result = Actions::default();
 
         let r = self.form.handle_event(
-            event.key_event(),
+            event.input_event(),
+            area,
             |_, _| Ok(()),
             |_, form| {
                 handle_result.reload = true;

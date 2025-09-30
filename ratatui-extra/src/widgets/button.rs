@@ -1,13 +1,58 @@
 use crate::extensions::BorderedWidget;
+use crate::extensions::KeyEventExt;
+use crate::extensions::MouseEventExt;
 use crate::thematize::Thematize;
-use ratatui::{layout::Rect, style::Style, text::Line, widgets::Block};
+use ratatui::crossterm::event::KeyCode;
+use ratatui::crossterm::event::MouseButton;
+use ratatui::crossterm::event::MouseEventKind;
+use ratatui::{crossterm::event::Event, layout::Rect, style::Style, text::Line, widgets::Block};
 
+#[derive(Debug)]
 pub struct Button {
     pub focus: bool,
     pub label: &'static str,
 }
 
 impl Button {
+    pub fn handle_event<E, F>(
+        event: &Event,
+        area: Rect,
+        label: &'static str,
+        on_press: F,
+    ) -> Result<(), E>
+    where
+        F: FnOnce() -> Result<(), E>,
+    {
+        match event {
+            Event::Key(key_event) => {
+                if key_event.is_pressed(KeyCode::Enter) {
+                    on_press()?;
+                }
+            }
+            Event::Mouse(mouse_event) => {
+                let button_area = Self::area(label, area);
+
+                if button_area.contains(mouse_event.position()) {
+                    if let MouseEventKind::Down(MouseButton::Left) = mouse_event.kind {
+                        on_press()?;
+                    }
+                }
+            }
+            _ => {}
+        };
+
+        Ok(())
+    }
+
+    pub fn area(label: &'static str, area: Rect) -> Rect {
+        Rect {
+            width: (label.len() + 2) as u16,
+            height: 3,
+            x: area.x,
+            y: area.y,
+        }
+    }
+
     pub fn render(
         &self,
         area: ratatui::prelude::Rect,
@@ -16,12 +61,7 @@ impl Button {
     ) where
         Self: Sized,
     {
-        let button_area = Rect {
-            width: (self.label.len() + 2) as u16,
-            height: 3,
-            x: area.x,
-            y: area.y,
-        };
+        let button_area = Self::area(self.label, area);
 
         Line::from(self.label).render_with_block(
             button_area,
