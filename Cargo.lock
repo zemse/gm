@@ -3381,7 +3381,7 @@ dependencies = [
 
 [[package]]
 name = "gm-bin"
-version = "0.0.1"
+version = "0.0.2-alpha"
 dependencies = [
  "clap",
  "console",
@@ -3392,7 +3392,7 @@ dependencies = [
 
 [[package]]
 name = "gm-common"
-version = "0.0.1"
+version = "0.0.2-alpha"
 dependencies = [
  "alloy",
  "serde",
@@ -3400,7 +3400,7 @@ dependencies = [
 
 [[package]]
 name = "gm-macos"
-version = "0.0.1"
+version = "0.0.2-alpha"
 dependencies = [
  "alloy",
  "block2",
@@ -3418,7 +3418,7 @@ dependencies = [
 
 [[package]]
 name = "gm-ratatui-extra"
-version = "0.0.1"
+version = "0.0.2-alpha"
 dependencies = [
  "alloy",
  "chrono",
@@ -3435,7 +3435,7 @@ dependencies = [
 
 [[package]]
 name = "gm-rpc-proxy"
-version = "0.0.1"
+version = "0.0.2-alpha"
 dependencies = [
  "axum",
  "reqwest 0.11.27",
@@ -3449,7 +3449,7 @@ dependencies = [
 
 [[package]]
 name = "gm-tui"
-version = "0.0.1"
+version = "0.0.2-alpha"
 dependencies = [
  "alloy",
  "crossterm 0.29.0",
@@ -3476,7 +3476,7 @@ dependencies = [
 
 [[package]]
 name = "gm-utils"
-version = "0.0.1"
+version = "0.0.2-alpha"
 dependencies = [
  "alloy",
  "arc-swap",
