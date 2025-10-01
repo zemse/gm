@@ -6,48 +6,166 @@ permissions:
 on:
   push:
     tags:
-      - v[0-9]+.*
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+      - 'v[0-9]*.[0-9]*.[0-9]*-*'
+  workflow_dispatch: {}
+
+env:
+  BIN_NAME: gm
 
 jobs:
+  # ---------- Create GitHub release ----------
   create-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: taiki-e/create-gh-release-action@v1
         with:
-          # (required) GitHub token for creating GitHub Releases.
-          token: ${{ secrets.PAT_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allow_updates: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            **Work in Progress**
 
+            This release is still being prepared.
+            More details will be added soon.
+
+  # ---------- Linux + Windows builds ----------
   upload-assets:
     needs: create-release
     strategy:
+      fail-fast: false
       matrix:
         include:
+          # Linux glibc
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-          - target: x86_64-apple-darwin
-            os: macos-latest
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
+            tar: unix
+            zip: none
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            tar: unix
+            zip: none
+            use_cross: true
+          - target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-latest
+            tar: unix
+            zip: none
+            use_cross: true
+
+          # Linux musl (portable static)
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            tar: unix
+            zip: none
+            use_cross: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            tar: unix
+            zip: none
+            use_cross: true
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
-          # (required) Comma-separated list of binary names (non-extension portion of filename) to build and upload.
-          # Note that glob pattern is not supported yet.
-          bin: gm
-          # (optional) Target triple, default is host triple.
-          # This is optional but it is recommended that this always be set to
-          # clarify which target you are building for if macOS is included in
-          # the matrix because GitHub Actions changed the default architecture
-          # of macos-latest since macos-14.
+          bin: ${{ env.BIN_NAME }}
           target: ${{ matrix.target }}
-          # (optional) On which platform to distribute the `.tar.gz` file.
-          # [default value: unix]
-          # [possible values: all, unix, windows, none]
-          tar: unix
+          tar: ${{ matrix.tar }}
+          zip: ${{ matrix.zip }}
+          checksum: sha256
+          use-cross: ${{ matrix.use_cross }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-          zip: windows
-          # (required) GitHub token for uploading assets to GitHub Releases.
-          token: ${{ secrets.PAT_TOKEN }}
+  # ---------- macOS (signed + notarized zips) ----------
+  macos-signed:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+          - target: aarch64-apple-darwin
+    runs-on: macos-14
+    env:
+      TARGET: ${{ matrix.target }}
+      OUT_DIR: target/${{ matrix.target }}/release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain + target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build (release)
+        run: cargo build --release --target "$TARGET"
+
+      - name: Set up temporary signing keychain
+        run: |
+          KEYCHAIN=build.keychain
+          security create-keychain -p "" "$KEYCHAIN"
+          security set-keychain-settings "$KEYCHAIN"
+          security unlock-keychain -p "" "$KEYCHAIN"
+
+          echo "$APPLE_CERT_P12_BASE64" | base64 --decode > /tmp/cert.p12
+          security import /tmp/cert.p12 -k "$KEYCHAIN" -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign
+
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed -e 's/.*"\(.*\)".*/\1/g')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$KEYCHAIN"
+        env:
+          APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          APPLE_CERT_PASSWORD:   ${{ secrets.APPLE_CERT_PASSWORD }}
+
+      - name: Resolve Developer ID Application identity
+        id: ident
+        run: |
+          IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | sed -E 's/.*"(.+)"/\1/' | head -n1)
+          if [ -z "$IDENTITY" ]; then
+            echo "No Developer ID Application identity found in keychain"; exit 1
+          fi
+          echo "identity=$IDENTITY" >> $GITHUB_OUTPUT
+
+      - name: Codesign binary (Hardened Runtime + timestamp)
+        run: |
+          BIN="$OUT_DIR/${BIN_NAME}"
+          codesign --force --sign "${{ steps.ident.outputs.identity }}" \
+                   --options runtime \
+                   --timestamp \
+                   "$BIN"
+          codesign -dv --verbose=4 "$BIN"
+
+      - name: Create ZIP (for notarization + distribution)
+        run: |
+          cd "$OUT_DIR"
+          ditto -c -k --sequesterRsrc --keepParent "$BIN_NAME" "${BIN_NAME}-${TARGET}.zip"
+
+      - name: Notarize ZIP with notarytool
+        env:
+          AC_KEY_ID:      ${{ secrets.AC_KEY_ID }}
+          AC_ISSUER_ID:   ${{ secrets.AC_ISSUER_ID }}
+          AC_P8_BASE64:   ${{ secrets.AC_P8_BASE64 }}
+          APPLE_TEAM_ID:  ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          echo "$AC_P8_BASE64" | base64 --decode > /tmp/AuthKey.p8
+          xcrun notarytool submit "$OUT_DIR/${BIN_NAME}-${TARGET}.zip" \
+            --key /tmp/AuthKey.p8 \
+            --key-id "$AC_KEY_ID" \
+            --issuer "$AC_ISSUER_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+      - name: Generate checksum
+        run: |
+          cd "$OUT_DIR"
+          shasum -a 256 "${BIN_NAME}-${TARGET}.zip" > "${BIN_NAME}-${TARGET}.zip.sha256"
+
+      - name: Upload signed macOS asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF##*/}"
+          gh release upload "$TAG" \
+            "$OUT_DIR/${BIN_NAME}-${TARGET}.zip" \
+            "$OUT_DIR/${BIN_NAME}-${TARGET}.zip.sha256" \
+            --clobber
