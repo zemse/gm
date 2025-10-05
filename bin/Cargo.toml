@@ -17,3 +17,4 @@ gm-tui = { path = "../tui" }
 tokio = { workspace = true }
 walletconnect-sdk = { workspace = true }
 console = { workspace = true }
+ratatui = { workspace = true }

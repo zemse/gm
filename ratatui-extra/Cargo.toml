@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 ratatui = { workspace = true }
-# crossterm = { workspace = true }
 alloy = { workspace = true }
 tokio = { workspace = true }
 strum = { workspace = true }

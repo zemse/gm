@@ -3349,6 +3349,7 @@ dependencies = [
  "clap",
  "console",
  "gm-tui",
+ "ratatui",
  "tokio",
  "walletconnect-sdk",
 ]

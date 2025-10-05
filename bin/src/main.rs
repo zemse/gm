@@ -6,8 +6,12 @@ use gm_tui::pages::{
 mod cli;
 use crate::cli::{Cli, Commands};
 
+mod panic_hook;
+
 #[tokio::main]
 async fn main() -> gm_tui::Result<()> {
+    panic_hook::set();
+
     let mut tui_app = gm_tui::App::new()?;
     let main_menu = tui_app
         .current_page_mut()
