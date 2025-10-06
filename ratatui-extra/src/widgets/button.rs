@@ -1,10 +1,12 @@
 use crate::extensions::BorderedWidget;
 use crate::extensions::KeyEventExt;
 use crate::extensions::MouseEventExt;
+use crate::extensions::RectExt;
 use crate::thematize::Thematize;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::MouseButton;
 use ratatui::crossterm::event::MouseEventKind;
+use ratatui::widgets::WidgetRef;
 use ratatui::{crossterm::event::Event, layout::Rect, style::Style, text::Line, widgets::Block};
 
 #[derive(Debug)]
@@ -63,17 +65,30 @@ impl Button {
     {
         let button_area = Self::area(self.label, area);
 
-        Line::from(self.label).render_with_block(
-            button_area,
-            buf,
-            Block::bordered()
-                .border_type(theme.border_type())
+        if theme.boxed() {
+            Line::from(self.label).render_with_block(
+                button_area,
+                buf,
+                Block::bordered()
+                    .border_type(theme.border_type())
+                    .style(if self.focus {
+                        theme.button_focused()
+                    } else {
+                        Style::default()
+                    }),
+                false,
+                (),
+            );
+        } else {
+            Block::default()
                 .style(if self.focus {
                     theme.button_focused()
                 } else {
-                    Style::default()
-                }),
-            false,
-        );
+                    theme.button_notfocused()
+                })
+                .render_ref(button_area, buf);
+
+            Line::from(self.label).render_ref(button_area.block_inner(), buf);
+        }
     }
 }

@@ -131,7 +131,9 @@ impl Component for ConfigPage {
                     form.get_boolean(FormItem::DeveloperMode),
                     {
                         let theme_name = form.get_text(FormItem::Theme).clone();
-                        theme::ThemeName::from_str(&theme_name)?.to_string()
+                        theme::ThemeName::from_str(&theme_name)
+                            .unwrap_or_default()
+                            .to_string()
                     },
                     form.get_boolean(FormItem::HeliosEnabled),
                 )?;
@@ -139,7 +141,7 @@ impl Component for ConfigPage {
                 let display_text = form.get_text_mut(FormItem::DisplayText);
                 *display_text = "Configuration saved".to_string();
 
-                handle_result.page_pops += 1;
+                handle_result.page_pop = true;
 
                 Ok(())
             },
@@ -149,11 +151,17 @@ impl Component for ConfigPage {
         Ok(handle_result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, ss: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        popup_area: Rect,
+        buf: &mut Buffer,
+        ss: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {
-        self.form.render(area, buf, &ss.theme);
+        self.form.render(area, popup_area, buf, &ss.theme);
         area
     }
 }

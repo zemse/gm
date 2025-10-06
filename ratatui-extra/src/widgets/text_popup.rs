@@ -6,7 +6,7 @@ use ratatui::{
 use super::{popup::Popup, text_scroll::TextScroll};
 use crate::{
     act::Act,
-    extensions::{BorderedWidget, KeyEventExt, RectExt},
+    extensions::{BorderedWidget, KeyEventExt, RectExt, ThemedWidget},
     thematize::Thematize,
 };
 
@@ -60,7 +60,10 @@ impl TextPopup {
 
         act
     }
-    pub fn render(
+}
+
+impl ThemedWidget for TextPopup {
+    fn render(
         &self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
@@ -78,12 +81,12 @@ impl TextPopup {
         let popup_inner_area = Popup::inner_area(area);
 
         let block = Block::bordered()
-            .style(theme.block())
+            .style(theme.style())
             .border_type(theme.border_type())
             .title(self.title)
             .title_bottom("press ESC or Enter to dismiss");
 
         self.text_scroll
-            .render_with_block(popup_inner_area, buf, block, true);
+            .render_with_block(popup_inner_area, buf, block, true, &theme);
     }
 }

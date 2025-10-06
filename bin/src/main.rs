@@ -1,6 +1,7 @@
 use clap::Parser;
-use gm_tui::pages::{
-    main_menu::MainMenuItem, shell::ShellPage, walletconnect::WalletConnectPage, Page,
+use gm_tui::{
+    pages::{shell::ShellPage, walletconnect::WalletConnectPage, Page},
+    MainMenuItem,
 };
 
 mod cli;
@@ -13,10 +14,7 @@ async fn main() -> gm_tui::Result<()> {
     panic_hook::set();
 
     let mut tui_app = gm_tui::App::new()?;
-    let main_menu = tui_app
-        .current_page_mut()
-        .and_then(|p| p.as_main_menu_mut())
-        .expect("current page not main menu");
+    let main_menu = &mut tui_app.main_menu;
 
     let args = Cli::parse();
 
@@ -30,9 +28,7 @@ async fn main() -> gm_tui::Result<()> {
                     wc.set_uri(&uri);
                 }
 
-                main_menu
-                    .select
-                    .set_focussed_item(MainMenuItem::WalletConnect);
+                main_menu.set_focussed_item(MainMenuItem::WalletConnect);
                 tui_app.insert_page(Page::WalletConnect(wc));
             }
 
@@ -47,7 +43,7 @@ async fn main() -> gm_tui::Result<()> {
                     *cursor = input.len();
                     pre_events = Some(vec![gm_tui::AppEvent::INPUT_KEY_ENTER]);
                 }
-                main_menu.select.set_focussed_item(MainMenuItem::Shell);
+                main_menu.set_focussed_item(MainMenuItem::Shell);
                 tui_app.insert_page(Page::Shell(run_page));
             }
 

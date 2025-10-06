@@ -1,39 +1,17 @@
 use gm_ratatui_extra::thematize::Thematize;
-use ratatui::prelude::Color;
-use ratatui::style::Modifier;
-use ratatui::style::Style;
-use ratatui::widgets::BorderType;
-use std::fmt::Formatter;
-use strum::EnumIter;
-use strum::IntoEnumIterator;
+use ratatui::{
+    style::{Color, Modifier, Style, Stylize},
+    widgets::BorderType,
+};
+use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-#[derive(Default, Debug, EnumIter)]
+#[derive(Display, Default, Debug, EnumIter, EnumString)]
 pub enum ThemeName {
     #[default]
     Monochrome,
-    MonochromeModern,
-    Dark,
-    DarkModern,
-}
-
-impl std::fmt::Display for ThemeName {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
-
-impl std::str::FromStr for ThemeName {
-    type Err = crate::Error;
-
-    fn from_str(theme_name: &str) -> crate::Result<Self> {
-        match theme_name {
-            "Monochrome" => Ok(Self::Monochrome),
-            "MonochromeModern" => Ok(Self::MonochromeModern),
-            "Dark" => Ok(Self::Dark),
-            "DarkModern" => Ok(Self::DarkModern),
-            _ => Err(crate::Error::UnknownTheme(theme_name.to_string())),
-        }
-    }
+    MonochromeBoxed,
+    DarkHacker,
+    DarkHackerBoxed,
 }
 
 impl ThemeName {
@@ -44,75 +22,113 @@ impl ThemeName {
 
 #[derive(Clone)]
 pub struct Theme {
-    pub text: Option<Color>,
+    pub boxed: bool,
+
+    pub fg: Option<Color>,
+    pub fg_dim: Option<Color>,
     pub bg: Option<Color>,
+    pub bg_dim: Option<Color>,
+
     pub reversed: bool,
-    pub select_focus: Option<Color>,
+
+    pub select_active_bold: Option<bool>,
+    pub select_active_fg: Option<Color>,
+    pub select_inactive_fg: Option<Color>,
+    pub select_focus_fg: Option<Color>,
+    pub select_focus_bg: Option<Color>,
+
     pub popup_reversed: bool,
     pub popup_bg: Option<Color>,
     pub error_popup_bg: Option<Color>,
     pub border_type: BorderType,
 }
 
-// impl From<&Theme> for Style {
-//     fn from(theme: &Theme) -> Self {}
-// }
-
-// impl From<&mut Theme> for Style {
-//     fn from(theme: &mut Theme) -> Self {
-//         let theme = &*theme;
-//         theme.into()
-//     }
-// }
-
-// impl From<&Theme> for BorderType {
-//     fn from(val: &Theme) -> Self {
-//         val.border_type
-//     }
-// }
-
 impl Theme {
     pub fn new(theme_name: ThemeName) -> Theme {
         match theme_name {
             ThemeName::Monochrome => Theme {
-                text: None,
+                boxed: false,
+
+                fg: None,
+                fg_dim: None,
                 bg: None,
-                select_focus: None,
+                bg_dim: None,
+
                 reversed: false,
+
+                select_active_bold: None,
+                select_active_fg: None,
+                select_inactive_fg: None,
+                select_focus_fg: None,
+                select_focus_bg: None,
+
                 popup_reversed: true,
                 popup_bg: None,
                 error_popup_bg: None,
                 border_type: BorderType::Plain,
             },
-            ThemeName::MonochromeModern => Theme {
-                text: None,
+            ThemeName::MonochromeBoxed => Theme {
+                boxed: true,
+
+                fg: None,
+                fg_dim: None,
                 bg: None,
-                select_focus: None,
+                bg_dim: None,
+
                 reversed: false,
+
+                select_active_bold: None,
+                select_active_fg: None,
+                select_inactive_fg: None,
+                select_focus_fg: None,
+                select_focus_bg: None,
+
                 popup_reversed: true,
                 popup_bg: None,
                 error_popup_bg: None,
-                border_type: BorderType::Rounded,
+                border_type: BorderType::Plain,
             },
-            ThemeName::Dark => Theme {
-                text: Some(Color::White),
-                bg: Some(Color::Black),
-                select_focus: None,
+            ThemeName::DarkHacker => Theme {
+                boxed: false,
+
+                fg: Some(Color::White),
+                fg_dim: Some(Color::Gray),
+                bg: None,
+                bg_dim: Some(Color::DarkGray),
+
                 reversed: false,
+
+                select_active_bold: Some(true),
+                select_active_fg: Some(Color::White),
+                select_inactive_fg: Some(Color::Gray),
+                select_focus_fg: Some(Color::Black),
+                select_focus_bg: Some(Color::LightGreen),
+
                 popup_reversed: false,
-                popup_bg: Some(Color::Blue),
+                popup_bg: Some(Color::Black),
                 error_popup_bg: Some(Color::Red),
                 border_type: BorderType::Plain,
             },
-            ThemeName::DarkModern => Theme {
-                text: Some(Color::White),
-                bg: Some(Color::Black),
-                select_focus: None,
+            ThemeName::DarkHackerBoxed => Theme {
+                boxed: true,
+
+                fg: Some(Color::White),
+                fg_dim: Some(Color::Gray),
+                bg: None,
+                bg_dim: Some(Color::DarkGray),
+
                 reversed: false,
+
+                select_active_bold: Some(true),
+                select_active_fg: Some(Color::White),
+                select_inactive_fg: Some(Color::Gray),
+                select_focus_fg: Some(Color::Black),
+                select_focus_bg: Some(Color::LightGreen),
+
                 popup_reversed: false,
-                popup_bg: Some(Color::Blue),
+                popup_bg: Some(Color::Black),
                 error_popup_bg: Some(Color::Red),
-                border_type: BorderType::Rounded,
+                border_type: BorderType::Plain,
             },
         }
     }
@@ -129,14 +145,38 @@ impl Thematize for Theme {
         }
     }
 
+    fn button_notfocused(&self) -> Style {
+        if let Some(bg_dim) = self.bg_dim {
+            Style::default().bg(bg_dim).fg(Color::Black)
+        } else {
+            Style::default()
+        }
+    }
+
     fn border_type(&self) -> BorderType {
         self.border_type
     }
 
-    fn block(&self) -> Style {
+    fn style(&self) -> Style {
         let mut style = Style::default();
-        if let Some(text_color) = self.text {
-            style = style.fg(text_color);
+        if let Some(fg) = self.fg {
+            style = style.fg(fg);
+        }
+        if let Some(bg_color) = self.bg {
+            style = style.bg(bg_color);
+        }
+        if self.reversed {
+            style = style.add_modifier(Modifier::REVERSED);
+        } else {
+            style = style.remove_modifier(Modifier::REVERSED);
+        }
+        style
+    }
+
+    fn style_dim(&self) -> Style {
+        let mut style = Style::default();
+        if let Some(fg) = self.fg_dim {
+            style = style.fg(fg);
         }
         if let Some(bg_color) = self.bg {
             style = style.bg(bg_color);
@@ -150,26 +190,60 @@ impl Thematize for Theme {
     }
 
     fn select_focused(&self) -> Style {
-        if let Some(select_focus) = self.select_focus {
-            Style::default()
-                .bg(select_focus)
-                .add_modifier(Modifier::BOLD)
+        let mut style = Style::default();
+
+        if let Some(select_focus_fg) = self.select_focus_fg {
+            style = style.fg(select_focus_fg)
+        };
+
+        if let Some(select_active_bold) = self.select_active_bold {
+            if select_active_bold {
+                style = style.add_modifier(Modifier::BOLD)
+            } else {
+                style = style.remove_modifier(Modifier::BOLD)
+            }
+        };
+
+        if let Some(select_focus_bg) = self.select_focus_bg {
+            style = style.bg(select_focus_bg)
         } else {
-            Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED)
+            style = style.add_modifier(Modifier::REVERSED)
+        };
+
+        if self.reversed {
+            style = style.remove_modifier(Modifier::REVERSED);
         }
+
+        style
     }
 
-    // fn select_popup(&self) -> Style {
-    //     if let Some(select_focus) = self.select_focus {
-    //         Style::default()
-    //             .bg(select_focus)
-    //             .add_modifier(Modifier::BOLD)
-    //     } else {
-    //         Style::default()
-    //             .add_modifier(Modifier::BOLD)
-    //             .remove_modifier(Modifier::REVERSED)
-    //     }
-    // }
+    fn select_active(&self) -> Style {
+        let mut style = Style::default();
+
+        if let Some(select_active_fg) = self.select_active_fg {
+            style = style.fg(select_active_fg)
+        };
+
+        if let Some(select_active_bold) = self.select_active_bold {
+            if select_active_bold {
+                style = style.add_modifier(Modifier::BOLD)
+            } else {
+                style = style.remove_modifier(Modifier::BOLD)
+            }
+        };
+
+        style
+    }
+
+    fn select_inactive(&self) -> Style {
+        let mut style = Style::default().not_bold();
+
+        if let Some(select_inactive_fg) = self.select_inactive_fg {
+            style = style.fg(select_inactive_fg)
+        };
+
+        style
+    }
 
     fn popup(&self) -> Theme {
         Theme {
@@ -185,5 +259,9 @@ impl Thematize for Theme {
             bg: s.error_popup_bg,
             ..s.clone()
         }
+    }
+
+    fn boxed(&self) -> bool {
+        self.boxed
     }
 }

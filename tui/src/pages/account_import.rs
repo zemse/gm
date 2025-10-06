@@ -5,7 +5,7 @@ use ratatui::{
     buffer::Buffer,
     crossterm::event::{Event, KeyCode},
     layout::{Offset, Rect},
-    widgets::Widget,
+    widgets::WidgetRef,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -46,7 +46,7 @@ impl Component for AccountImportPage {
         if let AppEvent::Input(input_event) = event {
             if self.display.is_some() {
                 if self.success {
-                    result.page_pops = 1;
+                    result.page_pop = true;
                     result.reload = true;
                 } else {
                     self.display = None;
@@ -80,7 +80,13 @@ impl Component for AccountImportPage {
         Ok(result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        _popup_area: Rect,
+        buf: &mut Buffer,
+        shared_state: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {
@@ -94,7 +100,7 @@ impl Component for AccountImportPage {
         .render(area, buf, &self.text_cursor, &shared_state.theme);
 
         if let Some(display) = &self.display {
-            display.render(area.offset(Offset { x: 0, y: 4 }), buf);
+            display.render_ref(area.offset(Offset { x: 0, y: 4 }), buf);
         }
 
         area

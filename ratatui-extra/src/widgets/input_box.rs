@@ -1,4 +1,5 @@
 use ratatui::{
+    buffer::Buffer,
     crossterm::event::{Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind},
     layout::{Offset, Position, Rect},
     style::Modifier,
@@ -143,19 +144,20 @@ impl InputBox<'_> {
                 },
                 Event::Mouse(mouse_event) => {
                     if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
-                        let lines = split_string(text_input, (area.width - 2) as usize);
+                        let lines = split_string(text_input, (area.width - 4) as usize);
                         let area_text = Rect {
                             x: area.x,
                             y: area.y,
                             width: area.width,
                             height: (2 + lines.len()) as u16,
                         }
-                        .block_inner();
+                        .block_inner()
+                        .margin_h(1);
                         if area_text.contains(mouse_event.position()) {
                             let relative_x =
                                 mouse_event.column.saturating_sub(area_text.x) as usize;
                             let relative_y = mouse_event.row.saturating_sub(area_text.y) as usize;
-                            let new_cursor = relative_x + relative_y * (area.width - 2) as usize;
+                            let new_cursor = relative_x + relative_y * (area.width - 4) as usize;
 
                             *text_cursor = new_cursor.min(text_input.len());
                             return true;
@@ -169,16 +171,11 @@ impl InputBox<'_> {
         false
     }
 
-    pub fn render(
-        self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
-        text_cursor: &usize,
-        theme: &impl Thematize,
-    ) where
+    pub fn render(self, area: Rect, buf: &mut Buffer, text_cursor: &usize, theme: &impl Thematize)
+    where
         Self: Sized,
     {
-        let lines = split_string(self.text, (area.width - 2) as usize);
+        let lines = split_string(self.text, (area.width - 4) as usize);
         let area_used = Rect {
             x: area.x,
             y: area.y,
@@ -186,11 +183,22 @@ impl InputBox<'_> {
             height: (2 + lines.len()) as u16,
         };
 
-        let block = Block::bordered()
-            .border_type(theme.border_type())
-            .title(self.label);
-        let inner_area = block.inner(area_used);
-        block.render(area_used, buf);
+        let inner_area = if theme.boxed() {
+            let block = Block::bordered()
+                .border_type(theme.border_type())
+                .title(self.label);
+            let inner_area = block.inner(area_used);
+            block.render(area_used, buf);
+            inner_area.margin_h(1)
+        } else {
+            Span::raw(self.label)
+                .style(theme.style_dim())
+                .render(area_used, buf);
+            Span::raw(">")
+                .style(theme.style())
+                .render(area_used.margin_top(1), buf);
+            area_used.block_inner().margin_h(1)
+        };
 
         if lines.len() == 1 && !lines.last().unwrap().is_empty() && self.currency.is_some() {
             let currency = self.currency.unwrap();
@@ -217,8 +225,8 @@ impl InputBox<'_> {
             self.empty_text.unwrap().render(inner_area, buf);
         }
         if self.focus {
-            let cx = inner_area.x + (*text_cursor as u16) % (area.width - 2);
-            let cy = inner_area.y + (*text_cursor as u16) / (area.width - 2);
+            let cx = inner_area.x + (*text_cursor as u16) % (area.width - 4);
+            let cy = inner_area.y + (*text_cursor as u16) / (area.width - 4);
 
             let Some(cell) = buf.cell_mut(Position::new(cx, cy)) else {
                 return;

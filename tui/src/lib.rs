@@ -10,5 +10,5 @@ mod theme;
 mod traits;
 mod widgets;
 
-pub use app::App;
+pub use app::{App, MainMenuItem};
 pub use events::AppEvent;

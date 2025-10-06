@@ -1,10 +1,12 @@
 use gm_ratatui_extra::candle_chart::{Candle, CandleChart, Interval};
 use ratatui::{
+    buffer::Buffer,
     crossterm::event::{Event, KeyCode, KeyEventKind},
+    layout::Rect,
     widgets::Widget,
 };
-use std::str::FromStr;
 use std::time::Duration;
+use std::{str::FromStr, sync::mpsc};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
@@ -29,11 +31,11 @@ impl Component for TradePage {
     fn handle_event(
         &mut self,
         event: &AppEvent,
-        _area: ratatui::prelude::Rect,
-        transmitter: &std::sync::mpsc::Sender<AppEvent>,
+        _area: Rect,
+        transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<crate::traits::Actions> {
+    ) -> crate::Result<Actions> {
         match event {
             AppEvent::Input(input_event) => {
                 match input_event {
@@ -101,9 +103,10 @@ impl Component for TradePage {
 
     fn render_component(
         &self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
-        _shared_state: &crate::app::SharedState,
+        area: Rect,
+        _popup_area: Rect,
+        buf: &mut Buffer,
+        _shared_state: &SharedState,
     ) -> ratatui::prelude::Rect
     where
         Self: Sized,

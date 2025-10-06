@@ -1,13 +1,15 @@
 use std::fmt::Display;
 
+use crate::thematize::Thematize;
+
 use super::cursor::Cursor;
 use super::scroll_bar::CustomScrollBar;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Style;
 use ratatui::text::Text;
 use ratatui::{
     layout::{Constraint, Layout},
-    style::Style,
     text::Line,
     widgets::{List, ListItem, Widget},
 };
@@ -17,13 +19,14 @@ pub struct Select<'a, T: Display> {
     pub focus: bool,
     pub list: &'a Vec<T>,
     pub cursor: &'a Cursor,
-    pub focus_style: Style,
 }
 
 impl<T: Display> Select<'_, T> {
     pub fn display_item(
         &self,
         area: Rect,
+        external_cursor: Option<usize>,
+        theme: Option<&impl Thematize>,
     ) -> (Vec<ListItem<'_>>, Vec<usize>, usize, usize, usize, usize) {
         let capacity = area.height as usize;
         let horizontal_layout = Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]);
@@ -41,9 +44,9 @@ impl<T: Display> Select<'_, T> {
         let mut current_page: usize = 0;
         let mut total_pages: usize = 1;
         let render_item = |(i, member): (usize, &T)| {
-            let text = &format!("{member}");
+            let text = format!("{member}");
             let wrapped_text = textwrap::wrap(
-                text,
+                &text,
                 Options::new(if capacity < list_height {
                     list_area.width as usize
                 } else {
@@ -81,8 +84,15 @@ impl<T: Display> Select<'_, T> {
                     .map(|s| Line::from(s.clone().into_owned()))
                     .collect::<Vec<_>>(),
             );
-            let style = if self.cursor.current == i && self.focus {
-                self.focus_style
+
+            let style = if let Some(theme) = theme {
+                if self.cursor.current == i && self.focus {
+                    theme.select_focused()
+                } else if external_cursor.is_some_and(|external_cursor| external_cursor == i) {
+                    theme.select_active()
+                } else {
+                    theme.select_inactive()
+                }
             } else {
                 Style::default()
             };
@@ -105,8 +115,13 @@ impl<T: Display> Select<'_, T> {
         )
     }
 
-    pub fn render(self, area: Rect, buf: &mut Buffer)
-    where
+    pub fn render(
+        self,
+        area: Rect,
+        buf: &mut Buffer,
+        external_cursor: Option<usize>,
+        theme: &impl Thematize,
+    ) where
         Self: Sized,
     {
         if self.list.is_empty() {
@@ -117,16 +132,17 @@ impl<T: Display> Select<'_, T> {
         let horizontal_layout = Layout::horizontal([Constraint::Min(3), Constraint::Length(1)]);
         let [list_area, scroll_area] = horizontal_layout.areas(area);
 
-        let (display_items, _, _, list_height, current_page, total_pages) = self.display_item(area);
+        let (display_items, _, _, list_height, current_page, total_pages) =
+            self.display_item(list_area, external_cursor, Some(theme));
 
         if capacity < list_height {
-            List::new(display_items).render(list_area, buf);
+            List::new(display_items).render(area, buf);
             CustomScrollBar {
                 cursor: current_page,
                 total_items: total_pages,
                 paginate: false,
             }
-            .render(scroll_area, buf);
+            .render(scroll_area, buf, theme);
         } else {
             List::new(display_items).render(area, buf);
         }

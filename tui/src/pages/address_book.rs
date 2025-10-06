@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::mpsc};
 
 use alloy::primitives::Address;
 use gm_ratatui_extra::filter_select_owned::FilterSelectOwned;
-use ratatui::layout::Rect;
+use ratatui::{buffer::Buffer, layout::Rect};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -173,10 +173,11 @@ impl Component for AddressBookPage {
 
     fn render_component(
         &self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
+        area: Rect,
+        _popup_area: Rect,
+        buf: &mut Buffer,
         shared_state: &SharedState,
-    ) -> ratatui::prelude::Rect
+    ) -> Rect
     where
         Self: Sized,
     {

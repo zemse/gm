@@ -1,4 +1,5 @@
 use ratatui::{
+    buffer::Buffer,
     crossterm::event::{KeyCode, KeyEvent},
     layout::{Constraint, Layout, Rect},
     widgets::Widget,
@@ -6,7 +7,10 @@ use ratatui::{
 use std::borrow::Cow;
 use textwrap::{wrap, Options};
 
-use crate::extensions::RectExt;
+use crate::{
+    extensions::{RectExt, ThemedWidget},
+    thematize::Thematize,
+};
 
 use super::scroll_bar::CustomScrollBar;
 
@@ -68,7 +72,7 @@ impl TextScroll {
         )
     }
 
-    pub fn handle_event(&mut self, key_event: Option<&KeyEvent>, area: ratatui::prelude::Rect) {
+    pub fn handle_event(&mut self, key_event: Option<&KeyEvent>, area: Rect) {
         if let Some(key_event) = key_event {
             match key_event.code {
                 KeyCode::Up => {
@@ -83,8 +87,8 @@ impl TextScroll {
     }
 }
 
-impl Widget for &TextScroll {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
+impl ThemedWidget for TextScroll {
+    fn render(&self, area: Rect, buf: &mut Buffer, theme: &impl Thematize)
     where
         Self: Sized,
     {
@@ -106,7 +110,7 @@ impl Widget for &TextScroll {
                 total_items: total,
                 paginate: false,
             }
-            .render(scroll_area, buf);
+            .render(scroll_area, buf, theme);
         } else {
             for line in &lines {
                 line.render(text_area, buf);

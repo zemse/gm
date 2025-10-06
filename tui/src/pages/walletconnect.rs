@@ -14,6 +14,7 @@ use gm_ratatui_extra::{
     thematize::Thematize,
 };
 use ratatui::{
+    buffer::Buffer,
     crossterm::event::{Event, KeyCode},
     layout::Rect,
     text::Text,
@@ -172,7 +173,7 @@ impl WalletConnectPage {
         Ok(Self {
             form: Form::init(|_| Ok(()))?,
             session_requests: vec![],
-            cursor: Cursor::default(),
+            cursor: Cursor::new(0),
             status: WalletConnectStatus::Idle,
             confirm_popup: ConfirmPopup::new("WalletConnect", String::new(), "Approve", "Reject", true),
             exit_popup: ConfirmPopup::new(
@@ -285,7 +286,7 @@ impl Component for WalletConnectPage {
         tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
         ss: &SharedState,
-    ) -> crate::Result<crate::traits::Actions> {
+    ) -> crate::Result<Actions> {
         let mut handle_result = Actions::default();
 
         let any_popup_open_before = self.confirm_popup.is_open()
@@ -580,7 +581,7 @@ impl Component for WalletConnectPage {
                 || Ok(()),
                 || -> crate::Result<()> {
                     go_back = true;
-                    handle_result.page_pops += 1;
+                    handle_result.page_pop = true;
                     Ok(())
                 },
             )?;
@@ -689,16 +690,17 @@ impl Component for WalletConnectPage {
 
     fn render_component(
         &self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
-        shared_state: &crate::app::SharedState,
-    ) -> ratatui::prelude::Rect
+        area: Rect,
+        popup_area: Rect,
+        buf: &mut Buffer,
+        shared_state: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {
         match &self.status {
             WalletConnectStatus::Idle => {
-                self.form.render(area, buf, &shared_state.theme);
+                self.form.render(area, popup_area, buf, &shared_state.theme);
             }
             WalletConnectStatus::Initializing => {
                 "Initializing connection...".render(area, buf);
@@ -727,9 +729,8 @@ impl Component for WalletConnectPage {
                             .map(|r| format!("{r:?}"))
                             .collect::<Vec<_>>(),
                         cursor: &self.cursor,
-                        focus_style: shared_state.theme.select_focused(),
                     }
-                    .render(area, buf);
+                    .render(area, buf, None, &shared_state.theme);
 
                     let mut s = String::new();
                     for msg in &self.session_requests {
@@ -744,14 +745,15 @@ impl Component for WalletConnectPage {
         }
 
         self.confirm_popup
-            .render(area, buf, &shared_state.theme.popup());
-        self.tx_popup.render(area, buf, &shared_state.theme.popup());
+            .render(popup_area, buf, &shared_state.theme.popup());
+        self.tx_popup
+            .render(popup_area, buf, &shared_state.theme.popup());
         self.sign_popup
-            .render(area, buf, &shared_state.theme.popup());
+            .render(popup_area, buf, &shared_state.theme.popup());
         self.sign_typed_data_popup
-            .render(area, buf, &shared_state.theme.popup());
+            .render(popup_area, buf, &shared_state.theme.popup());
         self.exit_popup
-            .render(area, buf, &shared_state.theme.popup());
+            .render(popup_area, buf, &shared_state.theme.popup());
 
         area
     }

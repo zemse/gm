@@ -142,7 +142,7 @@ impl Component for AccountCreatePage {
                 area,
                 || Ok(()),
                 || -> crate::Result<()> {
-                    result.page_pops += 1;
+                    result.page_pop = true;
                     result.reload = true;
                     Ok(())
                 },
@@ -261,14 +261,14 @@ impl Component for AccountCreatePage {
                             }
                             KeyCode::Enter => {
                                 result.reload = true;
-                                result.page_pops += 1;
+                                result.page_pop = true;
                             }
                             _ => {}
                         },
                         Event::Mouse(mouse_event) => {
                             if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
                                 result.reload = true;
-                                result.page_pops += 1;
+                                result.page_pop = true;
                             }
                         }
                         _ => {}
@@ -324,7 +324,13 @@ impl Component for AccountCreatePage {
         Ok(result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        popup_area: Rect,
+        buf: &mut Buffer,
+        shared_state: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {
@@ -417,8 +423,7 @@ impl Component for AccountCreatePage {
                     let remaining_time = est_time - elapsed_time.as_secs_f64();
 
                     Gauge::default()
-                        // TODO rename theme.block to theme.style, or add method
-                        .gauge_style(shared_state.theme.block())
+                        .gauge_style(shared_state.theme.style())
                         .percent(std::cmp::min(
                             100,
                             (elapsed_time.as_secs() * 100)
@@ -469,7 +474,7 @@ impl Component for AccountCreatePage {
             }
         }
 
-        self.exit_popup.render(area, buf, &shared_state.theme);
+        self.exit_popup.render(popup_area, buf, &shared_state.theme);
 
         area
     }

@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 
 use gm_ratatui_extra::{extensions::RectExt, thematize::Thematize};
-use ratatui::{buffer::Buffer, layout::Rect, style::Stylize, text::Line, widgets::Widget};
+use ratatui::{buffer::Buffer, layout::Rect, text::Line, widgets::Widget};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -25,11 +25,17 @@ impl Component for Title {
         Ok(result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        _popup_area: Rect,
+        buf: &mut Buffer,
+        shared_state: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {
-        buf.set_style(area, shared_state.theme.block());
+        buf.set_style(area, shared_state.theme.style_dim());
         let area = area.margin_h(1);
 
         let welcome_string = format!(
@@ -42,8 +48,7 @@ impl Component for Title {
 
         Line::from(welcome_string)
             // TODO change the name of .block
-            .style(shared_state.theme.block())
-            .bold()
+            .style(shared_state.theme.style())
             .render(area, buf);
 
         let display = if shared_state.online == Some(false) {
@@ -60,8 +65,7 @@ impl Component for Title {
         };
 
         Line::from(display)
-            .style(shared_state.theme.block())
-            .bold()
+            .style(shared_state.theme.style())
             .right_aligned()
             .render(area, buf);
 

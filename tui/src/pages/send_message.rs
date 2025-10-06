@@ -9,6 +9,7 @@ use gm_ratatui_extra::widgets::form::FormItemIndex;
 use gm_utils::alloy::StringExt;
 use gm_utils::disk_storage::DiskStorageInterface;
 use gm_utils::network::{Network, NetworkStore};
+use ratatui::buffer::Buffer;
 use tokio_util::sync::CancellationToken;
 
 use super::address_book::AddressBookMenuItem;
@@ -198,21 +199,23 @@ impl Component for SendMessagePage {
     fn render_component(
         &self,
         area: Rect,
-        buf: &mut ratatui::prelude::Buffer,
+        popup_area: Rect,
+        buf: &mut Buffer,
         shared_state: &SharedState,
-    ) -> ratatui::prelude::Rect
+    ) -> Rect
     where
         Self: Sized,
     {
-        self.form.render(area, buf, &shared_state.theme);
+        self.form.render(area, popup_area, buf, &shared_state.theme);
 
         self.address_book_popup
-            .render(area, buf, &shared_state.theme.popup());
+            .render(popup_area, buf, &shared_state.theme.popup());
 
         self.networks_popup
-            .render(area, buf, &shared_state.theme.popup());
+            .render(popup_area, buf, &shared_state.theme.popup());
 
-        self.tx_popup.render(area, buf, &shared_state.theme.popup());
+        self.tx_popup
+            .render(popup_area, buf, &shared_state.theme.popup());
 
         area
     }

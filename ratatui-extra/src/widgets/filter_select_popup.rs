@@ -25,7 +25,7 @@ impl<Item: Display> FilterSelectPopup<Item> {
             empty_text,
             open: false,
             items: None,
-            cursor: Cursor::default(),
+            cursor: Cursor::new(0),
             search_string: String::new(),
         }
     }
@@ -124,7 +124,7 @@ impl<Item: Display> FilterSelectPopup<Item> {
             let inner_area = Popup::inner_area(area);
             let block = Block::bordered()
                 .border_type(theme.border_type())
-                .style(theme.block())
+                .style(theme.style())
                 .title(self.title);
             let block_inner_area = block.inner(inner_area);
             block.render(inner_area, buf);
@@ -142,9 +142,8 @@ impl<Item: Display> FilterSelectPopup<Item> {
                         cursor: &self.cursor,
                         search_string: &self.search_string,
                         focus: true,
-                        focus_style: theme.select_focused(),
                     }
-                    .render(block_inner_area, buf);
+                    .render(block_inner_area, buf, &theme);
                 }
             } else {
                 "Loading...".render(block_inner_area, buf);

@@ -18,6 +18,7 @@ pub enum FormItem {
     Heading,
     Message,
     SignMessageButton,
+    LineBreak,
     Signature,
 }
 
@@ -45,6 +46,7 @@ impl TryFrom<FormItem> for FormWidget {
                 label: "Sign Message",
                 hover_focus: false,
             },
+            FormItem::LineBreak => FormWidget::LineBreak,
             FormItem::Signature => FormWidget::DisplayText(String::new()),
         };
         Ok(widget)
@@ -92,11 +94,17 @@ impl Component for SignMessagePage {
         )
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, ss: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        popup_area: Rect,
+        buf: &mut Buffer,
+        ss: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {
-        self.form.render(area, buf, &ss.theme);
+        self.form.render(area, popup_area, buf, &ss.theme);
 
         area
     }

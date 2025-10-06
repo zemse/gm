@@ -9,7 +9,7 @@ use alloy::{
 use gm_ratatui_extra::{
     act::Act,
     button::Button,
-    extensions::{CustomRender, RectExt},
+    extensions::{CustomRender, RectExt, ThemedWidget},
     popup::Popup,
     text_scroll::TextScroll,
     thematize::Thematize,
@@ -199,7 +199,7 @@ impl SignPopup {
                 Layout::vertical([Constraint::Min(1), Constraint::Length(3)])
                     .areas(block_inner_area);
 
-            self.text.render(text_area, buf);
+            self.text.render(text_area, buf, &theme);
 
             let [left_area, right_area] =
                 Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])

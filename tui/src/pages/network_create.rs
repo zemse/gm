@@ -35,7 +35,9 @@ pub enum FormItem {
     ChainlinkNativePriceFeed,
     ChainlinkNativePriceFeedDecimals,
     TokensButton,
+    LineBreak1,
     SaveButton,
+    LineBreak2,
     RemoveButton,
     ErrorText,
 }
@@ -141,10 +143,12 @@ impl TryFrom<FormItem> for FormWidget {
                 label: "Tokens",
                 hover_focus: false,
             },
+            FormItem::LineBreak1 => FormWidget::LineBreak,
             FormItem::SaveButton => FormWidget::Button {
                 label: "Save",
                 hover_focus: false,
             },
+            FormItem::LineBreak2 => FormWidget::LineBreak,
             FormItem::RemoveButton => FormWidget::Button {
                 label: "Remove",
                 hover_focus: false,
@@ -328,7 +332,7 @@ impl Component for NetworkCreatePage {
                         config.networks.remove(self.network_index);
                     }
                     let _ = config.save();
-                    handle_result.page_pops = 1;
+                    handle_result.page_pop = true;
                     handle_result.reload = true;
                     Ok(())
                 },
@@ -358,13 +362,13 @@ impl Component for NetworkCreatePage {
                                 config.networks.push(Self::network(form, &self.tokens)?);
                             }
                             let _ = config.save();
-                            handle_result.page_pops = 1;
+                            handle_result.page_pop = true;
                             handle_result.reload = true;
                         }
                     }
                     FormItem::TokensButton => {
                         let network = Self::network(form, &self.tokens)?;
-                        handle_result.page_pops = 1;
+                        handle_result.page_pop = true;
                         handle_result
                             .page_inserts
                             .push(Page::Token(TokenPage::new(self.network_index, network)?));
@@ -383,12 +387,18 @@ impl Component for NetworkCreatePage {
 
         Ok(handle_result)
     }
-    fn render_component(&self, area: Rect, buf: &mut Buffer, s: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        popup_area: Rect,
+        buf: &mut Buffer,
+        s: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {
-        self.form.render(area, buf, &s.theme);
-        self.remove_popup.render(area, buf, &s.theme.popup());
+        self.form.render(area, popup_area, buf, &s.theme);
+        self.remove_popup.render(popup_area, buf, &s.theme.popup());
         area
     }
 }

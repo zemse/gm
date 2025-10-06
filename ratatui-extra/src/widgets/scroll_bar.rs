@@ -1,4 +1,11 @@
-use ratatui::{layout::Offset, widgets::Widget};
+use ratatui::{
+    buffer::Buffer,
+    layout::{Offset, Rect},
+    text::Span,
+    widgets::WidgetRef,
+};
+
+use crate::thematize::Thematize;
 
 pub struct CustomScrollBar {
     // Cursor range must be 0 to total_items - 1
@@ -7,11 +14,8 @@ pub struct CustomScrollBar {
     pub paginate: bool,
 }
 
-impl Widget for CustomScrollBar {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
-        Self: Sized,
-    {
+impl CustomScrollBar {
+    pub fn render(self, area: Rect, buf: &mut Buffer, theme: &impl Thematize) {
         if self.cursor >= self.total_items {
             panic!(
                 "CustomScrollBar out-of-range error: cursor {} must be less than total_items {}",
@@ -56,22 +60,28 @@ impl Widget for CustomScrollBar {
 
         let mut i = 0;
         for _ in 0..top {
-            "║".render(area.offset(Offset { x: 0, y: i }), buf);
+            Span::raw("║")
+                .style(theme.select_inactive())
+                .render_ref(area.offset(Offset { x: 0, y: i }), buf);
             i += 1;
         }
         for _ in 0..middle {
-            "█".render(area.offset(Offset { x: 0, y: i }), buf);
+            Span::raw("█")
+                .style(theme.select_inactive())
+                .render_ref(area.offset(Offset { x: 0, y: i }), buf);
             i += 1;
         }
         for _ in 0..bottom {
-            "║".render(area.offset(Offset { x: 0, y: i }), buf);
+            Span::raw("║")
+                .style(theme.select_inactive())
+                .render_ref(area.offset(Offset { x: 0, y: i }), buf);
             i += 1;
         }
     }
 }
 
 fn get_page_height(i: usize, max_height: usize, num_pages: usize) -> usize {
-    let base = max_height / num_pages;
+    let base = max_height.saturating_div(num_pages);
     if i < max_height % num_pages {
         base + 1
     } else {

@@ -1,6 +1,6 @@
 use std::sync::mpsc;
 
-use gm_ratatui_extra::select_owned::SelectOwned;
+use gm_ratatui_extra::{extensions::ThemedWidget, select_owned::SelectOwned};
 use gm_utils::assets::Asset;
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use tokio_util::sync::CancellationToken;
@@ -21,7 +21,7 @@ pub struct AssetsPage {
 impl AssetsPage {
     pub fn new(assets: Option<Vec<Asset>>) -> crate::Result<Self> {
         Ok(Self {
-            select: SelectOwned::new(assets),
+            select: SelectOwned::new(assets, false),
         })
     }
 }
@@ -29,6 +29,14 @@ impl AssetsPage {
 impl Component for AssetsPage {
     fn set_focus(&mut self, focus: bool) {
         self.select.focus = focus;
+    }
+
+    fn set_cursor(&mut self, cursor: usize) {
+        self.select.cursor.current = cursor.min(self.select.len().saturating_sub(1));
+    }
+
+    fn get_cursor(&self) -> Option<usize> {
+        Some(self.select.cursor.current)
     }
 
     fn handle_event(
@@ -46,18 +54,28 @@ impl Component for AssetsPage {
         }
 
         let mut handle_result = Actions::default();
-        self.select
-            .handle_event(event.input_event(), area, |asset| {
+        self.select.handle_event(
+            event.input_event(),
+            area,
+            |asset| {
                 handle_result
                     .page_inserts
                     .push(Page::AssetTransfer(AssetTransferPage::new(asset)?));
                 Ok::<(), crate::Error>(())
-            })?;
+            },
+            |_| Ok(()),
+        )?;
 
         Ok(handle_result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        _popup_area: Rect,
+        buf: &mut Buffer,
+        shared_state: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {

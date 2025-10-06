@@ -5,7 +5,11 @@ use ratatui::{
     widgets::{Block, Widget},
 };
 
-use crate::{act::Act, extensions::RectExt, thematize::Thematize};
+use crate::{
+    act::Act,
+    extensions::{RectExt, ThemedWidget},
+    thematize::Thematize,
+};
 
 use super::{button::Button, popup::Popup, text_scroll::TextScroll};
 
@@ -123,7 +127,7 @@ impl ConfirmPopup {
                 Layout::vertical([Constraint::Min(1), Constraint::Length(3)])
                     .areas(block_inner_area);
 
-            self.text.render(text_area, buf);
+            self.text.render(text_area, buf, &theme);
 
             let [left_area, right_area] =
                 Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])

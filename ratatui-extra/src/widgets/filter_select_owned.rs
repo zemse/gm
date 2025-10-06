@@ -5,10 +5,14 @@ use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     layout::{Constraint, Layout, Rect},
     text::Line,
-    widgets::Widget,
+    widgets::WidgetRef,
 };
 
-use crate::{extensions::RectExt, select_owned::SelectOwned, thematize::Thematize};
+use crate::{
+    extensions::{RectExt, ThemedWidget},
+    select_owned::SelectOwned,
+    thematize::Thematize,
+};
 
 #[derive(Debug)]
 pub struct FilterSelectOwned<T: Display + PartialEq> {
@@ -56,7 +60,8 @@ impl<T: Display + PartialEq> FilterSelectOwned<T> {
     {
         if self.full_list.is_some() {
             if let Some(list_area) = area.height_consumed(2) {
-                self.select.handle_event(input_event, list_area, on_enter)?;
+                self.select
+                    .handle_event(input_event, list_area, on_enter, |_| Ok(()))?;
             }
 
             let search_string_prev = self.search_string.clone();
@@ -93,7 +98,7 @@ impl<T: Display + PartialEq> FilterSelectOwned<T> {
         } else {
             format!("Filter: {}", self.search_string)
         })
-        .render(search_area, buf);
+        .render_ref(search_area, buf);
 
         self.select.render(list_area, buf, theme);
     }

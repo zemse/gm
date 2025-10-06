@@ -1,6 +1,6 @@
 use std::sync::mpsc::Sender;
 
-use ratatui::{layout::Rect, widgets::Widget};
+use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -33,9 +33,10 @@ impl Component for DevKeyCapturePage {
     fn render_component(
         &self,
         area: Rect,
-        buf: &mut ratatui::prelude::Buffer,
-        _shared_state: &crate::app::SharedState,
-    ) -> ratatui::prelude::Rect
+        _popup_area: Rect,
+        buf: &mut Buffer,
+        _shared_state: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {

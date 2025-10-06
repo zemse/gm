@@ -12,6 +12,7 @@ use gm_utils::{
     alloy::StringExt,
     disk_storage::DiskStorageInterface,
 };
+use ratatui::{buffer::Buffer, layout::Rect};
 use std::sync::mpsc;
 use strum::{Display, EnumIter};
 use tokio_util::sync::CancellationToken;
@@ -77,7 +78,7 @@ impl Component for AddressBookCreatePage {
     fn handle_event(
         &mut self,
         event: &AppEvent,
-        area: ratatui::prelude::Rect,
+        area: Rect,
         _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
@@ -110,7 +111,7 @@ impl Component for AddressBookCreatePage {
                             let error = form.get_text_mut(FormItem::ErrorText);
                             *error = format!("{e:?}");
                         } else {
-                            handle_result.page_pops = 1;
+                            handle_result.page_pop = true;
                             handle_result.reload = true;
                         }
                     }
@@ -125,14 +126,15 @@ impl Component for AddressBookCreatePage {
 
     fn render_component(
         &self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
+        area: Rect,
+        popup_area: Rect,
+        buf: &mut Buffer,
         ss: &SharedState,
-    ) -> ratatui::prelude::Rect
+    ) -> Rect
     where
         Self: Sized,
     {
-        self.form.render(area, buf, &ss.theme);
+        self.form.render(area, popup_area, buf, &ss.theme);
 
         area
     }

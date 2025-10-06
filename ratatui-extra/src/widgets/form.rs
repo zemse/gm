@@ -2,12 +2,13 @@ use std::{collections::HashMap, marker::PhantomData};
 
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, MouseEventKind};
 use ratatui::layout::{Constraint, Layout, Position};
+use ratatui::widgets::WidgetRef;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
     style::Stylize,
     text::Text,
-    widgets::{Paragraph, Widget, Wrap},
+    widgets::{Paragraph, Wrap},
 };
 use strum::IntoEnumIterator;
 
@@ -59,6 +60,7 @@ pub enum FormWidget {
     },
     DisplayText(String),
     ErrorText(String),
+    LineBreak,
 }
 
 impl FormWidget {
@@ -72,7 +74,8 @@ impl FormWidget {
             FormWidget::Heading(_)
             | FormWidget::StaticText(_)
             | FormWidget::DisplayText(_)
-            | FormWidget::ErrorText(_) => None,
+            | FormWidget::ErrorText(_)
+            | FormWidget::LineBreak => None,
         }
     }
 
@@ -86,7 +89,8 @@ impl FormWidget {
             | FormWidget::Heading(_)
             | FormWidget::StaticText(_)
             | FormWidget::DisplayText(_)
-            | FormWidget::ErrorText(_) => 0,
+            | FormWidget::ErrorText(_)
+            | FormWidget::LineBreak => 0,
         }
     }
 
@@ -100,7 +104,8 @@ impl FormWidget {
             | FormWidget::Heading(_)
             | FormWidget::StaticText(_)
             | FormWidget::DisplayText(_)
-            | FormWidget::ErrorText(_) => None,
+            | FormWidget::ErrorText(_)
+            | FormWidget::LineBreak => None,
         }
     }
 
@@ -127,6 +132,7 @@ impl FormWidget {
                     (text.len() as u16).div_ceil(area.width) + 1
                 }
             }
+            FormWidget::LineBreak => 1,
         }
     }
 
@@ -312,7 +318,8 @@ impl<
             FormWidget::Heading(_)
             | FormWidget::StaticText(_)
             | FormWidget::DisplayText(_)
-            | FormWidget::ErrorText(_) => false,
+            | FormWidget::ErrorText(_)
+            | FormWidget::LineBreak => false,
 
             FormWidget::InputBox { .. }
             | FormWidget::DisplayBox { .. }
@@ -643,7 +650,7 @@ impl<
         [form_area, scroll_area]
     }
 
-    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &impl Thematize)
+    pub fn render(&self, area: Rect, popup_area: Rect, buf: &mut Buffer, theme: &impl Thematize)
     where
         Self: Sized,
     {
@@ -668,11 +675,11 @@ impl<
             // Render all form items in our virtual buffer.
             match item {
                 FormWidget::Heading(heading) => {
-                    heading.bold().render(virtual_area, &mut virtual_buf);
+                    heading.bold().render_ref(virtual_area, &mut virtual_buf);
                     virtual_area.consume_height(item.height(virtual_area));
                 }
                 FormWidget::StaticText(text) => {
-                    text.render(virtual_area, &mut virtual_buf);
+                    text.render_ref(virtual_area, &mut virtual_buf);
                     virtual_area.consume_height(item.height(virtual_area));
                 }
                 FormWidget::InputBox {
@@ -774,10 +781,14 @@ impl<
                     if !text.is_empty() {
                         Paragraph::new(Text::raw(text))
                             .wrap(Wrap { trim: false })
-                            .render(virtual_area, &mut virtual_buf);
+                            .render_ref(virtual_area, &mut virtual_buf);
 
                         virtual_area.consume_height(item.height(virtual_area));
                     }
+                }
+                FormWidget::LineBreak => {
+                    // Just consume 1 height
+                    virtual_area.consume_height(item.height(virtual_area));
                 }
             }
         }
@@ -797,7 +808,7 @@ impl<
                 total_items: (virtual_form_height - area.height + 1) as usize,
                 paginate: false,
             }
-            .render(scroll_area, buf);
+            .render(scroll_area, buf, theme);
         }
 
         let mut virtual_canvas_area = form_area;
@@ -820,7 +831,7 @@ impl<
             #[allow(clippy::single_match)]
             match item {
                 FormWidget::SelectInput { popup, .. } => {
-                    popup.render(area, buf, theme);
+                    popup.render(popup_area, buf, theme);
                 }
                 _ => {}
             }

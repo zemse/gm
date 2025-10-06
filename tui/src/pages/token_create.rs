@@ -149,7 +149,7 @@ impl Component for TokenCreatePage {
                         store.networks[self.network_index] = self.network.clone();
                         store.save()?;
                     }
-                    handle_result.page_pops = 1;
+                    handle_result.page_pop = true;
                     handle_result.page_inserts.push(Page::Token(TokenPage::new(
                         self.network_index,
                         self.network.clone(),
@@ -178,7 +178,7 @@ impl Component for TokenCreatePage {
                     config.networks[self.network_index] = self.network.clone();
                     config.save()?;
 
-                    handle_result.page_pops = 1;
+                    handle_result.page_pop = true;
                     handle_result.page_inserts.push(Page::Token(TokenPage::new(
                         self.network_index,
                         self.network.clone(),
@@ -195,12 +195,18 @@ impl Component for TokenCreatePage {
         handle_result.merge(r);
         Ok(handle_result)
     }
-    fn render_component(&self, area: Rect, buf: &mut Buffer, s: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        popup_area: Rect,
+        buf: &mut Buffer,
+        s: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {
-        self.form.render(area, buf, &s.theme);
-        self.remove_popup.render(area, buf, &s.theme.popup());
+        self.form.render(area, popup_area, buf, &s.theme);
+        self.remove_popup.render(popup_area, buf, &s.theme.popup());
         area
     }
 }

@@ -7,7 +7,6 @@ use crate::AppEvent;
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::cursor::Cursor;
 use gm_ratatui_extra::select::Select;
-use gm_ratatui_extra::thematize::Thematize;
 use gm_utils::network::{Network, Token};
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind};
@@ -50,7 +49,7 @@ impl TokenPage {
                 .collect::<Vec<_>>(),
         );
         Ok(Self {
-            cursor: Cursor::default(),
+            cursor: Cursor::new(0),
             focus: true,
             list,
             network,
@@ -91,7 +90,7 @@ impl Component for TokenPage {
                             KeyCode::Enter => match &self.list[self.cursor.current] {
                                 TokenSelect::Create => {
                                     let token_index = self.network.tokens.len();
-                                    handle_result.page_pops = 1;
+                                    handle_result.page_pop = true;
                                     handle_result.page_inserts.push(Page::TokenCreate(
                                         TokenCreatePage::new(
                                             token_index,
@@ -109,7 +108,7 @@ impl Component for TokenPage {
                                         .iter()
                                         .position(|t| t.contract_address == token.contract_address)
                                         .unwrap();
-                                    handle_result.page_pops = 1;
+                                    handle_result.page_pop = true;
                                     handle_result.page_inserts.push(Page::TokenCreate(
                                         TokenCreatePage::new(
                                             token_index,
@@ -121,7 +120,7 @@ impl Component for TokenPage {
                                 }
                             },
                             KeyCode::Esc => {
-                                handle_result.page_pops = 1;
+                                handle_result.page_pop = true;
                                 handle_result.page_inserts.push(Page::NetworkCreate(
                                     NetworkCreatePage::new(
                                         self.network_index,
@@ -140,7 +139,13 @@ impl Component for TokenPage {
         Ok(handle_result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        _popup_area: Rect,
+        buf: &mut Buffer,
+        shared_state: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {
@@ -148,9 +153,8 @@ impl Component for TokenPage {
             list: &self.list,
             cursor: &self.cursor,
             focus: self.focus,
-            focus_style: shared_state.theme.select_focused(),
         }
-        .render(area, buf);
+        .render(area, buf, None, &shared_state.theme);
         area
     }
 }

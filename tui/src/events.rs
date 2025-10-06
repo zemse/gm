@@ -6,7 +6,7 @@ use alloy::{
 };
 use gm_ratatui_extra::candle_chart::{Candle, Interval};
 use ratatui::crossterm::event::{
-    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers, MouseEvent,
 };
 use walletconnect_sdk::wc_message::WcMessage;
 
@@ -143,6 +143,13 @@ impl AppEvent {
     pub fn key_event(&self) -> Option<&KeyEvent> {
         match self {
             AppEvent::Input(Event::Key(key_event)) => Some(key_event),
+            _ => None,
+        }
+    }
+
+    pub fn mouse_event(&self) -> Option<&MouseEvent> {
+        match self {
+            AppEvent::Input(Event::Mouse(mouse_event)) => Some(mouse_event),
             _ => None,
         }
     }

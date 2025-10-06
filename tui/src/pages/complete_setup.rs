@@ -135,17 +135,23 @@ impl Component for CompleteSetupPage {
         handle_result.merge(r);
 
         if self.form.valid_count() == 0 {
-            handle_result.page_pops += 1;
+            handle_result.page_pop = true;
         }
 
         Ok(handle_result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, ss: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        popup_area: Rect,
+        buf: &mut Buffer,
+        ss: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {
-        self.form.render(area, buf, &ss.theme);
+        self.form.render(area, popup_area, buf, &ss.theme);
 
         area
     }

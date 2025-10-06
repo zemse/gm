@@ -40,6 +40,7 @@ impl Component for TextPage {
     fn render_component(
         &self,
         area: Rect,
+        _popup_area: Rect,
         buf: &mut ratatui::prelude::Buffer,
         _shared_state: &crate::app::SharedState,
     ) -> ratatui::prelude::Rect

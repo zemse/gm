@@ -3,36 +3,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::disk_storage::{DiskStorageInterface, FileFormat};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug)]
 pub struct Config {
     current_account: Option<Address>,
     testnet_mode: bool,
     #[serde(default)]
     developer_mode: bool,
     alchemy_api_key: Option<String>,
-    // TODO theme_name must be enum, which means either move themes into utils or this module in tui
-    #[serde(default = "default_theme_name")]
+    #[serde(default)]
     theme_name: String,
     #[serde(default)]
     helios_enabled: bool,
-}
-
-// TODO this is a temporary fix, need to have theme_name as an enum which requires a refactor
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            current_account: None,
-            testnet_mode: false,
-            developer_mode: false,
-            alchemy_api_key: None,
-            theme_name: default_theme_name(),
-            helios_enabled: false,
-        }
-    }
-}
-
-fn default_theme_name() -> String {
-    "Monochrome".to_string()
 }
 
 impl DiskStorageInterface for Config {

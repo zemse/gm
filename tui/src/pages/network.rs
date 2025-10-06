@@ -1,3 +1,4 @@
+use gm_ratatui_extra::extensions::ThemedWidget;
 use gm_ratatui_extra::select_owned::SelectOwned;
 use gm_utils::disk_storage::DiskStorageInterface;
 use ratatui::buffer::Buffer;
@@ -42,7 +43,7 @@ impl NetworkPage {
                 .collect::<Vec<_>>(),
         );
         Ok(Self {
-            select: SelectOwned::new(Some(list)),
+            select: SelectOwned::new(Some(list), false),
         })
     }
 }
@@ -67,8 +68,10 @@ impl Component for NetworkPage {
     ) -> crate::Result<Actions> {
         let mut result = Actions::default();
 
-        self.select
-            .handle_event(event.input_event(), area, |item| {
+        self.select.handle_event(
+            event.input_event(),
+            area,
+            |item| {
                 let network_store = NetworkStore::load()?;
                 match item {
                     NetworkSelect::Create => {
@@ -98,12 +101,20 @@ impl Component for NetworkPage {
                     }
                 }
                 Ok::<(), crate::Error>(())
-            })?;
+            },
+            |_| Ok(()),
+        )?;
 
         Ok(result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        _popup_area: Rect,
+        buf: &mut Buffer,
+        shared_state: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {

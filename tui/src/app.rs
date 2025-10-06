@@ -2,6 +2,7 @@
 use std::time::Instant;
 use std::{
     io::{self, stdout},
+    ops::Mul,
     str::FromStr,
     sync::{mpsc, Arc, RwLock, RwLockWriteGuard},
 };
@@ -13,22 +14,21 @@ use crate::{
         assets::watch_assets, input::watch_input_events, recent_addresses::watch_recent_addresses,
     },
     pages::{
-        config::ConfigPage,
-        dev_key_capture::DevKeyCapturePage,
-        footer::Footer,
-        invite_popup::InvitePopup,
-        main_menu::{MainMenuItem, MainMenuPage},
-        shell::ShellPage,
-        text::TextPage,
-        title::Title,
-        trade::TradePage,
-        Page,
+        account::AccountPage, address_book::AddressBookPage, assets::AssetsPage,
+        complete_setup::CompleteSetupPage, config::ConfigPage, dev_key_capture::DevKeyCapturePage,
+        footer::Footer, invite_popup::InvitePopup, network::NetworkPage,
+        send_message::SendMessagePage, shell::ShellPage, sign_message::SignMessagePage,
+        title::Title, trade::TradePage, walletconnect::WalletConnectPage, Page,
     },
     AppEvent,
 };
 use alloy::primitives::Address;
 use gm_ratatui_extra::{
-    extensions::RectExt, form::Form, text_popup::TextPopup, thematize::Thematize,
+    act::Act,
+    extensions::{RectExt, ThemedWidget},
+    select_owned::SelectOwned,
+    text_popup::TextPopup,
+    thematize::Thematize,
 };
 use gm_utils::{
     assets::{Asset, AssetManager},
@@ -37,16 +37,22 @@ use gm_utils::{
     network::NetworkStore,
     price_manager::PriceManager,
 };
-use ratatui::crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers},
-    execute,
-};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
-    widgets::{Block, Widget},
+    widgets::Widget,
     DefaultTerminal,
 };
+use ratatui::{
+    crossterm::{
+        event::{
+            DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
+        },
+        execute,
+    },
+    widgets::Block,
+};
+use strum::{Display, EnumIter, IntoEnumIterator};
 use tokio_util::sync::CancellationToken;
 
 use super::traits::{Actions, Component};
@@ -55,6 +61,100 @@ use crate::{
     events::helios::helios_thread,
     theme::{Theme, ThemeName},
 };
+
+#[derive(Debug, Display, EnumIter, PartialEq)]
+pub enum MainMenuItem {
+    CompleteSetup,
+    Portfolio,
+    Accounts,
+    AddressBook,
+    Networks,
+    WalletConnect,
+    SignMessage,
+    SendMessage,
+    DevKeyInput,
+    Shell,
+    Config,
+}
+
+impl MainMenuItem {
+    pub fn get_page(&self, shared_state: &SharedState) -> crate::Result<Page> {
+        Ok(match self {
+            MainMenuItem::CompleteSetup => Page::CompleteSetup(CompleteSetupPage::new()?),
+            MainMenuItem::Portfolio => Page::Assets(AssetsPage::new(shared_state.assets_read()?)?),
+            MainMenuItem::Accounts => Page::Account(AccountPage::new()?),
+            MainMenuItem::AddressBook => Page::AddressBook(AddressBookPage::new()?),
+            MainMenuItem::Networks => Page::Network(NetworkPage::new()?),
+            MainMenuItem::WalletConnect => Page::WalletConnect(WalletConnectPage::new()?),
+            MainMenuItem::SignMessage => Page::SignMessage(SignMessagePage::new()?),
+            MainMenuItem::SendMessage => Page::SendMessage(SendMessagePage::new()?),
+            MainMenuItem::DevKeyInput => Page::DevKeyCapture(DevKeyCapturePage::default()),
+            MainMenuItem::Shell => Page::Shell(ShellPage::default()),
+            MainMenuItem::Config => Page::Config(ConfigPage::new()?),
+        })
+    }
+
+    pub fn depends_on_current_account(&self) -> bool {
+        match self {
+            MainMenuItem::CompleteSetup
+            | MainMenuItem::AddressBook
+            | MainMenuItem::Networks
+            | MainMenuItem::Accounts
+            | MainMenuItem::WalletConnect
+            | MainMenuItem::DevKeyInput
+            | MainMenuItem::Config => false,
+
+            MainMenuItem::Portfolio
+            | MainMenuItem::SignMessage
+            | MainMenuItem::SendMessage
+            | MainMenuItem::Shell => true,
+        }
+    }
+
+    pub fn only_on_developer_mode(&self) -> bool {
+        match self {
+            MainMenuItem::CompleteSetup
+            | MainMenuItem::Portfolio
+            | MainMenuItem::Accounts
+            | MainMenuItem::AddressBook
+            | MainMenuItem::Networks
+            | MainMenuItem::WalletConnect
+            | MainMenuItem::SignMessage
+            | MainMenuItem::SendMessage
+            | MainMenuItem::Shell
+            | MainMenuItem::Config => false,
+            MainMenuItem::DevKeyInput => true,
+        }
+    }
+
+    pub fn get_menu(developer_mode: bool) -> crate::Result<Vec<MainMenuItem>> {
+        let mut all_options: Vec<MainMenuItem> = MainMenuItem::iter().collect();
+
+        #[cfg(feature = "demo")]
+        all_options.remove(0);
+
+        #[cfg(not(feature = "demo"))]
+        {
+            let temp_setup_page = CompleteSetupPage::new()?;
+            if temp_setup_page.form.valid_count() == 0 {
+                all_options.remove(0);
+            }
+        }
+
+        let current_account_exists = Config::current_account().is_ok();
+        let mut options = vec![];
+
+        for option in all_options {
+            if (!option.depends_on_current_account() || current_account_exists)
+                && (!option.only_on_developer_mode() || developer_mode)
+            {
+                options.push(option);
+            }
+        }
+
+        Ok(options)
+    }
+}
 
 pub struct SharedState {
     pub online: Option<bool>,
@@ -94,8 +194,26 @@ impl SharedState {
     }
 }
 
+struct AppAreas {
+    title: Rect,
+    middle: Rect,
+    footer: Rect,
+    menu: Rect,
+    gap: Rect,
+    body: Rect,
+    popup: Rect,
+}
+
+#[derive(PartialEq)]
+enum Focus {
+    Menu,
+    Body,
+}
+
 pub struct App {
     exit: bool,
+    focus: Focus,
+    pub main_menu: SelectOwned<MainMenuItem>,
     context: Vec<Page>,
     shared_state: SharedState,
 
@@ -119,13 +237,16 @@ impl App {
         let networks = NetworkStore::load_and_update()?;
 
         let config = Config::load()?;
-        let theme_name = ThemeName::from_str(config.get_theme_name())?;
+        let theme_name = ThemeName::from_str(config.get_theme_name()).unwrap_or_default();
         let theme = Theme::new(theme_name);
-        Ok(Self {
+        let mut app = Self {
             exit: false,
-            context: vec![Page::MainMenu(MainMenuPage::new(
-                config.get_developer_mode(),
-            )?)],
+            focus: Focus::Menu,
+            main_menu: SelectOwned::new(
+                Some(MainMenuItem::get_menu(config.get_developer_mode())?),
+                true,
+            ),
+            context: vec![Page::Assets(AssetsPage::new(None)?)],
             shared_state: SharedState {
                 asset_manager: Arc::new(RwLock::new(AssetManager::default())),
                 price_manager: Arc::new(PriceManager::new(networks.networks)?),
@@ -151,7 +272,10 @@ impl App {
 
             #[cfg(feature = "demo")]
             demo_timer: Some(Instant::now()),
-        })
+        };
+        app.update_focus(Focus::Menu);
+
+        Ok(app)
     }
 
     pub async fn run(&mut self, pre_events: Option<Vec<AppEvent>>) -> crate::Result<()> {
@@ -323,19 +447,25 @@ impl App {
         self.shared_state.alchemy_api_key_available = config.get_alchemy_api_key(false).is_ok();
         self.shared_state.current_account = config.get_current_account().ok();
         self.shared_state.developer_mode = config.get_developer_mode();
-        let theme_name = ThemeName::from_str(config.get_theme_name())?;
+        let theme_name = ThemeName::from_str(config.get_theme_name()).unwrap_or_default();
         let theme = Theme::new(theme_name);
         self.shared_state.theme = theme;
         for page in &mut self.context {
             page.reload(&self.shared_state)?;
         }
 
+        self.main_menu
+            .update_list(Some(MainMenuItem::get_menu(config.get_developer_mode())?));
+
         Ok(())
     }
 
-    async fn process_result(&mut self, result: Actions) -> crate::Result<(bool, bool)> {
-        for _ in 0..result.page_pops {
+    async fn process_result(&mut self, result: Actions) -> crate::Result<(bool, bool, bool)> {
+        if result.page_pop {
             self.context.pop();
+        }
+        if result.page_pop_all {
+            self.context.clear();
         }
         if result.reload {
             self.reload()?;
@@ -350,7 +480,25 @@ impl App {
             }
         }
         self.context.extend(result.page_inserts);
-        Ok((result.ignore_esc, result.ignore_ctrlc))
+        Ok((result.ignore_esc, result.ignore_ctrlc, result.ignore_left))
+    }
+
+    fn update_focus(&mut self, new_focus: Focus) {
+        self.focus = new_focus;
+
+        if self.context.is_empty() {
+            self.focus = Focus::Menu;
+        } else if self.focus == Focus::Menu {
+            if let Some(page) = self.context.last_mut() {
+                page.set_focus(false);
+            }
+            self.main_menu.focus = true;
+        } else if self.focus == Focus::Body {
+            if let Some(page) = self.context.last_mut() {
+                page.set_focus(true);
+            }
+            self.main_menu.focus = false;
+        }
     }
 
     async fn handle_event(
@@ -360,7 +508,7 @@ impl App {
         tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
     ) -> crate::Result<()> {
-        let [_, body_area, _] = self.get_areas(area);
+        let areas = self.get_areas(area);
 
         #[cfg(feature = "demo")]
         if let Some(demo_timer) = self.demo_timer {
@@ -474,25 +622,56 @@ impl App {
             #[cfg(feature = "demo")]
             self.demo_popup
                 .handle_event::<Actions>(event.key_event(), area)
-        } else if self.context.last().is_some() {
-            let page = self.context.last_mut().unwrap();
-            let page_area = if page.is_main_menu() {
-                let [left_area, _, _] = Layout::horizontal([
-                    Constraint::Length(13),
-                    Constraint::Length(1),
-                    Constraint::Min(2),
-                ])
-                .areas(body_area.block_inner());
-                left_area
-            } else {
-                body_area.block_inner()
-            };
-            page.handle_event(&event, page_area, tr, sd, &self.shared_state)?
         } else {
-            Actions::default()
+            let mut result = Actions::default();
+            let is_key_event = event.key_event().is_some();
+
+            // If focus is on body, handle all events. However if focus is not on body
+            // then handle all but key events. This allows to handle mouse clicks and widget updates.
+            if (self.focus == Focus::Body || !is_key_event) && self.context.last().is_some() {
+                let page = self.context.last_mut().unwrap();
+                let r = page.handle_event(&event, areas.body, tr, sd, &self.shared_state)?;
+                result.merge(r);
+            }
+
+            // If focus is on menu, handle all events. However if focus is not on menu
+            // then handle all but key events. This allows to handle mouse clicks.
+            if self.focus == Focus::Menu || !is_key_event {
+                let mut focus_update_1 = None;
+                let mut focus_update_2 = None;
+                self.main_menu.handle_event(
+                    event.input_event(),
+                    areas.menu,
+                    |item| {
+                        let mut page = item.get_page(&self.shared_state)?;
+                        page.set_focus(true);
+                        result.page_pop_all = true;
+                        result.page_inserts.push(page);
+
+                        focus_update_1 = Some(Focus::Body);
+
+                        Ok::<(), crate::Error>(())
+                    },
+                    |hover_in| {
+                        if hover_in {
+                            focus_update_2 = Some(Focus::Menu);
+                        } else {
+                            focus_update_2 = Some(Focus::Body);
+                        }
+
+                        Ok(())
+                    },
+                )?;
+
+                if let Some(new_focus) = focus_update_1.or(focus_update_2) {
+                    self.update_focus(new_focus);
+                }
+            }
+
+            result
         };
 
-        let (ignore_esc, ignore_ctrlc) = self.process_result(result).await?;
+        let (ignore_esc, ignore_ctrlc, ignore_left) = self.process_result(result).await?;
 
         // Context is empty (due to pressing ESC)
         if self.context.is_empty() {
@@ -523,16 +702,47 @@ impl App {
                             self.context.push(Page::Trade(TradePage::default()));
                         }
                     }
+                    KeyCode::Right => {
+                        if self.focus == Focus::Menu {
+                            self.update_focus(Focus::Body);
+                            if let Some(page) = self.context.last_mut() {
+                                page.set_cursor(self.main_menu.cursor.current);
+                            }
+                        }
+                    }
+                    KeyCode::Left => {
+                        if self.focus == Focus::Body
+                            && (!ignore_left || key_event.modifiers.contains(KeyModifiers::SHIFT))
+                        {
+                            if let Some(cursor) = self
+                                .context
+                                .last()
+                                .and_then(|page| page.get_cursor())
+                                .or(self.main_menu.external_cursor)
+                            {
+                                self.main_menu.cursor.current = cursor;
+                            }
+                            self.update_focus(Focus::Menu);
+                        }
+                    }
                     KeyCode::Esc => {
                         if self.fatal_error_popup.is_shown() {
                             self.fatal_error_popup.clear();
+                        } else if self.focus != Focus::Menu {
+                            self.update_focus(Focus::Menu);
                         } else if !ignore_esc {
                             let page = self.context.pop();
-                            if let Some(mut page) = page {
-                                page.exit_threads().await;
-                            }
+
                             if self.context.is_empty() {
                                 self.exit = true;
+                            }
+
+                            if let Some(mut page) = page {
+                                page.exit_threads().await;
+
+                                if self.context.is_empty() {
+                                    self.context.push(page); // Push it back to prevent empty screen while exiting
+                                }
                             }
                         }
                     }
@@ -544,14 +754,40 @@ impl App {
         Ok(())
     }
 
-    fn get_areas(&self, area: Rect) -> [Rect; 3] {
-        let [title_area, body_area, footer_area] = Layout::vertical([
+    fn get_areas(&self, area: Rect) -> AppAreas {
+        let [title_area, middle_area, footer_area] = Layout::vertical([
             Constraint::Length(1),
             Constraint::Min(3),
             Constraint::Length(1),
         ])
         .areas(area);
-        [title_area, body_area, footer_area]
+        let [menu_area, gap_area, body_area] = Layout::horizontal([
+            Constraint::Length(14),
+            Constraint::Length(1),
+            Constraint::Min(2),
+        ])
+        .areas(middle_area.block_inner());
+
+        AppAreas {
+            title: title_area,
+            middle: middle_area,
+            footer: footer_area,
+            menu: menu_area,
+            gap: gap_area.expand_vertical(1),
+            body: body_area,
+            popup: {
+                let diff = |num: u16| num.mul(1).saturating_div(8).max(2);
+                let width_diff = diff(area.width);
+                let height_diff = diff(area.height);
+
+                Rect {
+                    width: area.width - 2 * width_diff,
+                    height: area.height - 2 * height_diff,
+                    x: area.x + width_diff,
+                    y: area.y + height_diff,
+                }
+            },
+        }
     }
 
     pub fn current_page(&self) -> Option<&Page> {
@@ -577,109 +813,50 @@ impl Widget for &App {
             return;
         }
 
-        let [title_area, body_area, footer_area] = self.get_areas(area);
+        let areas = self.get_areas(area);
 
-        Title.render_component(title_area, buf, &self.shared_state);
+        Title.render_component(areas.title, areas.popup, buf, &self.shared_state);
 
-        if let Some(page) = self.current_page() {
-            // Render Body
-            if page.is_main_menu() && page.main_menu_focused_item().is_some() {
-                let main_menu_item = page.main_menu_focused_item().unwrap();
-                let [left_area, gap_area, right_area] = Layout::horizontal([
-                    Constraint::Length(13),
-                    Constraint::Length(1),
-                    Constraint::Min(2),
-                ])
-                .areas(body_area.block_inner());
+        if self.shared_state.theme.boxed() {
+            // Render border of the canvas
+            Block::bordered()
+                .border_type(self.shared_state.theme.border_type)
+                .render(areas.middle, buf);
 
-                // Render border of the canvas
-                Block::bordered()
-                    .border_type(self.shared_state.theme.border_type)
-                    .render(body_area, buf);
-
-                // Render the Middle stick
-                let height_inner = gap_area.height;
-                let mut gap_area = gap_area.expand_vertical(1);
-                "┬".render(gap_area, buf);
-                for _ in 0..height_inner {
-                    gap_area.consume_height(1);
-                    "│".render(gap_area, buf);
-                }
+            // Render the Middle stick
+            let height_inner = areas.gap.height - 2;
+            let mut gap_area = areas.gap;
+            "┬".render(gap_area, buf);
+            for _ in 0..height_inner {
                 gap_area.consume_height(1);
-                "┴".render(gap_area, buf);
-
-                // Render Main Menu on the Left side
-                page.render_component(left_area, buf, &self.shared_state);
-
-                // Render the preview of selection on the Right side
-                let dummy_page = match main_menu_item {
-                    MainMenuItem::Portfolio => {
-                        let mut preview_page = main_menu_item
-                            .get_page(&self.shared_state)
-                            .expect("main_menu_item.get_page() failed");
-                        preview_page.set_focus(false);
-                        preview_page
-                    }
-                    MainMenuItem::Config => Page::Config(ConfigPage {
-                        form: Form::init(|form| {
-                            form.show_everything_empty(true);
-                            Ok(())
-                        })
-                        .unwrap(),
-                    }),
-                    MainMenuItem::CompleteSetup => Page::Text(TextPage::new(
-                        "Setup some of the essential stuff to get the most out of gm".to_string(),
-                    )),
-                    MainMenuItem::Accounts => {
-                        Page::Text(TextPage::new("Create or load accounts".to_string()))
-                    }
-                    MainMenuItem::AddressBook => {
-                        Page::Text(TextPage::new("Manage familiar addresses".to_string()))
-                    }
-                    MainMenuItem::Networks => {
-                        Page::Text(TextPage::new("Manage networks and tokens".to_string()))
-                    }
-                    MainMenuItem::WalletConnect => {
-                        let mut preview_page = main_menu_item
-                            .get_page(&self.shared_state)
-                            .expect("main_menu_item.get_page() failed");
-                        preview_page.set_focus(false);
-                        preview_page
-                    }
-                    MainMenuItem::SignMessage => Page::Text(TextPage::new(
-                        "Sign a message and prove ownership to somebody".to_string(),
-                    )),
-                    MainMenuItem::SendMessage => {
-                        Page::Text(TextPage::new("Send onchain message to someone".to_string()))
-                    }
-                    MainMenuItem::DevKeyInput => Page::DevKeyCapture(DevKeyCapturePage::default()),
-                    MainMenuItem::Shell => Page::Shell(ShellPage::default()),
-                };
-
-                dummy_page.render_component(right_area, buf, &self.shared_state);
-            } else {
-                page.render_component_with_block(
-                    body_area,
-                    buf,
-                    Block::bordered().border_type(self.shared_state.theme.border_type),
-                    &self.shared_state,
-                );
+                "│".render(gap_area, buf);
             }
-
-            Footer {
-                exit: &self.exit,
-                is_main_menu: &page.is_main_menu(),
-            }
-            .render(footer_area, buf, &self.shared_state.theme);
+            gap_area.consume_height(1);
+            "┴".render(gap_area, buf);
         }
 
-        self.invite_popup.render(area, buf, &self.shared_state);
+        // Render Main Menu on the Left side
+        self.main_menu
+            .render(areas.menu, buf, &self.shared_state.theme);
+
+        if let Some(page) = self.current_page() {
+            page.render_component(areas.body, areas.popup, buf, &self.shared_state);
+        }
+
+        Footer {
+            exit: &self.exit,
+            is_main_menu: &true, // TODO improve
+        }
+        .render(areas.footer, buf, &self.shared_state.theme);
+
+        self.invite_popup
+            .render(areas.popup, buf, &self.shared_state);
 
         self.fatal_error_popup
-            .render(area, buf, &self.shared_state.theme.error_popup());
+            .render(areas.popup, buf, &self.shared_state.theme.error_popup());
 
         #[cfg(feature = "demo")]
         self.demo_popup
-            .render(area, buf, &self.shared_state.theme.popup());
+            .render(areas.popup, buf, &self.shared_state.theme.popup());
     }
 }

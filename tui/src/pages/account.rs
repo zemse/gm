@@ -6,7 +6,7 @@ use crate::{
     AppEvent,
 };
 use alloy::primitives::Address;
-use gm_ratatui_extra::select_owned::SelectOwned;
+use gm_ratatui_extra::{extensions::ThemedWidget, select_owned::SelectOwned};
 use gm_utils::{
     account::{AccountManager, AccountUtils},
     config::Config,
@@ -48,7 +48,7 @@ impl AccountPage {
                 .collect::<Vec<_>>(),
         );
         Ok(AccountPage {
-            select: SelectOwned::new(Some(list)),
+            select: SelectOwned::new(Some(list), false),
         })
     }
 }
@@ -74,8 +74,10 @@ impl Component for AccountPage {
     ) -> crate::Result<Actions> {
         let mut result = Actions::default();
 
-        self.select
-            .handle_event(event.input_event(), _area, |account_select| {
+        self.select.handle_event(
+            event.input_event(),
+            _area,
+            |account_select| {
                 match account_select {
                     AccountSelect::Create => {
                         result
@@ -91,16 +93,24 @@ impl Component for AccountPage {
                         Config::set_current_account(*address)?;
                         transmitter.send(AppEvent::AccountChange(*address))?;
                         transmitter.send(AppEvent::ConfigUpdate)?;
-                        result.page_pops = 1;
+                        result.page_pop = true;
                     }
                 }
                 Ok::<(), crate::Error>(())
-            })?;
+            },
+            |_| Ok(()),
+        )?;
 
         Ok(result)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        _popup_area: Rect,
+        buf: &mut Buffer,
+        shared_state: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {

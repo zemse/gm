@@ -16,7 +16,7 @@ impl Footer<'_> {
     ) where
         Self: Sized,
     {
-        buf.set_style(area, theme.block());
+        buf.set_style(area, theme.style());
         let footer_text = if *self.exit {
             "exiting please wait..."
         } else if *self.is_main_menu {
@@ -26,7 +26,7 @@ impl Footer<'_> {
         } else {
             "press control c to quit | press [ESC] to go back"
         };
-        Line::from(footer_text).style(theme.block()).render(
+        Line::from(footer_text).style(theme.style()).render(
             Rect {
                 x: area.x + 1,
                 y: area.y,

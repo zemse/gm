@@ -21,7 +21,9 @@ use std::{
 };
 
 use alloy::{hex, primitives::Address, rpc::types::TransactionRequest};
-use gm_ratatui_extra::{act::Act, input_box::InputBox, text_scroll::TextScroll};
+use gm_ratatui_extra::{
+    act::Act, extensions::ThemedWidget, input_box::InputBox, text_scroll::TextScroll,
+};
 use gm_rpc_proxy::{
     error::RpcProxyError,
     rpc_types::{ErrorObj, ResponsePayload},
@@ -31,7 +33,6 @@ use ratatui::{
     buffer::Buffer,
     crossterm::event::{Event, KeyCode, KeyModifiers},
     layout::Rect,
-    widgets::Widget,
 };
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
@@ -611,14 +612,20 @@ impl Component for ShellPage {
         Ok(actions)
     }
 
-    fn render_component(&self, area: Rect, buf: &mut Buffer, ss: &SharedState) -> Rect
+    fn render_component(
+        &self,
+        area: Rect,
+        popup_area: Rect,
+        buf: &mut Buffer,
+        ss: &SharedState,
+    ) -> Rect
     where
         Self: Sized,
     {
-        self.display.render(area, buf);
+        self.display.render(area, buf, &ss.theme);
 
-        self.tx_popup.render(area, buf, &ss.theme);
-        self.sign_popup.render(area, buf, &ss.theme);
+        self.tx_popup.render(popup_area, buf, &ss.theme);
+        self.sign_popup.render(popup_area, buf, &ss.theme);
 
         area
     }

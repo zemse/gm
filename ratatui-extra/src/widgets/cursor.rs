@@ -1,11 +1,15 @@
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Cursor {
     pub current: usize,
 }
 
 impl Cursor {
+    pub fn new(current: usize) -> Self {
+        Self { current }
+    }
+
     pub fn reset(&mut self) {
         self.current = 0;
     }

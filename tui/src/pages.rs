@@ -11,7 +11,7 @@ use assets::AssetsPage;
 use complete_setup::CompleteSetupPage;
 use config::ConfigPage;
 use dev_key_capture::DevKeyCapturePage;
-use main_menu::{MainMenuItem, MainMenuPage};
+use ratatui::{buffer::Buffer, layout::Rect};
 use send_message::SendMessagePage;
 use sign_message::SignMessagePage;
 use text::TextPage;
@@ -42,7 +42,6 @@ pub mod config;
 pub mod dev_key_capture;
 pub mod footer;
 pub mod invite_popup;
-pub mod main_menu;
 pub mod network;
 pub mod network_create;
 pub mod send_message;
@@ -61,7 +60,6 @@ pub mod walletconnect;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum Page {
-    MainMenu(MainMenuPage),
     CompleteSetup(CompleteSetupPage),
 
     Account(AccountPage),
@@ -105,30 +103,11 @@ impl Page {
             _ => false,
         }
     }
-
-    pub fn is_main_menu(&self) -> bool {
-        matches!(self, Page::MainMenu(_))
-    }
-
-    pub fn main_menu_focused_item(&self) -> Option<&MainMenuItem> {
-        match self {
-            Page::MainMenu(main_menu) => main_menu.select.get_focussed_item(),
-            _ => None,
-        }
-    }
-
-    pub fn as_main_menu_mut(&mut self) -> Option<&mut MainMenuPage> {
-        match self {
-            Page::MainMenu(page) => Some(page),
-            _ => None,
-        }
-    }
 }
 
 impl Component for Page {
     fn set_focus(&mut self, focus: bool) {
         match self {
-            Page::MainMenu(page) => page.set_focus(focus),
             Page::CompleteSetup(page) => page.set_focus(focus),
 
             Page::AddressBook(page) => page.set_focus(focus),
@@ -162,9 +141,78 @@ impl Component for Page {
         }
     }
 
+    fn set_cursor(&mut self, cursor: usize) {
+        match self {
+            Page::CompleteSetup(page) => page.set_cursor(cursor),
+
+            Page::AddressBook(page) => page.set_cursor(cursor),
+            Page::AddressBookCreate(page) => page.set_cursor(cursor),
+            Page::AddressBookDisplay(page) => page.set_cursor(cursor),
+
+            Page::Account(page) => page.set_cursor(cursor),
+            Page::AccountCreate(page) => page.set_cursor(cursor),
+            Page::AccountImport(page) => page.set_cursor(cursor),
+
+            Page::Network(page) => page.set_cursor(cursor),
+            Page::NetworkCreate(page) => page.set_cursor(cursor),
+            Page::Token(page) => page.set_cursor(cursor),
+            Page::TokenCreate(page) => page.set_cursor(cursor),
+
+            Page::Assets(page) => page.set_cursor(cursor),
+            Page::AssetTransfer(page) => page.set_cursor(cursor),
+
+            Page::Config(page) => page.set_cursor(cursor),
+            Page::SendMessage(page) => page.set_cursor(cursor),
+            Page::SignMessage(page) => page.set_cursor(cursor),
+
+            Page::WalletConnect(page) => page.set_cursor(cursor),
+
+            Page::Trade(page) => page.set_cursor(cursor),
+
+            Page::Text(page) => page.set_cursor(cursor),
+            Page::DevKeyCapture(page) => page.set_cursor(cursor),
+
+            Page::Shell(page) => page.set_cursor(cursor),
+        }
+    }
+
+    fn get_cursor(&self) -> Option<usize> {
+        match self {
+            Page::CompleteSetup(page) => page.get_cursor(),
+
+            Page::AddressBook(page) => page.get_cursor(),
+            Page::AddressBookCreate(page) => page.get_cursor(),
+            Page::AddressBookDisplay(page) => page.get_cursor(),
+
+            Page::Account(page) => page.get_cursor(),
+            Page::AccountCreate(page) => page.get_cursor(),
+            Page::AccountImport(page) => page.get_cursor(),
+
+            Page::Network(page) => page.get_cursor(),
+            Page::NetworkCreate(page) => page.get_cursor(),
+            Page::Token(page) => page.get_cursor(),
+            Page::TokenCreate(page) => page.get_cursor(),
+
+            Page::Assets(page) => page.get_cursor(),
+            Page::AssetTransfer(page) => page.get_cursor(),
+
+            Page::Config(page) => page.get_cursor(),
+            Page::SendMessage(page) => page.get_cursor(),
+            Page::SignMessage(page) => page.get_cursor(),
+
+            Page::WalletConnect(page) => page.get_cursor(),
+
+            Page::Trade(page) => page.get_cursor(),
+
+            Page::Text(page) => page.get_cursor(),
+            Page::DevKeyCapture(page) => page.get_cursor(),
+
+            Page::Shell(page) => page.get_cursor(),
+        }
+    }
+
     async fn exit_threads(&mut self) {
         match self {
-            Page::MainMenu(page) => page.exit_threads().await,
             Page::CompleteSetup(page) => page.exit_threads().await,
 
             Page::AddressBook(page) => page.exit_threads().await,
@@ -200,7 +248,6 @@ impl Component for Page {
 
     fn reload(&mut self, ss: &SharedState) -> crate::Result<()> {
         match self {
-            Page::MainMenu(page) => page.reload(ss),
             Page::CompleteSetup(page) => page.reload(ss),
 
             Page::AddressBook(page) => page.reload(ss),
@@ -237,13 +284,12 @@ impl Component for Page {
     fn handle_event(
         &mut self,
         event: &AppEvent,
-        area: ratatui::prelude::Rect,
+        area: Rect,
         tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
         ss: &SharedState,
     ) -> crate::Result<Actions> {
         match self {
-            Page::MainMenu(page) => page.handle_event(event, area, tr, sd, ss),
             Page::CompleteSetup(page) => page.handle_event(event, area, tr, sd, ss),
 
             Page::AddressBook(page) => page.handle_event(event, area, tr, sd, ss),
@@ -279,45 +325,49 @@ impl Component for Page {
 
     fn render_component(
         &self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
+        area: Rect,
+        popup_area: Rect,
+        buf: &mut Buffer,
         shared_state: &SharedState,
-    ) -> ratatui::prelude::Rect
+    ) -> Rect
     where
         Self: Sized,
     {
         match self {
-            Page::MainMenu(page) => page.render_component(area, buf, shared_state),
-            Page::CompleteSetup(page) => page.render_component(area, buf, shared_state),
+            Page::CompleteSetup(page) => page.render_component(area, popup_area, buf, shared_state),
 
-            Page::AddressBook(page) => page.render_component(area, buf, shared_state),
-            Page::AddressBookCreate(page) => page.render_component(area, buf, shared_state),
-            Page::AddressBookDisplay(page) => page.render_component(area, buf, shared_state),
+            Page::AddressBook(page) => page.render_component(area, popup_area, buf, shared_state),
+            Page::AddressBookCreate(page) => {
+                page.render_component(area, popup_area, buf, shared_state)
+            }
+            Page::AddressBookDisplay(page) => {
+                page.render_component(area, popup_area, buf, shared_state)
+            }
 
-            Page::Network(page) => page.render_component(area, buf, shared_state),
-            Page::NetworkCreate(page) => page.render_component(area, buf, shared_state),
-            Page::Token(page) => page.render_component(area, buf, shared_state),
-            Page::TokenCreate(page) => page.render_component(area, buf, shared_state),
+            Page::Network(page) => page.render_component(area, popup_area, buf, shared_state),
+            Page::NetworkCreate(page) => page.render_component(area, popup_area, buf, shared_state),
+            Page::Token(page) => page.render_component(area, popup_area, buf, shared_state),
+            Page::TokenCreate(page) => page.render_component(area, popup_area, buf, shared_state),
 
-            Page::Account(page) => page.render_component(area, buf, shared_state),
-            Page::AccountCreate(page) => page.render_component(area, buf, shared_state),
-            Page::AccountImport(page) => page.render_component(area, buf, shared_state),
+            Page::Account(page) => page.render_component(area, popup_area, buf, shared_state),
+            Page::AccountCreate(page) => page.render_component(area, popup_area, buf, shared_state),
+            Page::AccountImport(page) => page.render_component(area, popup_area, buf, shared_state),
 
-            Page::Assets(page) => page.render_component(area, buf, shared_state),
-            Page::AssetTransfer(page) => page.render_component(area, buf, shared_state),
+            Page::Assets(page) => page.render_component(area, popup_area, buf, shared_state),
+            Page::AssetTransfer(page) => page.render_component(area, popup_area, buf, shared_state),
 
-            Page::Config(page) => page.render_component(area, buf, shared_state),
-            Page::SendMessage(page) => page.render_component(area, buf, shared_state),
-            Page::SignMessage(page) => page.render_component(area, buf, shared_state),
+            Page::Config(page) => page.render_component(area, popup_area, buf, shared_state),
+            Page::SendMessage(page) => page.render_component(area, popup_area, buf, shared_state),
+            Page::SignMessage(page) => page.render_component(area, popup_area, buf, shared_state),
 
-            Page::WalletConnect(page) => page.render_component(area, buf, shared_state),
+            Page::WalletConnect(page) => page.render_component(area, popup_area, buf, shared_state),
 
-            Page::Trade(page) => page.render_component(area, buf, shared_state),
+            Page::Trade(page) => page.render_component(area, popup_area, buf, shared_state),
 
-            Page::Text(page) => page.render_component(area, buf, shared_state),
-            Page::DevKeyCapture(page) => page.render_component(area, buf, shared_state),
+            Page::Text(page) => page.render_component(area, popup_area, buf, shared_state),
+            Page::DevKeyCapture(page) => page.render_component(area, popup_area, buf, shared_state),
 
-            Page::Shell(page) => page.render_component(area, buf, shared_state),
+            Page::Shell(page) => page.render_component(area, popup_area, buf, shared_state),
         }
     }
 }

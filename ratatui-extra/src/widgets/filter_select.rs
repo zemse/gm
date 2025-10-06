@@ -1,11 +1,13 @@
 use std::fmt::Display;
 
 use ratatui::{
-    layout::{Constraint, Layout},
-    style::Style,
+    buffer::Buffer,
+    layout::{Constraint, Layout, Rect},
     text::Line,
     widgets::Widget,
 };
+
+use crate::thematize::Thematize;
 
 use super::{cursor::Cursor, select::Select};
 
@@ -14,11 +16,10 @@ pub struct FilterSelect<'a, T: Display> {
     pub cursor: &'a Cursor,
     pub search_string: &'a String,
     pub focus: bool,
-    pub focus_style: Style,
 }
 
-impl<T: Display> Widget for FilterSelect<'_, T> {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
+impl<T: Display> FilterSelect<'_, T> {
+    pub fn render(self, area: Rect, buf: &mut Buffer, theme: &impl Thematize)
     where
         Self: Sized,
     {
@@ -38,8 +39,7 @@ impl<T: Display> Widget for FilterSelect<'_, T> {
                 .collect::<Vec<&T>>(),
             cursor: self.cursor,
             focus: self.focus,
-            focus_style: self.focus_style,
         }
-        .render(list_area, buf);
+        .render(list_area, buf, None, theme);
     }
 }

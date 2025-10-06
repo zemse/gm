@@ -12,6 +12,8 @@ use gm_utils::alloy::StringExt;
 use gm_utils::assets::{Asset, TokenAddress};
 use gm_utils::erc20;
 use gm_utils::network::Network;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
 use std::sync::mpsc;
 use strum::{Display, EnumIter};
 use tokio_util::sync::CancellationToken;
@@ -153,7 +155,7 @@ impl Component for AssetTransferPage {
                 || Ok(()),
                 || {
                     if is_confirmed {
-                        result.page_pops = 1;
+                        result.page_pop = true;
                     }
                     Ok(())
                 },
@@ -249,21 +251,23 @@ impl Component for AssetTransferPage {
 
     fn render_component(
         &self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
+        area: Rect,
+        popup_area: Rect,
+        buf: &mut Buffer,
         shared_state: &SharedState,
-    ) -> ratatui::prelude::Rect
+    ) -> Rect
     where
         Self: Sized,
     {
-        self.form.render(area, buf, &shared_state.theme);
+        self.form.render(area, popup_area, buf, &shared_state.theme);
 
         self.address_book_popup
-            .render(area, buf, &shared_state.theme);
+            .render(popup_area, buf, &shared_state.theme);
 
-        self.asset_popup.render(area, buf, &shared_state.theme);
+        self.asset_popup
+            .render(popup_area, buf, &shared_state.theme);
 
-        self.tx_popup.render(area, buf, &shared_state.theme);
+        self.tx_popup.render(popup_area, buf, &shared_state.theme);
 
         area
     }

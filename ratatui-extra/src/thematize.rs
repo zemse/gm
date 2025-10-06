@@ -1,5 +1,5 @@
 use ratatui::{
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style, Stylize},
     widgets::BorderType,
 };
 
@@ -8,15 +8,26 @@ pub trait Thematize {
 
     fn error_popup(&self) -> Self;
 
-    fn block(&self) -> Style;
+    fn style(&self) -> Style;
+
+    fn style_dim(&self) -> Style;
 
     fn border_type(&self) -> BorderType;
 
     fn button_focused(&self) -> Style;
 
+    fn button_notfocused(&self) -> Style;
+
     fn select_focused(&self) -> Style;
+
+    fn select_active(&self) -> Style;
+
+    fn select_inactive(&self) -> Style;
+
+    fn boxed(&self) -> bool;
 }
 
+#[derive(Default)]
 pub struct DefaultTheme {
     reversed: bool,
 }
@@ -34,7 +45,11 @@ impl Thematize for DefaultTheme {
         }
     }
 
-    fn block(&self) -> Style {
+    fn style(&self) -> Style {
+        Style::default()
+    }
+
+    fn style_dim(&self) -> Style {
         Style::default()
     }
 
@@ -52,6 +67,10 @@ impl Thematize for DefaultTheme {
         }
     }
 
+    fn button_notfocused(&self) -> Style {
+        Style::default()
+    }
+
     fn select_focused(&self) -> Style {
         if self.reversed {
             Style::default()
@@ -60,5 +79,17 @@ impl Thematize for DefaultTheme {
         } else {
             Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED)
         }
+    }
+
+    fn select_active(&self) -> Style {
+        Style::default().bold()
+    }
+
+    fn select_inactive(&self) -> Style {
+        Style::default().not_bold().fg(Color::Gray)
+    }
+
+    fn boxed(&self) -> bool {
+        true
     }
 }

@@ -6,35 +6,62 @@ use ratatui::{
         MouseEventKind,
     },
     layout::{Position, Rect},
-    widgets::{Block, Widget},
+    widgets::{Block, WidgetRef},
 };
 
-pub trait BorderedWidget {
+use crate::thematize::Thematize;
+
+pub trait ThemedWidget {
+    fn render(&self, area: Rect, buf: &mut Buffer, theme: &impl Thematize);
+}
+
+pub trait BorderedWidget<A> {
     fn render_with_block(
-        self,
+        &self,
         area: Rect,
         buf: &mut Buffer,
         block: Block<'_>,
         leave_horizontal_space: bool,
+        args: A,
     ) where
         Self: Sized;
 }
 
-impl<T: Widget> BorderedWidget for T {
+impl<T: ThemedWidget, Theme: Thematize> BorderedWidget<&Theme> for T {
     fn render_with_block(
-        self,
+        &self,
         area: Rect,
         buf: &mut Buffer,
         block: Block<'_>,
         leave_horizontal_space: bool,
+        theme: &Theme,
     ) where
         Self: Sized,
     {
         let inner_area = block
             .inner(area)
             .margin_h(if leave_horizontal_space { 1 } else { 0 });
-        block.render(area, buf);
-        self.render(inner_area, buf);
+        block.render_ref(area, buf);
+        self.render(inner_area, buf, theme);
+    }
+}
+
+impl<T: WidgetRef> BorderedWidget<()> for T {
+    fn render_with_block(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        block: Block<'_>,
+        leave_horizontal_space: bool,
+        _: (),
+    ) where
+        Self: Sized,
+    {
+        let inner_area = block
+            .inner(area)
+            .margin_h(if leave_horizontal_space { 1 } else { 0 });
+        block.render_ref(area, buf);
+        self.render_ref(inner_area, buf);
     }
 }
 
@@ -60,7 +87,7 @@ impl<const N: usize> CustomRender for [&str; N] {
                 width: area.width,
                 height: 1,
             };
-            line.render(line_area, buf);
+            line.render_ref(line_area, buf);
             area.y += 1;
         }
         area.height = N as u16;
@@ -78,7 +105,7 @@ impl<const N: usize> CustomRender<bool> for [String; N] {
             let segs = split_string(line, area.width as usize);
             for seg in segs {
                 if let Some(new_area) = area.height_consumed(1) {
-                    seg.render(area, buf);
+                    seg.render_ref(area, buf);
                     area = new_area;
                 } else {
                     break;
@@ -123,6 +150,8 @@ pub trait RectExt {
     fn expand_vertical(self, m: u16) -> Rect;
 
     fn block_inner(self) -> Rect;
+
+    fn button_center(self, label_len: usize) -> Rect;
 }
 
 impl RectExt for Rect {
@@ -243,6 +272,17 @@ impl RectExt for Rect {
             height: self.height - 2,
         }
     }
+
+    fn button_center(self, label_len: usize) -> Rect {
+        let button_width = (label_len + 2) as u16;
+        let x = self.x + (self.width.saturating_sub(button_width)) / 2;
+        Rect {
+            x,
+            y: self.y,
+            width: button_width,
+            height: self.height,
+        }
+    }
 }
 
 pub trait EventExt {
@@ -265,7 +305,6 @@ impl EventExt for Event {
             self,
             Event::Key(KeyEvent {
                 kind: KeyEventKind::Press,
-                modifiers: KeyModifiers::NONE,
                 ..
             })
         )
