@@ -181,12 +181,14 @@ impl RectExt for Rect {
         }
     }
 
+    #[track_caller]
     fn consume_width(&mut self, width: u16) {
         *self = self
             .width_consumed(width)
             .expect("consume_width failed, if your terminal width is too small, try increasing it otherwise this is a bug");
     }
 
+    #[track_caller]
     fn consume_height(&mut self, height: u16) {
         *self = self
             .height_consumed(height)

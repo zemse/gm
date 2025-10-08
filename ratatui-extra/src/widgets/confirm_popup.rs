@@ -1,26 +1,32 @@
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{KeyCode, KeyEvent, KeyEventKind},
+    crossterm::event::{Event, KeyCode, KeyEventKind},
     layout::{Constraint, Layout, Rect},
-    widgets::{Block, Widget},
+    widgets::Block,
 };
 
 use crate::{
     act::Act,
-    extensions::{RectExt, ThemedWidget},
+    extensions::{EventExt, RectExt, ThemedWidget},
     thematize::Thematize,
 };
 
 use super::{button::Button, popup::Popup, text_scroll::TextScroll};
 
+struct Areas {
+    body_area: Rect,
+    confirm_button_area: Rect,
+    cancel_button_area: Rect,
+}
+
 #[derive(Debug)]
 pub struct ConfirmPopup {
     title: &'static str,
     text: TextScroll,
-    confirm_button_label: &'static str,
-    cancel_button_label: &'static str,
     open: bool,
-    button_cursor: bool, // is cursor on the confirm button?
+    confirm_button: Button,
+    cancel_button: Button,
+    is_confirm_focused: bool,
 }
 
 impl ConfirmPopup {
@@ -34,10 +40,10 @@ impl ConfirmPopup {
         Self {
             title,
             text: TextScroll::new(text, true),
-            confirm_button_label,
-            cancel_button_label,
+            confirm_button: Button::new(confirm_button_label).with_success_kind(true),
+            cancel_button: Button::new(cancel_button_label).with_success_kind(true),
             open: false,
-            button_cursor: initial_cursor_on_confirm,
+            is_confirm_focused: initial_cursor_on_confirm,
         }
     }
 
@@ -48,7 +54,7 @@ impl ConfirmPopup {
     // Opens the popup with the fresh items.
     pub fn open(&mut self) {
         self.open = true;
-        self.button_cursor = false;
+        // self.is_confirm_focused = false;
     }
 
     pub fn close(&mut self) {
@@ -61,7 +67,7 @@ impl ConfirmPopup {
 
     pub fn handle_event<A, E, F1, F2>(
         &mut self,
-        key_event: Option<&KeyEvent>,
+        input_event: Option<&Event>,
         area: Rect,
         mut on_confirm: F1,
         mut on_cancel: F2,
@@ -74,39 +80,98 @@ impl ConfirmPopup {
         let mut act = A::default();
 
         if self.open {
-            let text_area = Popup::inner_area(area).block_inner().margin_down(3);
-            self.text.handle_event(key_event, text_area);
+            act.ignore_left();
+            act.ignore_right();
 
-            if let Some(key_event) = key_event {
-                if key_event.kind == KeyEventKind::Press {
-                    match key_event.code {
-                        KeyCode::Left => {
-                            self.button_cursor = false;
+            let areas = self.get_areas(area);
+
+            if let Some(input_event) = input_event {
+                self.text
+                    .handle_event(input_event.key_event(), areas.body_area);
+
+                // if self.is_confirm_focused {
+                self.confirm_button.handle_event(
+                    Some(input_event),
+                    areas.confirm_button_area,
+                    || {
+                        on_confirm()?;
+                        self.open = false;
+                        Ok(())
+                    },
+                    |is_focused| {
+                        if is_focused {
+                            self.is_confirm_focused = true;
                         }
-                        KeyCode::Right => {
-                            self.button_cursor = true;
+                        Ok(())
+                    },
+                )?;
+                // } else {
+                self.cancel_button.handle_event(
+                    Some(input_event),
+                    areas.cancel_button_area,
+                    || {
+                        on_cancel()?;
+                        self.open = false;
+                        Ok(())
+                    },
+                    |is_focused| {
+                        if is_focused {
+                            self.is_confirm_focused = false;
                         }
-                        KeyCode::Enter => {
-                            if self.button_cursor {
-                                on_confirm()?;
-                            } else {
-                                on_cancel()?;
+                        Ok(())
+                    },
+                )?;
+                // }
+
+                if let Event::Key(key_event) = input_event {
+                    if key_event.kind == KeyEventKind::Press {
+                        match key_event.code {
+                            KeyCode::Left => {
+                                self.is_confirm_focused = false;
                             }
-                            self.close();
+                            KeyCode::Right => {
+                                self.is_confirm_focused = true;
+                            }
+                            KeyCode::Esc => {
+                                on_cancel()?;
+                                self.close();
+                            }
+                            _ => {}
                         }
-                        KeyCode::Esc => {
-                            on_cancel()?;
-                            self.close();
-                        }
-                        _ => {}
                     }
                 }
-            }
 
-            act.ignore_esc();
+                act.ignore_esc();
+            }
         }
 
+        // Ensure key events and mouse events cause proper effects
+        // TODO this is like a duck tape, find a better way
+        // if self.is_confirm_focused {
+        //     self.confirm_button.set_focus(true);
+        //     self.cancel_button.set_focus(false);
+        // } else {
+        //     self.confirm_button.set_focus(false);
+        //     self.cancel_button.set_focus(true);
+        // }
+
         Ok(act)
+    }
+
+    fn get_areas(&self, area: Rect) -> Areas {
+        let inner_area = Popup::inner_area(area);
+        let [body_area, button_area] =
+            Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(inner_area);
+
+        let [left_area, right_area] =
+            Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .areas(button_area);
+
+        Areas {
+            body_area,
+            cancel_button_area: left_area.button_center(self.cancel_button.label.len()),
+            confirm_button_area: right_area.button_center(self.confirm_button.label.len()),
+        }
     }
 
     pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &impl Thematize)
@@ -117,33 +182,25 @@ impl ConfirmPopup {
             let theme = theme.popup();
 
             Popup.render(area, buf, &theme);
+            Block::bordered().title(self.title).inner(area);
 
-            let inner_area = Popup::inner_area(area);
-            let block = Block::bordered().title(self.title);
-            let block_inner_area = block.inner(inner_area);
-            block.render(inner_area, buf);
+            let areas = self.get_areas(area);
 
-            let [text_area, button_area] =
-                Layout::vertical([Constraint::Min(1), Constraint::Length(3)])
-                    .areas(block_inner_area);
+            self.text.render(areas.body_area, buf, &theme);
 
-            self.text.render(text_area, buf, &theme);
+            self.cancel_button.render(
+                areas.cancel_button_area,
+                buf,
+                !self.is_confirm_focused,
+                &theme,
+            );
 
-            let [left_area, right_area] =
-                Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
-                    .areas(button_area);
-
-            Button {
-                focus: !self.button_cursor,
-                label: self.cancel_button_label,
-            }
-            .render(left_area, buf, &theme);
-
-            Button {
-                focus: self.button_cursor,
-                label: self.confirm_button_label,
-            }
-            .render(right_area, buf, &theme);
+            self.confirm_button.render(
+                areas.confirm_button_area,
+                buf,
+                self.is_confirm_focused,
+                &theme,
+            );
         }
     }
 }

@@ -23,7 +23,10 @@ use ratatui::{
 use serde_json::Value;
 use tokio::task::JoinHandle;
 
-use crate::{app::SharedState, error::FmtError, theme::Theme, traits::Actions, AppEvent};
+use crate::{
+    app::SharedState, error::FmtError, post_handle_event::PostHandleEventActions, theme::Theme,
+    AppEvent,
+};
 use gm_utils::{account::AccountManager, serde::SerdeResponseParse};
 
 fn spawn_sign_thread(
@@ -63,7 +66,9 @@ pub struct SignTypedDataPopup {
     typed_data_json: Value,
     display: TextScroll,
     open: bool,
-    button_cursor: bool,
+    cancel_button: Button,
+    confirm_button: Button,
+    is_confirm_focused: bool,
     status: SignStatus,
     sign_thread: Option<JoinHandle<()>>,
 }
@@ -80,7 +85,9 @@ impl SignTypedDataPopup {
             typed_data_json: Value::Null,
             display: TextScroll::default(),
             open: false,
-            button_cursor: false,
+            cancel_button: Button::new("Cancel"),
+            confirm_button: Button::new("Confirm"),
+            is_confirm_focused: true,
             status: SignStatus::Idle,
             sign_thread: None,
         }
@@ -92,7 +99,7 @@ impl SignTypedDataPopup {
 
     pub fn open(&mut self) {
         self.open = true;
-        self.button_cursor = false;
+        self.is_confirm_focused = false;
     }
 
     pub fn close(&mut self) {
@@ -125,7 +132,7 @@ impl SignTypedDataPopup {
     }
 
     fn reset(&mut self) {
-        self.button_cursor = false;
+        self.is_confirm_focused = false;
         self.status = SignStatus::Idle;
         if let Some(thread) = self.sign_thread.take() {
             thread.abort();
@@ -138,13 +145,13 @@ impl SignTypedDataPopup {
         mut on_signature: F1,
         mut on_cancel: F3,
         mut on_esc: F4,
-    ) -> crate::Result<Actions>
+    ) -> crate::Result<PostHandleEventActions>
     where
         F1: FnMut(&Signature) -> crate::Result<()>,
         F3: FnMut() -> crate::Result<()>,
         F4: FnMut() -> crate::Result<()>,
     {
-        let mut result = Actions::default();
+        let mut result = PostHandleEventActions::default();
 
         if self.is_open() {
             let area = Popup::inner_area(area).block_inner().margin_down(3);
@@ -158,13 +165,13 @@ impl SignTypedDataPopup {
                             match self.status {
                                 SignStatus::Idle => match key_event.code {
                                     KeyCode::Left => {
-                                        self.button_cursor = false;
+                                        self.is_confirm_focused = false;
                                     }
                                     KeyCode::Right => {
-                                        self.button_cursor = true;
+                                        self.is_confirm_focused = true;
                                     }
                                     KeyCode::Enter => {
-                                        if self.button_cursor {
+                                        if self.is_confirm_focused {
                                             let typed_data = (&self.typed_data_json)
                                                 .serde_parse_custom::<TypedData>()?;
                                             let digest = typed_data
@@ -241,17 +248,11 @@ impl SignTypedDataPopup {
 
             match self.status {
                 SignStatus::Idle => {
-                    Button {
-                        focus: !self.button_cursor,
-                        label: "Cancel",
-                    }
-                    .render(left_area, buf, &theme);
+                    self.cancel_button
+                        .render(left_area, buf, !self.is_confirm_focused, &theme);
 
-                    Button {
-                        focus: self.button_cursor,
-                        label: "Confirm",
-                    }
-                    .render(right_area, buf, &theme);
+                    self.confirm_button
+                        .render(right_area, buf, !self.is_confirm_focused, &theme);
                 }
                 SignStatus::Signing => {
                     "Signing data...".render(button_area.margin_top(1), buf);
@@ -274,17 +275,3 @@ impl SignTypedDataPopup {
         }
     }
 }
-
-// TODO there is a bug here that causes revert 0x815e1d64 from permit2, found while interacting with euler
-// fn eip712_digest_from_json(typed_data: &Value) -> crate::Result<B256> {
-//     let (_msg_type, message_value, _domain_type, domain_value) = eip712_to_dyn(typed_data)?;
-
-//     let encoded_domain = domain_value.abi_encode();
-//     let encoded_message = message_value.abi_encode();
-
-//     let domain_separator = keccak256(&encoded_domain);
-//     let message_hash = keccak256(&encoded_message);
-//     let eip712_hash = keccak256([&[0x19, 0x01], &domain_separator[..], &message_hash[..]].concat());
-
-//     Ok(eip712_hash)
-// }

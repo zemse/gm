@@ -1,6 +1,7 @@
 #[cfg(feature = "demo")]
 use std::time::Instant;
 use std::{
+    borrow::Cow,
     io::{self, stdout},
     ops::Mul,
     str::FromStr,
@@ -10,15 +11,17 @@ use std::{
 #[cfg(feature = "demo")]
 use crate::demo::{demo_exit_text, demo_text, demo_text_2};
 use crate::{
-    events::{
-        assets::watch_assets, input::watch_input_events, recent_addresses::watch_recent_addresses,
-    },
     pages::{
         account::AccountPage, address_book::AddressBookPage, assets::AssetsPage,
         complete_setup::CompleteSetupPage, config::ConfigPage, dev_key_capture::DevKeyCapturePage,
         footer::Footer, invite_popup::InvitePopup, network::NetworkPage,
         send_message::SendMessagePage, shell::ShellPage, sign_message::SignMessagePage,
         title::Title, trade::TradePage, walletconnect::WalletConnectPage, Page,
+    },
+    post_handle_event::PostHandleEventActions,
+    threads::{
+        assets::watch_assets, helios::helios_thread, input::watch_input_events,
+        recent_addresses::watch_recent_addresses, tick::start_ticking,
     },
     AppEvent,
 };
@@ -40,6 +43,7 @@ use gm_utils::{
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
+    text::Span,
     widgets::Widget,
     DefaultTerminal,
 };
@@ -55,10 +59,9 @@ use ratatui::{
 use strum::{Display, EnumIter, IntoEnumIterator};
 use tokio_util::sync::CancellationToken;
 
-use super::traits::{Actions, Component};
+use super::traits::Component;
 use crate::{
     error::FmtError,
-    events::helios::helios_thread,
     theme::{Theme, ThemeName},
 };
 
@@ -222,6 +225,7 @@ pub struct App {
     #[cfg(feature = "demo")]
     demo_popup: TextPopup,
 
+    tick_thread: Option<tokio::task::JoinHandle<()>>,
     input_thread: Option<std::thread::JoinHandle<()>>,
     refresh_prices_thread: Option<tokio::task::JoinHandle<()>>,
     assets_thread: Option<tokio::task::JoinHandle<()>>,
@@ -264,6 +268,7 @@ impl App {
             #[cfg(feature = "demo")]
             demo_popup: TextPopup::new("", false),
 
+            tick_thread: None,
             input_thread: None,
             refresh_prices_thread: None,
             assets_thread: None,
@@ -332,6 +337,12 @@ impl App {
     }
 
     fn init_threads(&mut self, tr: &mpsc::Sender<AppEvent>, sd: &CancellationToken) {
+        let tr_tick = tr.clone();
+        let shutdown_signal = sd.clone();
+        self.tick_thread = Some(tokio::spawn(async move {
+            start_ticking(tr_tick, shutdown_signal).await;
+        }));
+
         let tr_input = tr.clone();
         let shutdown_signal = sd.clone();
         self.input_thread = Some(std::thread::spawn(move || {
@@ -460,27 +471,34 @@ impl App {
         Ok(())
     }
 
-    async fn process_result(&mut self, result: Actions) -> crate::Result<(bool, bool, bool)> {
-        if result.page_pop {
+    async fn process_result(
+        &mut self,
+        mut result: PostHandleEventActions,
+    ) -> crate::Result<(bool, bool, bool)> {
+        if result.get_page_pop() {
             self.context.pop();
         }
-        if result.page_pop_all {
+        if result.get_page_pop_all() {
             self.context.clear();
         }
-        if result.reload {
+        if result.get_reload() {
             self.reload()?;
             if let Some(page) = self.context.last_mut() {
                 page.reload(&self.shared_state)?;
             }
         }
-        if result.refresh_assets {
+        if result.get_refresh_assets() {
             // TODO restart the assets thread to avoid the delay
             if let Ok(account) = Config::current_account() {
                 self.shared_state.assets_mut()?.clear_data_for(account);
             }
         }
-        self.context.extend(result.page_inserts);
-        Ok((result.ignore_esc, result.ignore_ctrlc, result.ignore_left))
+        self.context.extend(result.get_page_inserts_owned());
+        Ok((
+            result.get_ignore_esc(),
+            result.get_ignore_ctrlc(),
+            result.get_ignore_left(),
+        ))
     }
 
     fn update_focus(&mut self, new_focus: Focus) {
@@ -612,7 +630,7 @@ impl App {
         // Handle the event in the relavent component
         let result = if self.fatal_error_popup.is_shown() {
             self.fatal_error_popup
-                .handle_event::<Actions>(event.key_event(), area)
+                .handle_event::<PostHandleEventActions>(event.key_event(), areas.popup)
         } else if self.invite_popup.is_open() {
             self.invite_popup
                 .handle_event(&event, tr, &self.shared_state)?
@@ -621,16 +639,22 @@ impl App {
             unreachable!();
             #[cfg(feature = "demo")]
             self.demo_popup
-                .handle_event::<Actions>(event.key_event(), area)
+                .handle_event::<PostHandleEventActions>(event.key_event(), areas.popup)
         } else {
-            let mut result = Actions::default();
+            let mut result = PostHandleEventActions::default();
             let is_key_event = event.key_event().is_some();
+            let mut body_area = areas.body;
+
+            if self.context.len() > 1 {
+                body_area.consume_height(2);
+            }
 
             // If focus is on body, handle all events. However if focus is not on body
             // then handle all but key events. This allows to handle mouse clicks and widget updates.
             if (self.focus == Focus::Body || !is_key_event) && self.context.last().is_some() {
                 let page = self.context.last_mut().unwrap();
-                let r = page.handle_event(&event, areas.body, tr, sd, &self.shared_state)?;
+                let r =
+                    page.handle_event(&event, body_area, areas.popup, tr, sd, &self.shared_state)?;
                 result.merge(r);
             }
 
@@ -645,8 +669,8 @@ impl App {
                     |item| {
                         let mut page = item.get_page(&self.shared_state)?;
                         page.set_focus(true);
-                        result.page_pop_all = true;
-                        result.page_inserts.push(page);
+                        result.page_pop_all();
+                        result.page_insert(page);
 
                         focus_update_1 = Some(Focus::Body);
 
@@ -728,7 +752,7 @@ impl App {
                     KeyCode::Esc => {
                         if self.fatal_error_popup.is_shown() {
                             self.fatal_error_popup.clear();
-                        } else if self.focus != Focus::Menu {
+                        } else if self.context.len() == 1 && self.focus != Focus::Menu {
                             self.update_focus(Focus::Menu);
                         } else if !ignore_esc {
                             let page = self.context.pop();
@@ -820,6 +844,7 @@ impl Widget for &App {
         if self.shared_state.theme.boxed() {
             // Render border of the canvas
             Block::bordered()
+                .style(self.shared_state.theme.style_dim())
                 .border_type(self.shared_state.theme.border_type)
                 .render(areas.middle, buf);
 
@@ -839,8 +864,41 @@ impl Widget for &App {
         self.main_menu
             .render(areas.menu, buf, &self.shared_state.theme);
 
+        let mut body_area = areas.body;
+        if self.context.len() > 1 {
+            let mut nav_area = areas.body.change_height(1);
+            body_area.consume_height(2);
+
+            let names = self
+                .context
+                .iter()
+                .map(|page| page.name())
+                .collect::<Vec<Cow<'static, str>>>();
+
+            for (i, name) in names.iter().enumerate() {
+                let name_size = name.len();
+                let is_last = i == names.len() - 1;
+
+                Span::raw(name.to_string())
+                    .style(if is_last {
+                        self.shared_state.theme.style()
+                    } else {
+                        self.shared_state.theme.style_dim()
+                    })
+                    .render(nav_area, buf);
+                nav_area.consume_width(name_size as u16);
+
+                if !is_last {
+                    Span::raw(" / ")
+                        .style(self.shared_state.theme.style_dim())
+                        .render(nav_area, buf);
+                    nav_area.consume_width(3);
+                }
+            }
+        }
+
         if let Some(page) = self.current_page() {
-            page.render_component(areas.body, areas.popup, buf, &self.shared_state);
+            page.render_component(body_area, areas.popup, buf, &self.shared_state);
         }
 
         Footer {

@@ -2,7 +2,9 @@ use std::sync::mpsc;
 
 use gm_ratatui_extra::{
     act::Act,
+    button::Button,
     form::{Form, FormItemIndex, FormWidget},
+    input_box_owned::InputBoxOwned,
 };
 use gm_utils::{config::Config, disk_storage::DiskStorageInterface};
 use ratatui::{buffer::Buffer, layout::Rect};
@@ -11,9 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::{account::AccountPage, Page};
 use crate::{
-    app::SharedState,
-    traits::{Actions, Component},
-    AppEvent,
+    app::SharedState, post_handle_event::PostHandleEventActions, traits::Component, AppEvent,
 };
 
 #[derive(Debug, Display, PartialEq, EnumIter)]
@@ -41,18 +41,14 @@ impl TryFrom<FormItem> for FormWidget {
                 FormWidget::StaticText("Complete the following steps to get started:")
             }
             FormItem::CreateOrImportWallet => FormWidget::Button {
-                label: "Create or Import Wallet",
-                hover_focus: false,
+                widget: Button::new("Create or Import Wallet"),
             },
             FormItem::AlchemyApiKey => FormWidget::InputBox {
-                label: "Alchemy API Key",
-                text: Config::alchemy_api_key(false).ok().unwrap_or_default(),
-                empty_text: Some("Please get an Alchemy API key from https://www.alchemy.com/"),
-                currency: None,
+                widget: InputBoxOwned::new("Alchemy API key")
+                    .with_empty_text("Please get an Alchemy API key from https://www.alchemy.com/"),
             },
             FormItem::Save => FormWidget::Button {
-                label: "Save",
-                hover_focus: false,
+                widget: Button::new("Save"),
             },
             FormItem::Display => FormWidget::DisplayText(String::new()),
         };
@@ -102,32 +98,31 @@ impl Component for CompleteSetupPage {
         &mut self,
         event: &AppEvent,
         area: Rect,
+        _popup_area: Rect,
         transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
-        let display_text = self.form.get_text_mut(FormItem::Display);
-        *display_text = "".to_string();
+    ) -> crate::Result<PostHandleEventActions> {
+        self.form.set_text(FormItem::Display, "".to_string());
 
-        let mut handle_result = Actions::default();
+        let mut handle_result = PostHandleEventActions::default();
 
         let r = self.form.handle_event(
-            event.input_event(),
+            event.widget_event().as_ref(),
             area,
             |_, _| Ok(()),
             |label, form| {
                 if label == FormItem::CreateOrImportWallet {
-                    handle_result
-                        .page_inserts
-                        .push(Page::Account(AccountPage::new()?));
+                    handle_result.page_insert(Page::Account(AccountPage::new()?));
                 } else {
-                    handle_result.reload = true;
+                    handle_result.reload();
 
-                    Config::set_alchemy_api_key(form.get_text(FormItem::AlchemyApiKey).clone())?;
+                    Config::set_alchemy_api_key(
+                        form.get_text(FormItem::AlchemyApiKey).to_string(),
+                    )?;
                     transmitter.send(AppEvent::ConfigUpdate)?;
 
-                    let display_text = form.get_text_mut(FormItem::Display);
-                    *display_text = "Configuration saved".to_string();
+                    form.set_text(FormItem::Display, "Configuration saved".to_string());
                 }
                 Ok(())
             },
@@ -135,7 +130,7 @@ impl Component for CompleteSetupPage {
         handle_result.merge(r);
 
         if self.form.valid_count() == 0 {
-            handle_result.page_pop = true;
+            handle_result.page_pop();
         }
 
         Ok(handle_result)

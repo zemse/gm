@@ -8,9 +8,7 @@ use ratatui::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    app::SharedState,
-    traits::{Actions, Component},
-    AppEvent,
+    app::SharedState, post_handle_event::PostHandleEventActions, traits::Component, AppEvent,
 };
 
 #[derive(Debug)]
@@ -30,11 +28,12 @@ impl Component for TextPage {
         &mut self,
         _event: &AppEvent,
         _area: Rect,
+        _popup_area: Rect,
         _transmitter: &Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
-        Ok(Actions::default())
+    ) -> crate::Result<PostHandleEventActions> {
+        Ok(PostHandleEventActions::default())
     }
 
     fn render_component(

@@ -7,12 +7,16 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::SharedState,
+    post_handle_event::PostHandleEventActions,
     theme::{self, ThemeName},
-    traits::{Actions, Component},
+    traits::Component,
     AppEvent,
 };
 use gm_ratatui_extra::{
     act::Act,
+    boolean_input::BooleanInput,
+    button::Button,
+    input_box_owned::InputBoxOwned,
     widgets::{
         filter_select_popup::FilterSelectPopup,
         form::{Form, FormItemIndex, FormWidget},
@@ -41,32 +45,27 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Configuration"),
             FormItem::AlchemyApiKey => FormWidget::InputBox {
-                label: "Alchemy API key",
-                text: String::new(),
-                empty_text: Some("Please get an Alchemy API key from https://www.alchemy.com/"),
-                currency: None,
+                widget: InputBoxOwned::new("Alchemy API key")
+                    .with_empty_text("Please get an Alchemy API key from https://www.alchemy.com/"),
             },
             FormItem::TestnetMode => FormWidget::BooleanInput {
-                label: "Testnet Mode",
-                value: false,
+                widget: BooleanInput::new("Testnet Mode", false),
             },
             FormItem::DeveloperMode => FormWidget::BooleanInput {
-                label: "Developer Mode",
-                value: false,
+                widget: BooleanInput::new("Developer Mode", false),
             },
             FormItem::Theme => FormWidget::SelectInput {
-                label: "Theme",
-                text: String::new(),
-                empty_text: Some("Select a theme"),
+                widget: InputBoxOwned::new("Theme")
+                    .with_empty_text("Select a theme")
+                    .make_immutable(true),
                 popup: FilterSelectPopup::new("Select a theme", Some("No themes available")),
             },
             FormItem::HeliosEnabled => FormWidget::BooleanInput {
-                label: "Enable Helios (requires restart)",
-                value: false,
+                // TODO remove the restart requirement for helios to be toggled from there
+                widget: BooleanInput::new("Enable Helios (requires restart)", false),
             },
             FormItem::SaveButton => FormWidget::Button {
-                label: "Save",
-                hover_focus: false,
+                widget: Button::new("Save"),
             },
             FormItem::DisplayText => FormWidget::DisplayText(String::new()),
         };
@@ -83,11 +82,13 @@ impl ConfigPage {
     pub fn new() -> crate::Result<Self> {
         let form = Form::init(|form| {
             let config = Config::load()?;
-            *form.get_text_mut(FormItem::AlchemyApiKey) =
-                config.get_alchemy_api_key(false).unwrap_or_default();
+            form.set_text(
+                FormItem::AlchemyApiKey,
+                config.get_alchemy_api_key(false).unwrap_or_default(),
+            );
             *form.get_boolean_mut(FormItem::TestnetMode) = config.get_testnet_mode();
             *form.get_boolean_mut(FormItem::DeveloperMode) = config.get_developer_mode();
-            *form.get_text_mut(FormItem::Theme) = config.get_theme_name().to_string();
+            form.set_text(FormItem::Theme, config.get_theme_name().to_string());
             let popup = form.get_popup_mut(FormItem::Theme);
             popup.set_items(Some(ThemeName::list()));
             popup.set_cursor(&config.get_theme_name().to_string());
@@ -108,29 +109,29 @@ impl Component for ConfigPage {
         &mut self,
         event: &AppEvent,
         area: Rect,
+        _popup_area: Rect,
         _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
-        let display_text = self.form.get_text_mut(FormItem::DisplayText);
-        *display_text = "".to_string();
+    ) -> crate::Result<PostHandleEventActions> {
+        self.form.set_text(FormItem::DisplayText, "".to_string());
 
-        let mut handle_result = Actions::default();
+        let mut handle_result = PostHandleEventActions::default();
 
         let r = self.form.handle_event(
-            event.input_event(),
+            event.widget_event().as_ref(),
             area,
             |_, _| Ok(()),
             |_, form| {
-                handle_result.reload = true;
+                handle_result.reload();
 
                 let mut config = Config::load()?;
                 config.set_values(
-                    Some(form.get_text(FormItem::AlchemyApiKey).clone()),
+                    Some(form.get_text(FormItem::AlchemyApiKey).to_string()),
                     form.get_boolean(FormItem::TestnetMode),
                     form.get_boolean(FormItem::DeveloperMode),
                     {
-                        let theme_name = form.get_text(FormItem::Theme).clone();
+                        let theme_name = form.get_text(FormItem::Theme);
                         theme::ThemeName::from_str(&theme_name)
                             .unwrap_or_default()
                             .to_string()
@@ -138,14 +139,12 @@ impl Component for ConfigPage {
                     form.get_boolean(FormItem::HeliosEnabled),
                 )?;
 
-                let display_text = form.get_text_mut(FormItem::DisplayText);
-                *display_text = "Configuration saved".to_string();
-
-                handle_result.page_pop = true;
+                form.set_text(FormItem::DisplayText, "Configuration saved".to_string());
 
                 Ok(())
             },
         )?;
+
         handle_result.merge(r);
 
         Ok(handle_result)

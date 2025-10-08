@@ -6,9 +6,7 @@ use ratatui::{buffer::Buffer, layout::Rect};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    app::SharedState,
-    traits::{Actions, Component},
-    AppEvent,
+    app::SharedState, post_handle_event::PostHandleEventActions, traits::Component, AppEvent,
 };
 use gm_utils::{
     account::{AccountManager, AccountUtils},
@@ -133,15 +131,16 @@ impl Component for AddressBookPage {
         &mut self,
         event: &AppEvent,
         area: Rect,
+        _popup_area: Rect,
         _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
-        let mut result = Actions::default();
+    ) -> crate::Result<PostHandleEventActions> {
+        let mut result = PostHandleEventActions::default();
 
         self.filter_select
             .handle_event(event.input_event(), area, |ab_menu_item| {
-                result.page_inserts.push(match ab_menu_item.as_ref() {
+                result.page_insert(match ab_menu_item.as_ref() {
                     AddressBookMenuItem::Create => Page::AddressBookCreate(
                         AddressBookCreatePage::new(String::new(), String::new())?,
                     ),

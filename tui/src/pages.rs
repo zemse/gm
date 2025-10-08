@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::{borrow::Cow, sync::mpsc};
 
 use account::AccountPage;
 use account_create::AccountCreatePage;
@@ -14,6 +14,7 @@ use dev_key_capture::DevKeyCapturePage;
 use ratatui::{buffer::Buffer, layout::Rect};
 use send_message::SendMessagePage;
 use sign_message::SignMessagePage;
+use strum::AsRefStr;
 use text::TextPage;
 use tokio_util::sync::CancellationToken;
 use trade::TradePage;
@@ -25,7 +26,8 @@ use crate::{
         network::NetworkPage, network_create::NetworkCreatePage, shell::ShellPage,
         token::TokenPage, token_create::TokenCreatePage,
     },
-    traits::{Actions, Component},
+    post_handle_event::PostHandleEventActions,
+    traits::Component,
     AppEvent,
 };
 
@@ -58,7 +60,7 @@ pub mod tx_popup;
 pub mod walletconnect;
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug)]
+#[derive(Debug, AsRefStr)]
 pub enum Page {
     CompleteSetup(CompleteSetupPage),
 
@@ -106,6 +108,47 @@ impl Page {
 }
 
 impl Component for Page {
+    fn name(&self) -> Cow<'static, str> {
+        let name = match self {
+            Page::CompleteSetup(page) => page.name(),
+
+            Page::AddressBook(page) => page.name(),
+            Page::AddressBookCreate(page) => page.name(),
+            Page::AddressBookDisplay(page) => page.name(),
+
+            Page::Account(page) => page.name(),
+            Page::AccountCreate(page) => page.name(),
+            Page::AccountImport(page) => page.name(),
+
+            Page::Network(page) => page.name(),
+            Page::NetworkCreate(page) => page.name(),
+            Page::Token(page) => page.name(),
+            Page::TokenCreate(page) => page.name(),
+
+            Page::Assets(page) => page.name(),
+            Page::AssetTransfer(page) => page.name(),
+
+            Page::Config(page) => page.name(),
+            Page::SendMessage(page) => page.name(),
+            Page::SignMessage(page) => page.name(),
+
+            Page::WalletConnect(page) => page.name(),
+
+            Page::Trade(page) => page.name(),
+
+            Page::Text(page) => page.name(),
+            Page::DevKeyCapture(page) => page.name(),
+
+            Page::Shell(page) => page.name(),
+        };
+
+        if name.is_empty() {
+            Cow::Owned(self.as_ref().to_string())
+        } else {
+            name
+        }
+    }
+
     fn set_focus(&mut self, focus: bool) {
         match self {
             Page::CompleteSetup(page) => page.set_focus(focus),
@@ -129,7 +172,7 @@ impl Component for Page {
             Page::Config(page) => page.set_focus(focus),
             Page::SendMessage(page) => page.set_focus(focus),
             Page::SignMessage(page) => page.set_focus(focus),
-            // Page::Transaction(page) => page.set_focus(focus),
+
             Page::WalletConnect(page) => page.set_focus(focus),
 
             Page::Trade(page) => page.set_focus(focus),
@@ -285,41 +328,44 @@ impl Component for Page {
         &mut self,
         event: &AppEvent,
         area: Rect,
+        popup_area: Rect,
         tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
         ss: &SharedState,
-    ) -> crate::Result<Actions> {
+    ) -> crate::Result<PostHandleEventActions> {
         match self {
-            Page::CompleteSetup(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::CompleteSetup(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
 
-            Page::AddressBook(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::AddressBookCreate(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::AddressBookDisplay(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::AddressBook(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
+            Page::AddressBookCreate(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
+            Page::AddressBookDisplay(page) => {
+                page.handle_event(event, area, popup_area, tr, sd, ss)
+            }
 
-            Page::Network(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::NetworkCreate(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::Token(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::TokenCreate(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::Network(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
+            Page::NetworkCreate(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
+            Page::Token(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
+            Page::TokenCreate(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
 
-            Page::Account(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::AccountCreate(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::AccountImport(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::Account(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
+            Page::AccountCreate(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
+            Page::AccountImport(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
 
-            Page::Assets(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::AssetTransfer(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::Assets(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
+            Page::AssetTransfer(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
 
-            Page::Config(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::SendMessage(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::SignMessage(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::Config(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
+            Page::SendMessage(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
+            Page::SignMessage(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
 
-            Page::WalletConnect(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::WalletConnect(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
 
-            Page::Trade(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::Trade(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
 
-            Page::Text(page) => page.handle_event(event, area, tr, sd, ss),
-            Page::DevKeyCapture(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::Text(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
+            Page::DevKeyCapture(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
 
-            Page::Shell(page) => page.handle_event(event, area, tr, sd, ss),
+            Page::Shell(page) => page.handle_event(event, area, popup_area, tr, sd, ss),
         }
     }
 

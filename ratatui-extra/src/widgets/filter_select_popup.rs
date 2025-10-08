@@ -1,12 +1,20 @@
 use std::fmt::Display;
 
 use ratatui::{
+    buffer::Buffer,
     crossterm::event::{KeyCode, KeyEvent, KeyEventKind},
+    layout::Rect,
+    text::Span,
     widgets::{Block, Widget},
 };
 
 use super::{filter_select::FilterSelect, popup::Popup};
-use crate::{act::Act, cursor::Cursor, extensions::KeyEventExt, thematize::Thematize};
+use crate::{
+    act::Act,
+    cursor::Cursor,
+    extensions::{KeyEventExt, RectExt},
+    thematize::Thematize,
+};
 
 #[derive(Clone, Debug)]
 pub struct FilterSelectPopup<Item: Display> {
@@ -46,6 +54,12 @@ impl<Item: Display> FilterSelectPopup<Item> {
         self.items
             .as_ref()
             .and_then(|items| items.get(self.cursor.current))
+    }
+
+    pub fn display_selection(&self) -> String {
+        self.current_selection()
+            .map(|s| s.to_string())
+            .unwrap_or_default()
     }
 
     pub fn is_open(&self) -> bool {
@@ -108,33 +122,33 @@ impl<Item: Display> FilterSelectPopup<Item> {
 
         Ok(act)
     }
-    pub fn render(
-        &self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
-        theme: &impl Thematize,
-    ) where
+    pub fn render(&self, popup_area: Rect, buf: &mut Buffer, theme: &impl Thematize)
+    where
         Self: Sized,
     {
         if self.is_open() {
             let theme = theme.popup();
 
-            Popup.render(area, buf, &theme);
+            Popup.render(popup_area, buf, &theme);
 
-            let inner_area = Popup::inner_area(area);
-            let block = Block::bordered()
-                .border_type(theme.border_type())
-                .style(theme.style())
-                .title(self.title);
-            let block_inner_area = block.inner(inner_area);
-            block.render(inner_area, buf);
+            if theme.boxed() {
+                let block = Block::bordered()
+                    .border_type(theme.border_type())
+                    .style(theme.style());
+                block.render(popup_area, buf);
+            }
+
+            let mut inner_area = Popup::inner_area(popup_area);
+
+            Span::raw(self.title).render(inner_area, buf);
+            inner_area.consume_height(2);
 
             if let Some(items) = &self.items {
                 if items.is_empty() {
                     if let Some(empty_text) = self.empty_text {
-                        empty_text.render(block_inner_area, buf);
+                        empty_text.render(inner_area, buf);
                     } else {
-                        "The list is empty.".render(block_inner_area, buf);
+                        "The list is empty.".render(inner_area, buf);
                     }
                 } else {
                     FilterSelect {
@@ -143,10 +157,10 @@ impl<Item: Display> FilterSelectPopup<Item> {
                         search_string: &self.search_string,
                         focus: true,
                     }
-                    .render(block_inner_area, buf, &theme);
+                    .render(inner_area, buf, &theme);
                 }
             } else {
-                "Loading...".render(block_inner_area, buf);
+                "Loading...".render(inner_area, buf);
             }
         }
     }

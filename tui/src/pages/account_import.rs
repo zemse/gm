@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::{borrow::Cow, sync::mpsc};
 
 use gm_ratatui_extra::input_box::InputBox;
 use ratatui::{
@@ -10,9 +10,7 @@ use ratatui::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    app::SharedState,
-    traits::{Actions, Component},
-    AppEvent,
+    app::SharedState, post_handle_event::PostHandleEventActions, traits::Component, AppEvent,
 };
 use gm_utils::account::AccountManager;
 
@@ -26,15 +24,20 @@ pub struct AccountImportPage {
 }
 
 impl Component for AccountImportPage {
+    fn name(&self) -> Cow<'static, str> {
+        Cow::Borrowed("Import")
+    }
+
     fn handle_event(
         &mut self,
         event: &AppEvent,
         area: Rect,
+        _popup_area: Rect,
         _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
-        let mut result = Actions::default();
+    ) -> crate::Result<PostHandleEventActions> {
+        let mut result = PostHandleEventActions::default();
 
         InputBox::handle_event(
             event.input_event(),
@@ -46,8 +49,8 @@ impl Component for AccountImportPage {
         if let AppEvent::Input(input_event) = event {
             if self.display.is_some() {
                 if self.success {
-                    result.page_pop = true;
-                    result.reload = true;
+                    result.page_pop();
+                    result.reload();
                 } else {
                     self.display = None;
                 }

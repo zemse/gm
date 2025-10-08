@@ -10,8 +10,8 @@ use std::{str::FromStr, sync::mpsc};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::traits::{Actions, Component};
 use crate::{app::SharedState, AppEvent};
+use crate::{post_handle_event::PostHandleEventActions, traits::Component};
 
 #[derive(Default, Debug)]
 pub struct TradePage {
@@ -32,10 +32,11 @@ impl Component for TradePage {
         &mut self,
         event: &AppEvent,
         _area: Rect,
+        _popup_area: Rect,
         transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
+    ) -> crate::Result<PostHandleEventActions> {
         match event {
             AppEvent::Input(input_event) => {
                 match input_event {
@@ -98,7 +99,7 @@ impl Component for TradePage {
             self.api_thread = Some(start_api_thread(Interval::OneSecond, transmitter, None));
         }
 
-        Ok(Actions::default())
+        Ok(Default::default())
     }
 
     fn render_component(

@@ -23,7 +23,7 @@ use ratatui::{
 };
 use tokio::task::JoinHandle;
 
-use crate::{app::SharedState, theme::Theme, traits::Actions, AppEvent};
+use crate::{app::SharedState, post_handle_event::PostHandleEventActions, theme::Theme, AppEvent};
 
 pub fn sign_thread(
     message: &str,
@@ -69,14 +69,31 @@ pub enum SignPopupEvent {
     EscapedAfterSigning,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct SignPopup {
     msg_hex: String,
     text: TextScroll,
     open: bool,
-    button_cursor: bool, // is cursor on the confirm button?
+    confirm_button: Button,
+    cancel_button: Button,
+    is_confirm_focused: bool,
     status: SignStatus,
     sign_thread: Option<JoinHandle<()>>,
+}
+
+impl Default for SignPopup {
+    fn default() -> Self {
+        Self {
+            msg_hex: String::new(),
+            text: TextScroll::default(),
+            open: false,
+            confirm_button: Button::new("Confirm"),
+            cancel_button: Button::new("Cancel"),
+            is_confirm_focused: true,
+            status: SignStatus::Idle,
+            sign_thread: None,
+        }
+    }
 }
 
 impl SignPopup {
@@ -86,7 +103,7 @@ impl SignPopup {
 
     pub fn open(&mut self) {
         self.open = true;
-        self.button_cursor = true;
+        self.is_confirm_focused = true;
     }
 
     pub fn close(&mut self) {
@@ -104,7 +121,7 @@ impl SignPopup {
     }
 
     fn reset(&mut self) {
-        self.button_cursor = false;
+        self.is_confirm_focused = false;
         self.status = SignStatus::Idle;
         if let Some(thread) = self.sign_thread.take() {
             thread.abort();
@@ -115,11 +132,11 @@ impl SignPopup {
         &mut self,
         (event, area, tr, ss): (&AppEvent, Rect, &mpsc::Sender<AppEvent>, &SharedState),
         mut on_event: F,
-    ) -> crate::Result<Actions>
+    ) -> crate::Result<PostHandleEventActions>
     where
         F: FnMut(SignPopupEvent) -> crate::Result<()>,
     {
-        let mut result = Actions::default();
+        let mut result = PostHandleEventActions::default();
 
         self.text.handle_event(event.key_event(), area);
 
@@ -130,13 +147,13 @@ impl SignPopup {
                         match self.status {
                             SignStatus::Idle => match key_event.code {
                                 KeyCode::Left => {
-                                    self.button_cursor = false;
+                                    self.is_confirm_focused = false;
                                 }
                                 KeyCode::Right => {
-                                    self.button_cursor = true;
+                                    self.is_confirm_focused = true;
                                 }
                                 KeyCode::Enter => {
-                                    if self.button_cursor {
+                                    if self.is_confirm_focused {
                                         self.status = SignStatus::Signing;
                                         self.sign_thread =
                                             Some(sign_thread(&self.text.text, tr, ss)?);
@@ -207,17 +224,11 @@ impl SignPopup {
 
             match self.status {
                 SignStatus::Idle => {
-                    Button {
-                        focus: !self.button_cursor,
-                        label: "Cancel",
-                    }
-                    .render(left_area, buf, &theme);
+                    self.cancel_button
+                        .render(left_area, buf, !self.is_confirm_focused, &theme);
 
-                    Button {
-                        focus: self.button_cursor,
-                        label: "Confirm",
-                    }
-                    .render(right_area, buf, &theme);
+                    self.confirm_button
+                        .render(right_area, buf, !self.is_confirm_focused, &theme);
                 }
 
                 SignStatus::Signing => {

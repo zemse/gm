@@ -45,7 +45,8 @@ use crate::{
         sign_popup::{SignPopup, SignPopupEvent},
         tx_popup::TxPopup,
     },
-    traits::{Actions, Component},
+    post_handle_event::PostHandleEventActions,
+    traits::Component,
     AppEvent,
 };
 
@@ -302,11 +303,12 @@ impl Component for ShellPage {
         &mut self,
         event: &AppEvent,
         area: Rect,
+        _popup_area: Rect,
         tr: &Sender<AppEvent>,
         _: &CancellationToken,
         ss: &SharedState,
-    ) -> crate::Result<Actions> {
-        let mut actions = Actions::default();
+    ) -> crate::Result<PostHandleEventActions> {
+        let mut actions = PostHandleEventActions::default();
 
         if self.server_threads.is_none() {
             self.create_server_threads(tr, ss)?;

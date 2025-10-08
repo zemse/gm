@@ -1,17 +1,21 @@
 use crate::app::SharedState;
 use crate::pages::token::TokenPage;
 use crate::pages::Page;
-use crate::traits::{Actions, Component};
+use crate::post_handle_event::PostHandleEventActions;
+use crate::traits::Component;
 use crate::AppEvent;
 use alloy::primitives::Address;
 use gm_ratatui_extra::act::Act;
+use gm_ratatui_extra::button::Button;
 use gm_ratatui_extra::confirm_popup::ConfirmPopup;
 use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
+use gm_ratatui_extra::input_box_owned::InputBoxOwned;
 use gm_ratatui_extra::thematize::Thematize;
 use gm_utils::disk_storage::DiskStorageInterface;
 use gm_utils::network::{Network, NetworkStore, Token};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use std::borrow::Cow;
 use std::sync::mpsc::Sender;
 use strum::Display;
 use strum_macros::EnumIter;
@@ -39,36 +43,22 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Edit Network"),
             FormItem::Name => FormWidget::InputBox {
-                label: "Name",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Name"),
             },
             FormItem::Symbol => FormWidget::InputBox {
-                label: "Symbol",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Symbol"),
             },
             FormItem::Decimals => FormWidget::InputBox {
-                label: "Decimals",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Decimals"),
             },
             FormItem::ContractAddress => FormWidget::InputBox {
-                label: "Contract Address",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Contract Address"),
             },
             FormItem::SaveButton => FormWidget::Button {
-                label: "Save",
-                hover_focus: false,
+                widget: Button::new("Save"),
             },
             FormItem::RemoveButton => FormWidget::Button {
-                label: "Remove",
-                hover_focus: false,
+                widget: Button::new("Remove"),
             },
             FormItem::ErrorText => FormWidget::ErrorText(String::new()),
         };
@@ -78,6 +68,7 @@ impl TryFrom<FormItem> for FormWidget {
 
 #[derive(Debug)]
 pub struct TokenCreatePage {
+    pub is_new: bool,
     pub form: Form<FormItem, crate::Error>,
     pub token: Token,
     pub token_index: usize,
@@ -86,14 +77,23 @@ pub struct TokenCreatePage {
     pub remove_popup: ConfirmPopup,
 }
 impl TokenCreatePage {
-    pub fn new(token_index: usize, network_index: usize, network: Network) -> crate::Result<Self> {
+    pub fn new(
+        is_new: bool,
+        token_index: usize,
+        network_index: usize,
+        network: Network,
+    ) -> crate::Result<Self> {
         let token = network.tokens.get(token_index).cloned().unwrap_or_default();
         Ok(Self {
+            is_new,
             form: Form::init(|form| {
-                *form.get_text_mut(FormItem::Name) = token.name.clone();
-                *form.get_text_mut(FormItem::Symbol) = token.symbol.clone();
-                *form.get_text_mut(FormItem::Decimals) = token.decimals.to_string();
-                *form.get_text_mut(FormItem::ContractAddress) = token.contract_address.to_string();
+                form.set_text(FormItem::Name, token.name.clone());
+                form.set_text(FormItem::Symbol, token.symbol.clone());
+                form.set_text(FormItem::Decimals, token.decimals.to_string());
+                form.set_text(
+                    FormItem::ContractAddress,
+                    token.contract_address.to_string(),
+                );
                 // if network.tokens.get(token_index).is_none() {
                 //     form.hide_item(FormItem::RemoveButton);
                 // }
@@ -114,33 +114,37 @@ impl TokenCreatePage {
     }
     pub fn token(form: &Form<FormItem, crate::Error>) -> Token {
         Token {
-            name: form.get_text(FormItem::Name).clone(),
-            symbol: form.get_text(FormItem::Symbol).clone(),
+            name: form.get_text(FormItem::Name).to_string(),
+            symbol: form.get_text(FormItem::Symbol).to_string(),
             decimals: form
                 .get_text(FormItem::Decimals)
                 .parse()
                 .unwrap_or_default(),
             contract_address: form
                 .get_text(FormItem::ContractAddress)
-                .clone()
                 .parse::<Address>()
                 .unwrap_or_default(),
         }
     }
 }
 impl Component for TokenCreatePage {
+    fn name(&self) -> Cow<'static, str> {
+        Cow::Borrowed("Create")
+    }
+
     fn handle_event(
         &mut self,
         event: &AppEvent,
         area: Rect,
+        _popup_area: Rect,
         _transmitter: &Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
-        let mut handle_result = Actions::default();
+    ) -> crate::Result<PostHandleEventActions> {
+        let mut handle_result = PostHandleEventActions::default();
         if self.remove_popup.is_open() {
             let r = self.remove_popup.handle_event(
-                event.key_event(),
+                event.input_event(),
                 area,
                 || -> crate::Result<()> {
                     if self.network.tokens.get(self.token_index).is_some() {
@@ -149,12 +153,12 @@ impl Component for TokenCreatePage {
                         store.networks[self.network_index] = self.network.clone();
                         store.save()?;
                     }
-                    handle_result.page_pop = true;
-                    handle_result.page_inserts.push(Page::Token(TokenPage::new(
+                    handle_result.page_pop();
+                    handle_result.page_insert(Page::Token(TokenPage::new(
                         self.network_index,
                         self.network.clone(),
                     )?));
-                    handle_result.reload = true;
+                    handle_result.reload();
                     Ok(())
                 },
                 || Ok(()),
@@ -162,7 +166,7 @@ impl Component for TokenCreatePage {
             handle_result.merge(r);
         }
         let r = self.form.handle_event(
-            event.input_event(),
+            event.widget_event().as_ref(),
             area,
             |_, _| Ok(()),
             |label, form| {
@@ -178,12 +182,12 @@ impl Component for TokenCreatePage {
                     config.networks[self.network_index] = self.network.clone();
                     config.save()?;
 
-                    handle_result.page_pop = true;
-                    handle_result.page_inserts.push(Page::Token(TokenPage::new(
+                    handle_result.page_pop();
+                    handle_result.page_insert(Page::Token(TokenPage::new(
                         self.network_index,
                         self.network.clone(),
                     )?));
-                    handle_result.reload = true;
+                    handle_result.reload();
                 }
                 if label == FormItem::RemoveButton {
                     self.remove_popup.open();

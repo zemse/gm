@@ -5,9 +5,7 @@ use ratatui::{buffer::Buffer, layout::Rect, text::Line, widgets::Widget};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    app::SharedState,
-    traits::{Actions, Component},
-    AppEvent,
+    app::SharedState, post_handle_event::PostHandleEventActions, traits::Component, AppEvent,
 };
 
 pub struct Title;
@@ -17,11 +15,12 @@ impl Component for Title {
         &mut self,
         _event: &AppEvent,
         _area: Rect,
+        _popup_area: Rect,
         _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
-        let result = Actions::default();
+    ) -> crate::Result<PostHandleEventActions> {
+        let result = PostHandleEventActions::default();
         Ok(result)
     }
 

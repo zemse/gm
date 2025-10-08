@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::{collections::HashMap, marker::PhantomData};
 
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, MouseEventKind};
@@ -12,12 +13,13 @@ use ratatui::{
 };
 use strum::IntoEnumIterator;
 
-use super::{button::Button, input_box::InputBox};
+use super::{button::Button, input_box_owned::InputBoxOwned};
 use crate::act::Act;
-use crate::extensions::{EventExt, MouseEventExt, RectExt, WidgetHeight};
+use crate::boolean_input::BooleanInput;
+use crate::event::WidgetEvent;
+use crate::extensions::{MouseEventExt, RectExt, WidgetHeight};
 use crate::widgets::scroll_bar::CustomScrollBar;
 use crate::{thematize::Thematize, widgets::filter_select_popup::FilterSelectPopup};
-use gm_utils::text::split_string;
 
 enum CursorAction {
     Prev,
@@ -34,29 +36,20 @@ pub enum FormWidget {
     Heading(&'static str),
     StaticText(&'static str),
     InputBox {
-        label: &'static str,
-        text: String,
-        empty_text: Option<&'static str>,
-        currency: Option<String>,
+        widget: InputBoxOwned,
     },
     BooleanInput {
-        label: &'static str,
-        value: bool,
+        widget: BooleanInput,
     },
     DisplayBox {
-        label: &'static str,
-        text: String,
-        empty_text: Option<&'static str>,
+        widget: InputBoxOwned,
     },
     SelectInput {
-        label: &'static str,
-        text: String,
-        empty_text: Option<&'static str>,
+        widget: InputBoxOwned,
         popup: FilterSelectPopup<String>,
     },
     Button {
-        label: &'static str,
-        hover_focus: bool,
+        widget: Button,
     },
     DisplayText(String),
     ErrorText(String),
@@ -66,11 +59,14 @@ pub enum FormWidget {
 impl FormWidget {
     pub fn label(&self) -> Option<&'static str> {
         match self {
-            FormWidget::InputBox { label, .. } => Some(label),
-            FormWidget::DisplayBox { label, .. } => Some(label),
-            FormWidget::BooleanInput { label, .. } => Some(label),
-            FormWidget::Button { label, .. } => Some(label),
-            FormWidget::SelectInput { label, .. } => Some(label),
+            FormWidget::InputBox { widget }
+            | FormWidget::DisplayBox { widget, .. }
+            | FormWidget::SelectInput { widget, .. } => Some(widget.label),
+
+            FormWidget::BooleanInput { widget, .. } => Some(widget.label),
+
+            FormWidget::Button { widget, .. } => Some(widget.label),
+
             FormWidget::Heading(_)
             | FormWidget::StaticText(_)
             | FormWidget::DisplayText(_)
@@ -79,27 +75,13 @@ impl FormWidget {
         }
     }
 
-    pub fn max_cursor(&self) -> usize {
-        match self {
-            FormWidget::InputBox { text, .. }
-            | FormWidget::DisplayBox { text, .. }
-            | FormWidget::SelectInput { text, .. } => text.len(),
-            FormWidget::BooleanInput { value, .. } => value.to_string().len(),
-            FormWidget::Button { .. }
-            | FormWidget::Heading(_)
-            | FormWidget::StaticText(_)
-            | FormWidget::DisplayText(_)
-            | FormWidget::ErrorText(_)
-            | FormWidget::LineBreak => 0,
-        }
-    }
-
     pub fn to_value(&self) -> Option<String> {
         match self {
-            FormWidget::InputBox { text, .. }
-            | FormWidget::DisplayBox { text, .. }
-            | FormWidget::SelectInput { text, .. } => Some(text.clone()),
-            FormWidget::BooleanInput { value, .. } => Some(value.to_string()),
+            FormWidget::InputBox { widget, .. }
+            | FormWidget::DisplayBox { widget, .. }
+            | FormWidget::SelectInput { widget, .. } => Some(widget.get_text().to_string()),
+            FormWidget::BooleanInput { .. } => None,
+
             FormWidget::Button { .. }
             | FormWidget::Heading(_)
             | FormWidget::StaticText(_)
@@ -111,18 +93,11 @@ impl FormWidget {
 
     pub fn height(&self, area: Rect) -> u16 {
         match self {
-            FormWidget::InputBox { text, .. }
-            | FormWidget::DisplayBox { text, .. }
-            | FormWidget::SelectInput { text, .. } => {
-                let lines = split_string(text, (area.width - 2) as usize);
-                (2 + lines.len()) as u16
-            }
+            FormWidget::InputBox { widget, .. }
+            | FormWidget::DisplayBox { widget, .. }
+            | FormWidget::SelectInput { widget, .. } => widget.height_used(area),
 
-            FormWidget::BooleanInput { value, .. } => {
-                let value = value.to_string();
-                let lines = split_string(&value, (area.width - 2) as usize);
-                (2 + lines.len()) as u16
-            }
+            FormWidget::BooleanInput { .. } => 3,
             FormWidget::Button { .. } => 3,
             FormWidget::Heading(_) | FormWidget::StaticText(_) => 2,
             FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
@@ -138,7 +113,7 @@ impl FormWidget {
 
     pub fn width(&self, area: Rect) -> u16 {
         match self {
-            FormWidget::Button { label, .. } => Button::area(label, area).width,
+            FormWidget::Button { widget, .. } => widget.area(area).width,
             _ => area.width,
         }
     }
@@ -150,7 +125,6 @@ pub struct Form<
     E: From<crate::error::RatatuiExtraError>,
 > {
     cursor: usize,
-    text_cursor: usize,
     scroll_y: u16,
     pub form_focus: bool,
     pub items: Vec<FormWidget>,
@@ -170,7 +144,6 @@ impl<
     {
         let mut form = Self {
             cursor: 0,
-            text_cursor: 0,
             scroll_y: 0,
             form_focus: true,
             items: T::iter()
@@ -188,7 +161,6 @@ impl<
             }
         }
         set_values_closure(&mut form)?;
-        form.text_cursor = form.items[form.cursor].max_cursor();
 
         Ok(form)
     }
@@ -233,7 +205,6 @@ impl<
         if self.valid_count() > 0 {
             loop {
                 self.cursor = (self.cursor + 1) % self.items.len();
-                self.update_text_cursor();
 
                 if self.is_valid_cursor(self.cursor) {
                     break;
@@ -245,7 +216,7 @@ impl<
     pub fn retreat_cursor(&mut self) {
         loop {
             self.cursor = (self.cursor + self.items.len() - 1) % self.items.len();
-            self.update_text_cursor();
+            // self.update_text_cursor();
 
             if self.is_valid_cursor(self.cursor) {
                 break;
@@ -305,10 +276,6 @@ impl<
         }
     }
 
-    pub fn update_text_cursor(&mut self) {
-        self.text_cursor = self.items[self.cursor].max_cursor();
-    }
-
     pub fn is_valid_cursor(&self, idx: usize) -> bool {
         if self.hide.contains_key(&idx) {
             return false;
@@ -329,45 +296,48 @@ impl<
         }
     }
 
-    pub fn get_text(&self, idx: T) -> &String {
+    pub fn get_text(&self, idx: T) -> Cow<'_, str> {
         match &self.items[idx.index()] {
-            FormWidget::InputBox { text, .. } => text,
-            FormWidget::DisplayBox { text, .. } => text,
-            FormWidget::DisplayText(text) => text,
-            FormWidget::ErrorText(text) => text,
-            FormWidget::SelectInput { text, .. } => text,
+            FormWidget::InputBox { widget, .. } | FormWidget::DisplayBox { widget, .. } => {
+                Cow::Borrowed(widget.get_text())
+            }
+            FormWidget::SelectInput { popup, .. } => Cow::Owned(popup.display_selection()),
+
+            FormWidget::DisplayText(text) => Cow::Borrowed(text),
+            FormWidget::ErrorText(text) => Cow::Borrowed(text),
             _ => unreachable!(),
         }
     }
 
-    pub fn get_text_mut(&mut self, idx: T) -> &mut String {
+    pub fn set_text(&mut self, idx: T, text: String) {
         match &mut self.items[idx.index()] {
-            FormWidget::InputBox { text, .. } => text,
-            FormWidget::DisplayBox { text, .. } => text,
-            FormWidget::DisplayText(text) => text,
-            FormWidget::ErrorText(text) => text,
-            FormWidget::SelectInput { text, .. } => text,
+            FormWidget::InputBox { widget, .. }
+            | FormWidget::DisplayBox { widget, .. }
+            | FormWidget::SelectInput { widget, .. } => widget.set_text(text),
+            FormWidget::DisplayText(current) | FormWidget::ErrorText(current) => {
+                *current = text;
+            }
             _ => unreachable!(),
         }
     }
 
     pub fn get_boolean(&self, idx: T) -> bool {
         match &self.items[idx.index()] {
-            FormWidget::BooleanInput { value, .. } => *value,
+            FormWidget::BooleanInput { widget, .. } => widget.value,
             _ => unreachable!(),
         }
     }
 
     pub fn get_boolean_mut(&mut self, idx: T) -> &mut bool {
         match &mut self.items[idx.index()] {
-            FormWidget::BooleanInput { value, .. } => value,
+            FormWidget::BooleanInput { widget, .. } => &mut widget.value,
             _ => unreachable!(),
         }
     }
 
     pub fn get_currency_mut(&mut self, idx: T) -> Option<&mut Option<String>> {
         match &mut self.items[idx.index()] {
-            FormWidget::InputBox { currency, .. } => Some(currency),
+            FormWidget::InputBox { widget, .. } => Some(&mut widget.currency),
             _ => None,
         }
     }
@@ -389,7 +359,7 @@ impl<
 
     pub fn get_button_hover_mut_idx(&mut self, idx: usize) -> &mut bool {
         match &mut self.items[idx] {
-            FormWidget::Button { hover_focus, .. } => hover_focus,
+            FormWidget::Button { widget } => &mut widget.hover_focus,
             _ => unreachable!(),
         }
     }
@@ -420,7 +390,7 @@ impl<
 
     pub fn handle_event<A, F1, F2>(
         &mut self,
-        input_event: Option<&Event>,
+        event: Option<&WidgetEvent>,
         area: Rect,
         mut on_value_change: F2,
         mut on_button_press: F1,
@@ -432,9 +402,9 @@ impl<
     {
         let mut result = A::default();
 
-        if let Some(input_event) = input_event {
-            match input_event {
-                Event::Key(key_event) => {
+        if let Some(event) = event {
+            match event {
+                WidgetEvent::InputEvent(Event::Key(key_event)) => {
                     if key_event.kind == KeyEventKind::Press && !self.is_some_popup_open() {
                         match key_event.code {
                             KeyCode::Up => {
@@ -453,13 +423,12 @@ impl<
                         }
                     }
                 }
-                Event::Mouse(mouse_event) => {
+                WidgetEvent::InputEvent(Event::Mouse(mouse_event)) => {
                     if area.contains(mouse_event.position()) {
                         if mouse_event.is_left_click() {
                             if let Some(i) = self.get_clicked_item(area, mouse_event.position()) {
                                 if self.is_valid_cursor(i) {
                                     self.cursor = i;
-                                    self.update_text_cursor();
                                     self.handle_cursor(area, CursorAction::None);
                                 }
                             }
@@ -472,7 +441,9 @@ impl<
                             if self.scroll_y + form_area.height < virtual_form_height {
                                 self.scroll_y = self.scroll_y.saturating_add(1);
                             }
-                        } else if mouse_event.is(MouseEventKind::Moved) {
+                        }
+                        // TODO remove this feature is implemented in the button event handler
+                        else if mouse_event.is(MouseEventKind::Moved) {
                             let item_idx = self.get_clicked_item(area, mouse_event.position());
                             if item_idx.is_some_and(|idx| self.is_button_idx(idx)) {
                                 *self.get_button_hover_mut_idx(item_idx.unwrap()) = true;
@@ -489,75 +460,66 @@ impl<
                 _ => {}
             }
 
-            if input_event.is_mouse_left_click() || input_event.is_key_press() {
-                let value_before = self.items[self.cursor].to_value();
+            let value_before = self.items[self.cursor].to_value();
 
-                let item_area = self.get_area_for_item(area, self.cursor);
-                match &mut self.items[self.cursor] {
-                    FormWidget::InputBox { text, .. } => {
-                        InputBox::handle_event(
-                            Some(input_event),
-                            item_area,
-                            text,
-                            &mut self.text_cursor,
-                        );
-                    }
-                    FormWidget::DisplayBox { .. } => {
-                        // we don't have to handle this as parent component will do it
-                    }
-                    FormWidget::BooleanInput { value, .. } => {
-                        if input_event.key_event().is_some_and(|key_event| {
-                            matches!(
-                                key_event.code,
-                                KeyCode::Char(_)
-                                    | KeyCode::Left
-                                    | KeyCode::Right
-                                    | KeyCode::Backspace
-                            )
-                        }) {
-                            *value = !*value;
-                            self.text_cursor = value.to_string().len();
-                        }
-                    }
-                    FormWidget::SelectInput { text, popup, .. } => {
-                        let is_open = popup.is_open();
+            let item_area = self.get_area_for_item(area, self.cursor);
+            match &mut self.items[self.cursor] {
+                FormWidget::InputBox { widget, .. } => {
+                    let r = widget.handle_event(Some(event), item_area);
+                    result.merge(r);
+                }
+                FormWidget::DisplayBox { .. } => {
+                    // we don't have to handle this as parent component will do it
+                }
+                FormWidget::BooleanInput { widget, .. } => {
+                    let r = widget.handle_event(event.input_event(), item_area);
+                    result.merge(r);
+                }
+                FormWidget::SelectInput { widget, popup } => {
+                    let is_open = popup.is_open();
 
-                        let popup_result =
-                            popup.handle_event(input_event.key_event(), |selected| {
-                                *text = selected.clone();
-                                self.text_cursor = selected.len();
-                                Ok(())
-                            })?;
-                        result.merge(popup_result);
+                    let r = widget.handle_event(Some(event), area);
+                    result.merge(r);
 
-                        if !is_open {
-                            if let Some(key_event) = input_event.key_event() {
-                                match key_event.code {
-                                    // Press any key to open the popup
-                                    KeyCode::Backspace | KeyCode::Char(_) | KeyCode::Enter => {
-                                        popup.open();
-                                    }
-                                    _ => {}
+                    let r = popup.handle_event(event.key_event(), |selected| {
+                        widget.set_text(selected.to_string());
+                        Ok(())
+                    })?;
+                    result.merge(r);
+
+                    if !is_open {
+                        if let Some(key_event) = event.key_event() {
+                            match key_event.code {
+                                // Press any key to open the popup
+                                KeyCode::Backspace | KeyCode::Char(_) | KeyCode::Enter => {
+                                    popup.open();
                                 }
+                                _ => {}
                             }
                         }
                     }
-                    FormWidget::Button { label, .. } => {
-                        if input_event.is_mouse_left_click()
-                            || input_event.is_key_pressed(KeyCode::Enter)
-                        {
-                            Button::handle_event(input_event, item_area, label, || {
-                                on_button_press(self.current_label_enum()?, self)
-                            })?;
-                        }
+                }
+                FormWidget::Button { widget } => {
+                    let mut is_pressed = false;
+                    widget.handle_event(
+                        event.input_event(),
+                        item_area,
+                        || {
+                            is_pressed = true;
+                            Ok(())
+                        },
+                        |_| Ok(()),
+                    )?;
+                    if is_pressed {
+                        on_button_press(self.current_label_enum()?, self)?;
                     }
-                    _ => {}
                 }
+                _ => {}
+            }
 
-                let value_after = self.items[self.cursor].to_value();
-                if value_after != value_before {
-                    on_value_change(self.current_label_enum()?, self)?;
-                }
+            let value_after = self.items[self.cursor].to_value();
+            if value_after != value_before {
+                on_value_change(self.current_label_enum()?, self)?;
             }
         }
 
@@ -682,98 +644,57 @@ impl<
                     text.render_ref(virtual_area, &mut virtual_buf);
                     virtual_area.consume_height(item.height(virtual_area));
                 }
-                FormWidget::InputBox {
-                    label,
-                    text,
-                    empty_text,
-                    currency,
-                } => {
-                    let widget = InputBox {
-                        focus: self.form_focus && self.cursor == i,
-                        label,
-                        text: if !self.everything_empty {
-                            text
-                        } else {
-                            &"".to_string()
-                        },
-                        empty_text: if !self.everything_empty {
-                            *empty_text
-                        } else {
-                            Some("")
-                        },
-                        currency: currency.as_ref(),
-                    };
-                    let height_used = widget.height_used(virtual_area);
+                FormWidget::InputBox { widget, .. } => {
+                    let height_used = item.height(virtual_area);
 
-                    widget.render(virtual_area, &mut virtual_buf, &self.text_cursor, theme);
+                    widget.render(
+                        virtual_area,
+                        &mut virtual_buf,
+                        self.form_focus && self.cursor == i,
+                        theme,
+                    );
                     virtual_area.consume_height(height_used);
                 }
-                FormWidget::DisplayBox {
-                    label,
-                    text,
-                    empty_text,
-                } => {
-                    let widget = InputBox {
-                        focus: self.form_focus && self.cursor == i,
-                        label,
-                        text: if !self.everything_empty {
-                            text
-                        } else {
-                            &"".to_string()
-                        },
-                        empty_text: if !self.everything_empty {
-                            *empty_text
-                        } else {
-                            Some("")
-                        },
-                        currency: None,
-                    };
-                    let height_used = widget.height_used(virtual_area);
+                FormWidget::DisplayBox { widget, .. } => {
+                    let height_used = item.height(virtual_area);
 
-                    widget.render(virtual_area, &mut virtual_buf, &self.text_cursor, theme);
+                    widget.render(
+                        virtual_area,
+                        &mut virtual_buf,
+                        self.form_focus && self.cursor == i,
+                        theme,
+                    );
                     virtual_area.consume_height(height_used);
                 }
-                FormWidget::BooleanInput { label, value } => {
-                    let widget = InputBox {
-                        focus: self.form_focus && self.cursor == i,
-                        label,
-                        text: if !self.everything_empty {
-                            &value.to_string()
-                        } else {
-                            &"".to_string()
-                        },
-                        empty_text: None,
-                        currency: None,
-                    };
-                    let height_used = widget.height_used(virtual_area); // to see height based on width
+                FormWidget::BooleanInput { widget, .. } => {
+                    let height_used = item.height(virtual_area);
 
-                    widget.render(virtual_area, &mut virtual_buf, &self.text_cursor, theme);
+                    widget.render(
+                        virtual_area,
+                        &mut virtual_buf,
+                        self.form_focus && self.cursor == i,
+                        theme,
+                    );
                     virtual_area.consume_height(height_used);
                 }
-                FormWidget::SelectInput {
-                    label,
-                    text,
-                    empty_text,
-                    ..
-                } => {
-                    let widget = InputBox {
-                        focus: self.form_focus && self.cursor == i,
-                        label,
-                        text,
-                        empty_text: *empty_text,
-                        currency: None,
-                    };
-                    let height_used = widget.height_used(virtual_area); // to see height based on width
+                FormWidget::SelectInput { widget, .. } => {
+                    let height_used = item.height(virtual_area);
 
-                    widget.render(virtual_area, &mut virtual_buf, &self.text_cursor, theme);
+                    widget.render(
+                        virtual_area,
+                        &mut virtual_buf,
+                        self.form_focus && self.cursor == i,
+                        theme,
+                    );
                     virtual_area.consume_height(height_used);
                 }
-                FormWidget::Button { label, hover_focus } => {
-                    Button {
-                        focus: self.form_focus && (self.cursor == i || *hover_focus),
-                        label,
-                    }
-                    .render(virtual_area, &mut virtual_buf, theme);
+                FormWidget::Button { widget } => {
+                    widget.render(
+                        virtual_area,
+                        &mut virtual_buf,
+                        self.form_focus && self.cursor == i,
+                        theme,
+                    );
 
                     virtual_area.consume_height(item.height(virtual_area));
                 }

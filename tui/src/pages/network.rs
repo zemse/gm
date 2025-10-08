@@ -10,7 +10,8 @@ use tokio_util::sync::CancellationToken;
 use crate::app::SharedState;
 use crate::pages::network_create::NetworkCreatePage;
 use crate::pages::Page;
-use crate::traits::{Actions, Component};
+use crate::post_handle_event::PostHandleEventActions;
+use crate::traits::Component;
 use crate::AppEvent;
 use gm_utils::network::{Network, NetworkStore};
 
@@ -62,11 +63,12 @@ impl Component for NetworkPage {
         &mut self,
         event: &AppEvent,
         area: Rect,
+        _popup_area: Rect,
         _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
-        let mut result = Actions::default();
+    ) -> crate::Result<PostHandleEventActions> {
+        let mut result = PostHandleEventActions::default();
 
         self.select.handle_event(
             event.input_event(),
@@ -76,13 +78,11 @@ impl Component for NetworkPage {
                 match item {
                     NetworkSelect::Create => {
                         let network_index = network_store.networks.len();
-                        result
-                            .page_inserts
-                            .push(Page::NetworkCreate(NetworkCreatePage::new(
-                                network_index,
-                                Network::default(),
-                            )?));
-                        result.reload = true;
+                        result.page_insert(Page::NetworkCreate(NetworkCreatePage::new(
+                            true,
+                            network_index,
+                            Network::default(),
+                        )?));
                     }
 
                     NetworkSelect::Existing(name) => {
@@ -91,13 +91,11 @@ impl Component for NetworkPage {
                             .iter()
                             .position(|n| n.name == name.name)
                             .unwrap();
-                        result
-                            .page_inserts
-                            .push(Page::NetworkCreate(NetworkCreatePage::new(
-                                network_index,
-                                *name.clone(),
-                            )?));
-                        result.reload = true;
+                        result.page_insert(Page::NetworkCreate(NetworkCreatePage::new(
+                            false,
+                            network_index,
+                            *name.clone(),
+                        )?));
                     }
                 }
                 Ok::<(), crate::Error>(())

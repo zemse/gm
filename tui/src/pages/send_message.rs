@@ -1,9 +1,12 @@
 use crate::app::SharedState;
 use crate::pages::tx_popup::TxPopup;
-use crate::traits::{Actions, Component};
+use crate::post_handle_event::PostHandleEventActions;
+use crate::traits::Component;
 use crate::widgets::{address_book_popup, networks_popup, AddressBookPopup, NetworksPopup};
 use gm_ratatui_extra::act::Act;
+use gm_ratatui_extra::button::Button;
 use gm_ratatui_extra::form::{Form, FormWidget};
+use gm_ratatui_extra::input_box_owned::InputBoxOwned;
 use gm_ratatui_extra::thematize::Thematize;
 use gm_ratatui_extra::widgets::form::FormItemIndex;
 use gm_utils::alloy::StringExt;
@@ -40,25 +43,18 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Send a Message"),
             FormItem::To => FormWidget::InputBox {
-                label: "To",
-                text: String::new(),
-                empty_text: Some("<press SPACE to select from address book>"),
-                currency: None,
+                widget: InputBoxOwned::new("To")
+                    .with_empty_text("press SPACE to select from address book"),
             },
             FormItem::Message => FormWidget::InputBox {
-                label: "Message",
-                text: String::new(),
-                empty_text: Some("Type message to send"),
-                currency: None,
+                widget: InputBoxOwned::new("Message").with_empty_text("Type message to send"),
             },
             FormItem::Network => FormWidget::DisplayBox {
-                label: "Network",
-                text: String::new(),
-                empty_text: Some("<press SPACE to select network>"),
+                widget: InputBoxOwned::new("Network")
+                    .with_empty_text("press SPACE to select network"),
             },
             FormItem::SendMessageButton => FormWidget::Button {
-                label: "Send Message",
-                hover_focus: false,
+                widget: Button::new("Send Message"),
             },
         };
         Ok(widget)
@@ -93,11 +89,12 @@ impl Component for SendMessagePage {
         &mut self,
         event: &AppEvent,
         area: Rect,
+        _popup_area: Rect,
         tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
         ss: &SharedState,
-    ) -> Result<Actions> {
-        let mut result = Actions::default();
+    ) -> Result<PostHandleEventActions> {
+        let mut result = PostHandleEventActions::default();
 
         #[allow(clippy::single_match)]
         match event {
@@ -105,11 +102,11 @@ impl Component for SendMessagePage {
                 let network_name = self.form.get_text(FormItem::Network);
                 let network_store = NetworkStore::load()?;
                 let network = network_store
-                    .get_by_name(network_name)
+                    .get_by_name(&network_name)
                     .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))?;
 
                 if network.is_testnet != ss.testnet_mode {
-                    self.form.get_text_mut(FormItem::Network).clear();
+                    self.form.set_text(FormItem::Network, "".to_string());
                 }
             }
             _ => {}
@@ -119,8 +116,9 @@ impl Component for SendMessagePage {
             result.merge(self.address_book_popup.handle_event(
                 event.key_event(),
                 |entry| -> crate::Result<()> {
-                    let to_address = self.form.get_text_mut(FormItem::To);
-                    *to_address = entry.address()?.to_string();
+                    self.form
+                        .set_text(FormItem::To, entry.address()?.to_string());
+
                     self.form.advance_cursor();
                     Ok(())
                 },
@@ -129,8 +127,8 @@ impl Component for SendMessagePage {
             result.merge(self.networks_popup.handle_event(
                 event.key_event(),
                 |network| -> crate::Result<()> {
-                    let network_str = self.form.get_text_mut(FormItem::Network);
-                    *network_str = network.name.clone();
+                    self.form.set_text(FormItem::Network, network.name.clone());
+
                     self.form.advance_cursor();
                     Ok(())
                 },
@@ -163,7 +161,7 @@ impl Component for SendMessagePage {
                     .set_items(Some(NetworkStore::load()?.filter(ss.testnet_mode)));
             } else {
                 let r = self.form.handle_event(
-                    event.input_event(),
+                    event.widget_event().as_ref(),
                     area,
                     |_, _| Ok(()),
                     |label, form| {
@@ -176,11 +174,11 @@ impl Component for SendMessagePage {
                             }
 
                             self.tx_popup.set_tx_req(
-                                Network::from_name(network_name)?,
+                                Network::from_name(&network_name)?,
                                 TransactionRequest::default()
                                     .to(to.parse_as_address()?)
                                     .input(TransactionInput::from(Bytes::from(
-                                        message.to_owned().into_bytes(),
+                                        message.to_string().into_bytes(),
                                     ))),
                             );
                             self.tx_popup.open();

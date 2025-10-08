@@ -24,6 +24,9 @@ impl ThemeName {
 pub struct Theme {
     pub boxed: bool,
 
+    pub primary_color: Option<Color>,
+    pub cancel_color: Option<Color>,
+
     pub fg: Option<Color>,
     pub fg_dim: Option<Color>,
     pub bg: Option<Color>,
@@ -49,47 +52,56 @@ impl Theme {
             ThemeName::Monochrome => Theme {
                 boxed: false,
 
-                fg: None,
-                fg_dim: None,
+                primary_color: None,
+                cancel_color: None,
+
+                fg: Some(Color::White),
+                fg_dim: Some(Color::Gray),
                 bg: None,
-                bg_dim: None,
+                bg_dim: Some(Color::DarkGray),
 
                 reversed: false,
 
-                select_active_bold: None,
-                select_active_fg: None,
-                select_inactive_fg: None,
-                select_focus_fg: None,
-                select_focus_bg: None,
+                select_active_bold: Some(true),
+                select_active_fg: Some(Color::White),
+                select_inactive_fg: Some(Color::Gray),
+                select_focus_fg: Some(Color::Black),
+                select_focus_bg: Some(Color::White),
 
-                popup_reversed: true,
-                popup_bg: None,
-                error_popup_bg: None,
+                popup_reversed: false,
+                popup_bg: Some(Color::Black),
+                error_popup_bg: Some(Color::Red),
                 border_type: BorderType::Plain,
             },
             ThemeName::MonochromeBoxed => Theme {
                 boxed: true,
 
-                fg: None,
-                fg_dim: None,
+                primary_color: None,
+                cancel_color: None,
+
+                fg: Some(Color::White),
+                fg_dim: Some(Color::Gray),
                 bg: None,
-                bg_dim: None,
+                bg_dim: Some(Color::DarkGray),
 
                 reversed: false,
 
-                select_active_bold: None,
-                select_active_fg: None,
-                select_inactive_fg: None,
-                select_focus_fg: None,
-                select_focus_bg: None,
+                select_active_bold: Some(true),
+                select_active_fg: Some(Color::White),
+                select_inactive_fg: Some(Color::Gray),
+                select_focus_fg: Some(Color::Black),
+                select_focus_bg: Some(Color::White),
 
-                popup_reversed: true,
-                popup_bg: None,
-                error_popup_bg: None,
+                popup_reversed: false,
+                popup_bg: Some(Color::Black),
+                error_popup_bg: Some(Color::Red),
                 border_type: BorderType::Plain,
             },
             ThemeName::DarkHacker => Theme {
                 boxed: false,
+
+                primary_color: Some(Color::LightGreen),
+                cancel_color: Some(Color::LightRed),
 
                 fg: Some(Color::White),
                 fg_dim: Some(Color::Gray),
@@ -111,6 +123,9 @@ impl Theme {
             },
             ThemeName::DarkHackerBoxed => Theme {
                 boxed: true,
+
+                primary_color: Some(Color::LightGreen),
+                cancel_color: Some(Color::LightRed),
 
                 fg: Some(Color::White),
                 fg_dim: Some(Color::Gray),
@@ -135,6 +150,22 @@ impl Theme {
 }
 
 impl Thematize for Theme {
+    fn cursor(&self) -> Style {
+        if let Some(primary_color) = self.primary_color {
+            Style::default().fg(Color::Black).bg(primary_color)
+        } else {
+            Style::default().add_modifier(Modifier::REVERSED)
+        }
+    }
+
+    fn cursor_cancelled(&self) -> Style {
+        if let Some(cancel_color) = self.cancel_color {
+            Style::default().fg(Color::Black).bg(cancel_color)
+        } else {
+            Style::default().add_modifier(Modifier::REVERSED)
+        }
+    }
+
     fn button_focused(&self) -> Style {
         if self.reversed {
             Style::default()

@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     sync::mpsc,
     thread::{self, JoinHandle},
     time::{Duration, Instant},
@@ -22,9 +23,8 @@ use ratatui::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    app::SharedState,
-    events::AppEvent,
-    traits::{Actions, Component},
+    app::SharedState, events::AppEvent, post_handle_event::PostHandleEventActions,
+    traits::Component,
 };
 use gm_utils::{
     account::{mine_wallet, AccountManager, AccountUtils},
@@ -115,6 +115,10 @@ impl AccountCreatePage {
 }
 
 impl Component for AccountCreatePage {
+    fn name(&self) -> Cow<'static, str> {
+        Cow::Borrowed("Create")
+    }
+
     async fn exit_threads(&mut self) {
         self.exit_signal.cancel();
 
@@ -130,20 +134,21 @@ impl Component for AccountCreatePage {
         &mut self,
         event: &AppEvent,
         area: Rect,
+        _popup_area: Rect,
         transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
-        let mut result = Actions::default();
+    ) -> crate::Result<PostHandleEventActions> {
+        let mut result = PostHandleEventActions::default();
 
         if self.exit_popup.is_open() {
             let r = self.exit_popup.handle_event(
-                event.key_event(),
+                event.input_event(),
                 area,
                 || Ok(()),
                 || -> crate::Result<()> {
-                    result.page_pop = true;
-                    result.reload = true;
+                    result.page_pop();
+                    result.reload();
                     Ok(())
                 },
             )?;
@@ -222,7 +227,7 @@ impl Component for AccountCreatePage {
                                     }
                                     KeyCode::Esc => {
                                         // When context goes back to previous page, it should reload state
-                                        result.reload = true;
+                                        result.reload();
                                     }
                                     _ => {}
                                 }
@@ -257,18 +262,18 @@ impl Component for AccountCreatePage {
                     Stage::Result => match input_event {
                         Event::Key(key_event) => match key_event.code {
                             KeyCode::Esc => {
-                                result.reload = true;
+                                result.reload();
                             }
                             KeyCode::Enter => {
-                                result.reload = true;
-                                result.page_pop = true;
+                                result.reload();
+                                result.page_pop();
                             }
                             _ => {}
                         },
                         Event::Mouse(mouse_event) => {
                             if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
-                                result.reload = true;
-                                result.page_pop = true;
+                                result.reload();
+                                result.page_pop();
                             }
                         }
                         _ => {}
@@ -289,7 +294,7 @@ impl Component for AccountCreatePage {
                 if shared_state.current_account.is_none() {
                     Config::set_current_account(addr)?;
                 }
-                result.reload = true;
+                result.reload();
                 self.stage = Stage::Result;
             }
             _ => {}

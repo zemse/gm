@@ -12,7 +12,9 @@ use ratatui::{
 use serde_json::json;
 use tokio::task::JoinHandle;
 
-use crate::{app::SharedState, error::FmtError, traits::Actions, AppEvent};
+use crate::{
+    app::SharedState, error::FmtError, post_handle_event::PostHandleEventActions, AppEvent,
+};
 
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub enum InviteCodeValidity {
@@ -143,8 +145,8 @@ impl InvitePopup {
         event: &AppEvent,
         tr: &mpsc::Sender<AppEvent>,
         ss: &SharedState,
-    ) -> crate::Result<Actions> {
-        let mut result = Actions::default();
+    ) -> crate::Result<PostHandleEventActions> {
+        let mut result = PostHandleEventActions::default();
 
         if self.check_thread.is_none() {
             if let Some(invite_code) = self.invite_code.as_ref() {

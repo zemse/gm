@@ -28,7 +28,10 @@ use serde_json::Value;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::{app::SharedState, error::FmtError, theme::Theme, traits::Actions, AppEvent};
+use crate::{
+    app::SharedState, error::FmtError, post_handle_event::PostHandleEventActions, theme::Theme,
+    AppEvent,
+};
 use gm_utils::{account::AccountManager, network::Network};
 
 #[derive(Clone, Default, Debug, PartialEq)]
@@ -46,17 +49,39 @@ pub enum TxStatus {
     Failed(FixedBytes<32>),
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct TxPopup {
     network: Network,
     tx_req: TransactionRequest,
     text: TextScroll,
     open: bool,
-    button_cursor: bool, // is cursor on the confirm button?
+
+    cancel_button: Button,
+    confirm_button: Button,
+    is_confirm_focused: bool,
+
     tx_hash: Option<FixedBytes<32>>,
     status: TxStatus,
     send_tx_thread: Option<JoinHandle<()>>,
     watch_tx_thread: Option<JoinHandle<()>>,
+}
+
+impl Default for TxPopup {
+    fn default() -> Self {
+        Self {
+            network: Network::default(),
+            tx_req: TransactionRequest::default(),
+            text: TextScroll::new(String::new(), true),
+            open: false,
+            cancel_button: Button::new("Cancel").with_success_kind(false),
+            confirm_button: Button::new("Confirm").with_success_kind(true),
+            is_confirm_focused: false,
+            tx_hash: None,
+            status: TxStatus::NotSent,
+            send_tx_thread: None,
+            watch_tx_thread: None,
+        }
+    }
 }
 
 impl TxPopup {
@@ -72,7 +97,7 @@ impl TxPopup {
 
     pub fn open(&mut self) {
         self.open = true;
-        self.button_cursor = true;
+        self.is_confirm_focused = true;
     }
 
     pub fn close(&mut self) {
@@ -99,7 +124,7 @@ impl TxPopup {
     }
 
     fn reset(&mut self) {
-        self.button_cursor = false;
+        self.is_confirm_focused = false;
         self.status = TxStatus::NotSent;
         self.tx_hash = None;
         if let Some(thread) = self.send_tx_thread.take() {
@@ -124,7 +149,7 @@ impl TxPopup {
         mut on_rpc_error: F3,
         mut on_cancel: F4,
         mut on_esc: F5,
-    ) -> crate::Result<Actions>
+    ) -> crate::Result<PostHandleEventActions>
     where
         F1: FnMut(FixedBytes<32>) -> crate::Result<()>,
         F2: FnMut(FixedBytes<32>) -> crate::Result<()>,
@@ -132,7 +157,7 @@ impl TxPopup {
         F4: FnMut() -> crate::Result<()>,
         F5: FnMut() -> crate::Result<()>,
     {
-        let mut result = Actions::default();
+        let mut result = PostHandleEventActions::default();
 
         self.text.handle_event(
             event.key_event(),
@@ -146,16 +171,16 @@ impl TxPopup {
                         match &self.status {
                             TxStatus::NotSent => match key_event.code {
                                 KeyCode::Left => {
-                                    if self.button_cursor {
-                                        result.ignore_left = true;
+                                    if self.is_confirm_focused {
+                                        result.ignore_left();
                                     }
-                                    self.button_cursor = false;
+                                    self.is_confirm_focused = false;
                                 }
                                 KeyCode::Right => {
-                                    self.button_cursor = true;
+                                    self.is_confirm_focused = true;
                                 }
                                 KeyCode::Enter => {
-                                    if self.button_cursor {
+                                    if self.is_confirm_focused {
                                         self.send_tx_thread = Some(send_tx_thread(
                                             &self.tx_req,
                                             &self.network,
@@ -240,8 +265,10 @@ impl TxPopup {
 
             let text_area = text_area.block_inner();
             if theme.boxed() {
-                let block = Block::bordered().title("Transaction");
-                block.render(inner_area, buf);
+                Block::bordered()
+                    .title("Transaction")
+                    .style(theme.style_dim())
+                    .render(inner_area, buf);
             } else {
                 let block = Block::default().title("Transaction");
                 block.render(inner_area, buf);
@@ -255,17 +282,19 @@ impl TxPopup {
 
             match &self.status {
                 TxStatus::NotSent => {
-                    Button {
-                        focus: !self.button_cursor,
-                        label: "Cancel",
-                    }
-                    .render(left_area.button_center(6), buf, &theme);
+                    self.cancel_button.render(
+                        left_area.button_center(6),
+                        buf,
+                        !self.is_confirm_focused,
+                        &theme,
+                    );
 
-                    Button {
-                        focus: self.button_cursor,
-                        label: "Confirm",
-                    }
-                    .render(right_area.button_center(7), buf, &theme);
+                    self.confirm_button.render(
+                        right_area.button_center(7),
+                        buf,
+                        !self.is_confirm_focused,
+                        &theme,
+                    );
                 }
                 TxStatus::JsonRpcError {
                     message,

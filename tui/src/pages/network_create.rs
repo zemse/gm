@@ -1,16 +1,21 @@
 use crate::app::SharedState;
 use crate::pages::token::TokenPage;
 use crate::pages::Page;
-use crate::traits::{Actions, Component};
+use crate::post_handle_event::PostHandleEventActions;
+use crate::traits::Component;
 use crate::AppEvent;
 use gm_ratatui_extra::act::Act;
+use gm_ratatui_extra::boolean_input::BooleanInput;
+use gm_ratatui_extra::button::Button;
 use gm_ratatui_extra::confirm_popup::ConfirmPopup;
 use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
+use gm_ratatui_extra::input_box_owned::InputBoxOwned;
 use gm_ratatui_extra::thematize::Thematize;
 use gm_utils::disk_storage::DiskStorageInterface;
 use gm_utils::network::{Network, NetworkStore, Token};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use std::borrow::Cow;
 use std::ops::Not;
 use std::sync::mpsc::Sender;
 use strum::{Display, EnumIter};
@@ -52,106 +57,60 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Edit Network"),
             FormItem::Name => FormWidget::InputBox {
-                label: "Name",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Name"),
             },
             FormItem::NameAlchemy => FormWidget::InputBox {
-                label: "Name Alchemy",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Name Alchemy"),
             },
             FormItem::NameAliases => FormWidget::InputBox {
-                label: "Name Aliases",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Name Aliases"),
             },
             FormItem::ChainId => FormWidget::InputBox {
-                label: "Chain Id",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Chain Id"),
             },
             FormItem::Symbol => FormWidget::InputBox {
-                label: "Symbol",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Symbol"),
             },
             FormItem::NativeDecimals => FormWidget::InputBox {
-                label: "Native Decimals",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Native Decimals"),
             },
             FormItem::PriceTicker => FormWidget::InputBox {
-                label: "Price Ticker",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Price Ticker"),
             },
             FormItem::RpcUrl => FormWidget::InputBox {
-                label: "RPC Url",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("RPC Url"),
             },
             FormItem::RpcAlchemy => FormWidget::InputBox {
-                label: "RPC Alchemy Url",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("RPC Alchemy Url"),
             },
             FormItem::RpcInfura => FormWidget::InputBox {
-                label: "RPC Infura Url",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("RPC Infura Url"),
             },
             FormItem::ExplorerUrl => FormWidget::InputBox {
-                label: "Explorer Url",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Explorer Url"),
             },
             FormItem::IsTestnet => FormWidget::BooleanInput {
-                label: "Testnet",
-                value: false,
+                widget: BooleanInput::new("Is Testnet", false),
             },
             FormItem::RpcPort => FormWidget::InputBox {
-                label: "RPC Port",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("RPC Port"),
             },
             FormItem::ChainlinkNativePriceFeed => FormWidget::InputBox {
-                label: "Chainlink Native Price Feed",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Chainlink Native Price Feed"),
             },
             FormItem::ChainlinkNativePriceFeedDecimals => FormWidget::InputBox {
-                label: "Chainlink Native Price Feed Decimals",
-                text: String::new(),
-                empty_text: None,
-                currency: None,
+                widget: InputBoxOwned::new("Chainlink Native Price Feed Decimals"),
             },
             FormItem::TokensButton => FormWidget::Button {
-                label: "Tokens",
-                hover_focus: false,
+                widget: Button::new("Tokens"),
             },
             FormItem::LineBreak1 => FormWidget::LineBreak,
             FormItem::SaveButton => FormWidget::Button {
-                label: "Save",
-                hover_focus: false,
+                widget: Button::new("Save"),
             },
             FormItem::LineBreak2 => FormWidget::LineBreak,
             FormItem::RemoveButton => FormWidget::Button {
-                label: "Remove",
-                hover_focus: false,
+                widget: Button::new("Remove"),
             },
             FormItem::ErrorText => FormWidget::ErrorText(String::new()),
         };
@@ -161,6 +120,7 @@ impl TryFrom<FormItem> for FormWidget {
 
 #[derive(Debug)]
 pub struct NetworkCreatePage {
+    pub is_new: bool,
     pub form: Form<FormItem, crate::Error>,
     pub tokens: Vec<Token>,
     pub network_index: usize,
@@ -168,54 +128,59 @@ pub struct NetworkCreatePage {
     pub remove_popup: ConfirmPopup,
 }
 impl NetworkCreatePage {
-    pub fn new(network_index: usize, network: Network) -> crate::Result<Self> {
+    pub fn new(is_new: bool, network_index: usize, network: Network) -> crate::Result<Self> {
         let config = NetworkStore::load()?;
 
         Ok(Self {
+            is_new,
             network: network.clone(),
             form: Form::init(|form| {
-                *form.get_text_mut(FormItem::Name) = network.name.clone();
+                form.set_text(FormItem::Name, network.name.clone());
                 if let Some(name_alchemy) = network.name_alchemy {
-                    *form.get_text_mut(FormItem::NameAlchemy) = name_alchemy;
+                    form.set_text(FormItem::NameAlchemy, name_alchemy);
                 }
                 if network.name_aliases.is_empty().not() {
-                    *form.get_text_mut(FormItem::NameAliases) = network.name_aliases[0].clone();
+                    form.set_text(FormItem::NameAliases, network.name_aliases[0].clone());
                 }
 
-                *form.get_text_mut(FormItem::ChainId) = network.chain_id.to_string();
+                form.set_text(FormItem::ChainId, network.chain_id.to_string());
                 if let Some(symbol) = network.symbol {
-                    *form.get_text_mut(FormItem::Symbol) = symbol;
+                    form.set_text(FormItem::Symbol, symbol);
                 }
                 if let Some(native_decimals) = network.native_decimals {
-                    *form.get_text_mut(FormItem::NativeDecimals) = native_decimals.to_string();
+                    form.set_text(FormItem::NativeDecimals, native_decimals.to_string());
                 }
                 if let Some(price_ticker) = network.price_ticker {
-                    *form.get_text_mut(FormItem::PriceTicker) = price_ticker;
+                    form.set_text(FormItem::PriceTicker, price_ticker);
                 }
                 if let Some(rpc_url) = network.rpc_url {
-                    *form.get_text_mut(FormItem::RpcUrl) = rpc_url;
+                    form.set_text(FormItem::RpcUrl, rpc_url);
                 }
                 if let Some(rpc_alchemy) = network.rpc_alchemy {
-                    *form.get_text_mut(FormItem::RpcAlchemy) = rpc_alchemy;
+                    form.set_text(FormItem::RpcAlchemy, rpc_alchemy);
                 }
                 if let Some(rpc_infura) = network.rpc_infura {
-                    *form.get_text_mut(FormItem::RpcInfura) = rpc_infura;
+                    form.set_text(FormItem::RpcInfura, rpc_infura);
                 }
                 if let Some(explorer_url) = network.explorer_url {
-                    *form.get_text_mut(FormItem::ExplorerUrl) = explorer_url;
+                    form.set_text(FormItem::ExplorerUrl, explorer_url);
                 }
                 if let Some(rpc_port) = network.rpc_port {
-                    *form.get_text_mut(FormItem::RpcPort) = rpc_port.to_string();
+                    form.set_text(FormItem::RpcPort, rpc_port.to_string());
                 }
                 if let Some(chainlink_native_price_feed) = network.chainlink_native_price_feed {
-                    *form.get_text_mut(FormItem::ChainlinkNativePriceFeed) =
-                        chainlink_native_price_feed.to_string()
+                    form.set_text(
+                        FormItem::ChainlinkNativePriceFeed,
+                        chainlink_native_price_feed.to_string(),
+                    )
                 }
                 if let Some(chainlink_native_price_feed_decimals) =
                     network.chainlink_native_price_feed_decimals
                 {
-                    *form.get_text_mut(FormItem::ChainlinkNativePriceFeedDecimals) =
-                        chainlink_native_price_feed_decimals.to_string()
+                    form.set_text(
+                        FormItem::ChainlinkNativePriceFeedDecimals,
+                        chainlink_native_price_feed_decimals.to_string(),
+                    )
                 }
                 if config.networks.get(network_index).is_none() {
                     form.hide_item(FormItem::RemoveButton);
@@ -240,61 +205,57 @@ impl NetworkCreatePage {
 
     fn network(form: &Form<FormItem, crate::Error>, tokens: &[Token]) -> crate::Result<Network> {
         Ok(Network {
-            name: form.get_text(FormItem::Name).clone(),
+            name: form.get_text(FormItem::Name).to_string(),
             name_alchemy: form
                 .get_text(FormItem::NameAlchemy)
                 .is_empty()
                 .not()
-                .then(|| form.get_text(FormItem::NameAlchemy).clone()),
-            name_aliases: vec![form.get_text(FormItem::NameAliases).clone()],
+                .then(|| form.get_text(FormItem::NameAlchemy).to_string()),
+            name_aliases: vec![form.get_text(FormItem::NameAliases).to_string()],
             chain_id: form.get_text(FormItem::ChainId).parse().unwrap_or_default(),
             symbol: form
                 .get_text(FormItem::Symbol)
                 .is_empty()
                 .not()
-                .then(|| form.get_text(FormItem::Symbol).clone()),
+                .then(|| form.get_text(FormItem::Symbol).to_string()),
             native_decimals: form.get_text(FormItem::NativeDecimals).parse().ok(),
             price_ticker: form
                 .get_text(FormItem::PriceTicker)
                 .is_empty()
                 .not()
-                .then(|| form.get_text(FormItem::PriceTicker).clone()),
+                .then(|| form.get_text(FormItem::PriceTicker).to_string()),
             rpc_url: form
                 .get_text(FormItem::RpcUrl)
                 .is_empty()
                 .not()
-                .then(|| form.get_text(FormItem::RpcUrl).clone()),
+                .then(|| form.get_text(FormItem::RpcUrl).to_string()),
             rpc_alchemy: form
                 .get_text(FormItem::RpcAlchemy)
                 .is_empty()
                 .not()
-                .then(|| form.get_text(FormItem::RpcAlchemy).clone()),
+                .then(|| form.get_text(FormItem::RpcAlchemy).to_string()),
             rpc_infura: form
                 .get_text(FormItem::RpcInfura)
                 .is_empty()
                 .not()
-                .then(|| form.get_text(FormItem::RpcInfura).clone()),
+                .then(|| form.get_text(FormItem::RpcInfura).to_string()),
             explorer_url: form
                 .get_text(FormItem::ExplorerUrl)
                 .is_empty()
                 .not()
-                .then(|| form.get_text(FormItem::ExplorerUrl).clone()),
+                .then(|| form.get_text(FormItem::ExplorerUrl).to_string()),
             is_testnet: form.get_boolean(FormItem::IsTestnet),
             rpc_port: form
                 .get_text(FormItem::RpcPort)
                 .is_empty()
                 .not()
-                .then(|| form.get_text(FormItem::RpcPort).clone().parse())
+                .then(|| form.get_text(FormItem::RpcPort).parse())
                 .transpose()?,
             chainlink_native_price_feed: form
                 .get_text(FormItem::ChainlinkNativePriceFeed)
                 .is_empty()
                 .not()
-                .then(|| {
-                    form.get_text(FormItem::ChainlinkNativePriceFeed)
-                        .clone()
-                        .parse()
-                })
+                .then(|| form.get_text(FormItem::ChainlinkNativePriceFeed).parse())
                 .transpose()
                 .map_err(crate::Error::FromHexError)?,
             chainlink_native_price_feed_decimals: form
@@ -303,7 +264,6 @@ impl NetworkCreatePage {
                 .not()
                 .then(|| {
                     form.get_text(FormItem::ChainlinkNativePriceFeedDecimals)
-                        .clone()
                         .parse()
                 })
                 .transpose()?,
@@ -313,27 +273,32 @@ impl NetworkCreatePage {
 }
 
 impl Component for NetworkCreatePage {
+    fn name(&self) -> Cow<'static, str> {
+        Cow::Borrowed("Create")
+    }
+
     fn handle_event(
         &mut self,
         event: &AppEvent,
         area: Rect,
+        popup_area: Rect,
         _transmitter: &Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
-        let mut handle_result = Actions::default();
+    ) -> crate::Result<PostHandleEventActions> {
+        let mut handle_result = PostHandleEventActions::default();
         if self.remove_popup.is_open() {
             let r = self.remove_popup.handle_event(
-                event.key_event(),
-                area,
+                event.input_event(),
+                popup_area,
                 || -> crate::Result<()> {
                     let mut config = NetworkStore::load()?;
                     if config.networks.get(self.network_index).is_some() {
                         config.networks.remove(self.network_index);
                     }
                     let _ = config.save();
-                    handle_result.page_pop = true;
-                    handle_result.reload = true;
+                    handle_result.page_pop();
+                    handle_result.reload();
                     Ok(())
                 },
                 || Ok(()),
@@ -341,18 +306,22 @@ impl Component for NetworkCreatePage {
             handle_result.merge(r);
         }
         let r = self.form.handle_event(
-            event.input_event(),
+            event.widget_event().as_ref(),
             area,
             |_, _| Ok(()),
             |label, form| {
                 match label {
                     FormItem::SaveButton => {
                         if form.get_text(FormItem::Name).is_empty() {
-                            let error = form.get_text_mut(FormItem::ErrorText);
-                            *error = "Please enter name, you cannot leave it empty".to_string();
+                            form.set_text(
+                                FormItem::ErrorText,
+                                "Please enter name, you cannot leave it empty".to_string(),
+                            );
                         } else if form.get_text(FormItem::ChainId).is_empty() {
-                            let error = form.get_text_mut(FormItem::ErrorText);
-                            *error = "Please enter chain id, you cannot leave it empty".to_string();
+                            form.set_text(
+                                FormItem::ErrorText,
+                                "Please enter chain id, you cannot leave it empty".to_string(),
+                            );
                         } else {
                             let mut config = NetworkStore::load()?;
                             if config.networks.get(self.network_index).is_some() {
@@ -362,17 +331,15 @@ impl Component for NetworkCreatePage {
                                 config.networks.push(Self::network(form, &self.tokens)?);
                             }
                             let _ = config.save();
-                            handle_result.page_pop = true;
-                            handle_result.reload = true;
+                            handle_result.page_pop();
+                            handle_result.reload();
                         }
                     }
                     FormItem::TokensButton => {
                         let network = Self::network(form, &self.tokens)?;
-                        handle_result.page_pop = true;
                         handle_result
-                            .page_inserts
-                            .push(Page::Token(TokenPage::new(self.network_index, network)?));
-                        handle_result.reload = true;
+                            .page_insert(Page::Token(TokenPage::new(self.network_index, network)?));
+                        // TODO should not allow going to tokens if network is not saved, do something about this
                     }
                     FormItem::RemoveButton => {
                         self.remove_popup.open();

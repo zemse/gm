@@ -1,15 +1,17 @@
 use std::sync::mpsc;
 
 use alloy::signers::SignerSync;
-use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
+use gm_ratatui_extra::{
+    button::Button,
+    form::{Form, FormItemIndex, FormWidget},
+    input_box_owned::InputBoxOwned,
+};
 use ratatui::{buffer::Buffer, layout::Rect};
 use strum::{Display, EnumIter};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    app::SharedState,
-    traits::{Actions, Component},
-    AppEvent,
+    app::SharedState, post_handle_event::PostHandleEventActions, traits::Component, AppEvent,
 };
 use gm_utils::account::AccountManager;
 
@@ -37,14 +39,10 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Sign a Message"),
             FormItem::Message => FormWidget::InputBox {
-                label: "Message",
-                text: String::new(),
-                empty_text: Some("Type message to sign"),
-                currency: None,
+                widget: InputBoxOwned::new("Message").with_empty_text("Type message to sign"),
             },
             FormItem::SignMessageButton => FormWidget::Button {
-                label: "Sign Message",
-                hover_focus: false,
+                widget: Button::new("Sign Message"),
             },
             FormItem::LineBreak => FormWidget::LineBreak,
             FormItem::Signature => FormWidget::DisplayText(String::new()),
@@ -70,12 +68,13 @@ impl Component for SignMessagePage {
         &mut self,
         event: &AppEvent,
         area: Rect,
+        _popup_area: Rect,
         _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
+    ) -> crate::Result<PostHandleEventActions> {
         self.form.handle_event(
-            event.input_event(),
+            event.widget_event().as_ref(),
             area,
             |_, _| Ok(()),
             |item, form| {
@@ -87,7 +86,7 @@ impl Component for SignMessagePage {
                     let wallet_address = shared_state.try_current_account()?;
                     let wallet = AccountManager::load_wallet(&wallet_address)?;
                     let signature = wallet.sign_message_sync(message.as_bytes())?;
-                    *form.get_text_mut(FormItem::Signature) = format!("Signature:\n{signature}");
+                    form.set_text(FormItem::Signature, format!("Signature:\n{signature}"));
                 }
                 Ok(())
             },

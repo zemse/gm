@@ -7,9 +7,11 @@ use std::{
 use alloy::{hex, rpc::types::TransactionRequest};
 use gm_ratatui_extra::{
     act::Act,
+    button::Button,
     confirm_popup::ConfirmPopup,
     cursor::Cursor,
     form::{Form, FormItemIndex, FormWidget},
+    input_box_owned::InputBoxOwned,
     select::Select,
     thematize::Thematize,
 };
@@ -38,7 +40,8 @@ use crate::{
         sign_typed_data_popup::SignTypedDataPopup,
         tx_popup::TxPopup,
     },
-    traits::{Actions, Component},
+    post_handle_event::PostHandleEventActions,
+    traits::Component,
     AppEvent,
 };
 use gm_utils::network::Network;
@@ -138,14 +141,11 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Wallet Connect"),
             FormItem::UriInput => FormWidget::InputBox {
-                label: "URI",
-                text: String::new(),
-                empty_text: Some("Paste Walletconnect URI from dapp"),
-                currency: None,
+                widget: InputBoxOwned::new("URL")
+                    .with_empty_text("Paste Walletconnect URI from dapp"),
             },
             FormItem::ConnectButton => FormWidget::Button {
-                label: "Connect",
-                hover_focus: false,
+                widget: Button::new("Connect"),
             },
         };
         Ok(widget)
@@ -194,8 +194,7 @@ impl WalletConnectPage {
     }
 
     pub fn set_uri(&mut self, uri: &str) {
-        let input = self.form.get_text_mut(FormItem::UriInput);
-        *input = uri.to_string();
+        self.form.set_text(FormItem::UriInput, uri.to_string());
     }
 
     fn open_request_at_cursor(&mut self) -> crate::Result<()> {
@@ -283,11 +282,12 @@ impl Component for WalletConnectPage {
         &mut self,
         event: &AppEvent,
         area: Rect,
+        _popup_area: Rect,
         tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
         ss: &SharedState,
-    ) -> crate::Result<Actions> {
-        let mut handle_result = Actions::default();
+    ) -> crate::Result<PostHandleEventActions> {
+        let mut handle_result = PostHandleEventActions::default();
 
         let any_popup_open_before = self.confirm_popup.is_open()
             || self.exit_popup.is_open()
@@ -358,7 +358,7 @@ impl Component for WalletConnectPage {
         // Handle based on what's active on the UI
         if self.confirm_popup.is_open() {
             let r = self.confirm_popup.handle_event(
-                event.key_event(),
+                event.input_event(),
                 area,
                 || -> crate::Result<()> {
                     let pairing = self
@@ -576,24 +576,24 @@ impl Component for WalletConnectPage {
             handle_result.merge(r);
         } else if self.exit_popup.is_open() {
             let r = self.exit_popup.handle_event(
-                event.key_event(),
+                event.input_event(),
                 area,
                 || Ok(()),
                 || -> crate::Result<()> {
                     go_back = true;
-                    handle_result.page_pop = true;
+                    handle_result.page_pop();
                     Ok(())
                 },
             )?;
             handle_result.merge(r);
         } else if self.status == WalletConnectStatus::Idle {
             let r = self.form.handle_event(
-                event.input_event(),
+                event.widget_event().as_ref(),
                 area,
                 |_, _| Ok(()),
                 |item, form| {
                     if item == FormItem::ConnectButton {
-                        let uri_input = form.get_text(FormItem::UriInput).clone();
+                        let uri_input = form.get_text(FormItem::UriInput).to_string();
                         let current_account = ss.current_account.unwrap(); // TODO ensure we can see this page only if account exists
                         let tr = tr.clone();
 

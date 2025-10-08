@@ -4,9 +4,7 @@ use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    app::SharedState,
-    traits::{Actions, Component},
-    AppEvent,
+    app::SharedState, post_handle_event::PostHandleEventActions, traits::Component, AppEvent,
 };
 
 #[derive(Default, Debug)]
@@ -19,15 +17,16 @@ impl Component for DevKeyCapturePage {
         &mut self,
         event: &AppEvent,
         _area: Rect,
+        _popup_area: Rect,
         _transmitter: &Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
+    ) -> crate::Result<PostHandleEventActions> {
         if let AppEvent::Input(key_event) = event {
             self.data = Some(format!("{key_event:?}"))
         }
 
-        Ok(Actions::default())
+        Ok(PostHandleEventActions::default())
     }
 
     fn render_component(

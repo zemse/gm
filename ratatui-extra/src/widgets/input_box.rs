@@ -184,12 +184,12 @@ impl InputBox<'_> {
         };
 
         let inner_area = if theme.boxed() {
-            let block = Block::bordered()
+            Block::bordered()
                 .border_type(theme.border_type())
-                .title(self.label);
-            let inner_area = block.inner(area_used);
-            block.render(area_used, buf);
-            inner_area.margin_h(1)
+                .style(theme.style_dim())
+                .title(self.label)
+                .render(area_used, buf);
+            area_used.block_inner().margin_h(1)
         } else {
             Span::raw(self.label)
                 .style(theme.style_dim())

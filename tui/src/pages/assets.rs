@@ -6,9 +6,7 @@ use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    app::SharedState,
-    traits::{Actions, Component},
-    AppEvent,
+    app::SharedState, post_handle_event::PostHandleEventActions, traits::Component, AppEvent,
 };
 
 use super::{asset_transfer::AssetTransferPage, Page};
@@ -43,24 +41,23 @@ impl Component for AssetsPage {
         &mut self,
         event: &AppEvent,
         area: Rect,
+        _popup_area: Rect,
         _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
+    ) -> crate::Result<PostHandleEventActions> {
         let assets = shared_state.assets_read()?;
 
         if let AppEvent::AssetsUpdate(_, _) = event {
             self.select.update_list(assets);
         }
 
-        let mut handle_result = Actions::default();
+        let mut handle_result = PostHandleEventActions::default();
         self.select.handle_event(
             event.input_event(),
             area,
             |asset| {
-                handle_result
-                    .page_inserts
-                    .push(Page::AssetTransfer(AssetTransferPage::new(asset)?));
+                handle_result.page_insert(Page::AssetTransfer(AssetTransferPage::new(asset)?));
                 Ok::<(), crate::Error>(())
             },
             |_| Ok(()),

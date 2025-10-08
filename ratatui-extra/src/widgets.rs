@@ -1,3 +1,4 @@
+pub mod boolean_input;
 pub mod button;
 pub mod candle_chart;
 pub mod confirm_popup;
@@ -7,6 +8,7 @@ pub mod filter_select_owned;
 pub mod filter_select_popup;
 pub mod form;
 pub mod input_box;
+pub mod input_box_owned;
 pub mod popup;
 pub mod scroll_bar;
 pub mod select;

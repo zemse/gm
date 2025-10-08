@@ -4,7 +4,10 @@ use alloy::{
     primitives::Address,
     signers::{k256::ecdsa::SigningKey, Signature},
 };
-use gm_ratatui_extra::candle_chart::{Candle, Interval};
+use gm_ratatui_extra::{
+    candle_chart::{Candle, Interval},
+    event::WidgetEvent,
+};
 use ratatui::crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers, MouseEvent,
 };
@@ -22,13 +25,10 @@ use crate::pages::{
     walletconnect::WalletConnectStatus,
 };
 
-pub mod assets;
-pub mod helios;
-pub mod input;
-pub mod recent_addresses;
-
 #[derive(Debug)]
 pub enum AppEvent {
+    Tick,
+
     Input(Event),
 
     AccountChange(Address),
@@ -131,6 +131,14 @@ impl AppEvent {
                 ..
             })) if *code == key,
         )
+    }
+
+    pub fn widget_event(&self) -> Option<WidgetEvent> {
+        match self {
+            AppEvent::Tick => Some(WidgetEvent::Tick),
+            AppEvent::Input(event) => Some(WidgetEvent::InputEvent(event.clone())),
+            _ => None,
+        }
     }
 
     pub fn input_event(&self) -> Option<&Event> {

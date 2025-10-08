@@ -1,8 +1,8 @@
 use crate::app::SharedState;
-use crate::pages::network_create::NetworkCreatePage;
 use crate::pages::token_create::TokenCreatePage;
 use crate::pages::Page;
-use crate::traits::{Actions, Component};
+use crate::post_handle_event::PostHandleEventActions;
+use crate::traits::Component;
 use crate::AppEvent;
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::cursor::Cursor;
@@ -72,14 +72,15 @@ impl Component for TokenPage {
         &mut self,
         event: &AppEvent,
         _area: Rect,
+        _popup_area: Rect,
         _transmitter: &Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
+    ) -> crate::Result<PostHandleEventActions> {
         let cursor_max = self.list.len();
         self.cursor.handle(event.key_event(), cursor_max);
 
-        let mut handle_result = Actions::default();
+        let mut handle_result = PostHandleEventActions::default();
         handle_result.ignore_esc();
         if let AppEvent::Input(input_event) = event {
             match input_event {
@@ -90,17 +91,15 @@ impl Component for TokenPage {
                             KeyCode::Enter => match &self.list[self.cursor.current] {
                                 TokenSelect::Create => {
                                     let token_index = self.network.tokens.len();
-                                    handle_result.page_pop = true;
-                                    handle_result.page_inserts.push(Page::TokenCreate(
+                                    handle_result.page_insert(Page::TokenCreate(
                                         TokenCreatePage::new(
+                                            true,
                                             token_index,
                                             self.network_index,
                                             self.network.clone(),
                                         )?,
                                     ));
-                                    handle_result.reload = true;
                                 }
-
                                 TokenSelect::Existing(token) => {
                                     let token_index = self
                                         .network
@@ -108,25 +107,24 @@ impl Component for TokenPage {
                                         .iter()
                                         .position(|t| t.contract_address == token.contract_address)
                                         .unwrap();
-                                    handle_result.page_pop = true;
-                                    handle_result.page_inserts.push(Page::TokenCreate(
+                                    handle_result.page_insert(Page::TokenCreate(
                                         TokenCreatePage::new(
+                                            false,
                                             token_index,
                                             self.network_index,
                                             self.network.clone(),
                                         )?,
                                     ));
-                                    handle_result.reload = true;
                                 }
                             },
                             KeyCode::Esc => {
-                                handle_result.page_pop = true;
-                                handle_result.page_inserts.push(Page::NetworkCreate(
-                                    NetworkCreatePage::new(
-                                        self.network_index,
-                                        self.network.clone(),
-                                    )?,
-                                ));
+                                // handle_result.page_pop();
+                                // handle_result.page_inserts.push(Page::NetworkCreate(
+                                //     NetworkCreatePage::new(
+                                //         self.network_index,
+                                //         self.network.clone(),
+                                //     )?,
+                                // ));
                             }
                             _ => {}
                         }

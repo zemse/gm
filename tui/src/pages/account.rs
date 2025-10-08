@@ -1,9 +1,7 @@
 use std::{fmt::Display, sync::mpsc};
 
 use crate::{
-    app::SharedState,
-    traits::{Actions, Component},
-    AppEvent,
+    app::SharedState, post_handle_event::PostHandleEventActions, traits::Component, AppEvent,
 };
 use alloy::primitives::Address;
 use gm_ratatui_extra::{extensions::ThemedWidget, select_owned::SelectOwned};
@@ -68,11 +66,12 @@ impl Component for AccountPage {
         &mut self,
         event: &AppEvent,
         _area: Rect,
+        _popup_area: Rect,
         transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
-    ) -> crate::Result<Actions> {
-        let mut result = Actions::default();
+    ) -> crate::Result<PostHandleEventActions> {
+        let mut result = PostHandleEventActions::default();
 
         self.select.handle_event(
             event.input_event(),
@@ -80,20 +79,16 @@ impl Component for AccountPage {
             |account_select| {
                 match account_select {
                     AccountSelect::Create => {
-                        result
-                            .page_inserts
-                            .push(Page::AccountCreate(AccountCreatePage::default()));
+                        result.page_insert(Page::AccountCreate(AccountCreatePage::default()));
                     }
                     AccountSelect::Import => {
-                        result
-                            .page_inserts
-                            .push(Page::AccountImport(AccountImportPage::default()));
+                        result.page_insert(Page::AccountImport(AccountImportPage::default()));
                     }
                     AccountSelect::Existing(address) => {
                         Config::set_current_account(*address)?;
                         transmitter.send(AppEvent::AccountChange(*address))?;
                         transmitter.send(AppEvent::ConfigUpdate)?;
-                        result.page_pop = true;
+                        result.page_pop();
                     }
                 }
                 Ok::<(), crate::Error>(())

@@ -4,6 +4,10 @@ use ratatui::{
 };
 
 pub trait Thematize {
+    fn cursor(&self) -> Style;
+
+    fn cursor_cancelled(&self) -> Style;
+
     fn popup(&self) -> Self;
 
     fn error_popup(&self) -> Self;
@@ -33,6 +37,14 @@ pub struct DefaultTheme {
 }
 
 impl Thematize for DefaultTheme {
+    fn cursor(&self) -> Style {
+        Style::default().add_modifier(Modifier::REVERSED)
+    }
+
+    fn cursor_cancelled(&self) -> Style {
+        Style::default().add_modifier(Modifier::REVERSED)
+    }
+
     fn popup(&self) -> DefaultTheme {
         DefaultTheme {
             reversed: !self.reversed,
