@@ -53,7 +53,7 @@ pub enum AppEvent {
     TxUpdate(TxStatus),
     TxError(String),
 
-    SignResult(Signature),
+    SignResult(Address, Signature),
     SignError(String),
 
     WalletConnectStatus(WalletConnectStatus),

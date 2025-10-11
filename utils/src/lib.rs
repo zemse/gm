@@ -7,6 +7,7 @@ pub mod config;
 pub mod disk_storage;
 pub mod erc20;
 pub mod error;
+pub mod etherscan;
 pub mod inquire;
 pub mod log;
 pub mod network;

@@ -35,18 +35,18 @@ fn spawn_sign_thread(
     shared_state: &SharedState,
 ) -> crate::Result<JoinHandle<()>> {
     let tr = tr.clone();
-    let sender_account = shared_state
+    let signer_account = shared_state
         .current_account
         .ok_or(crate::Error::CurrentAccountNotSet)?;
 
     Ok(tokio::spawn(async move {
-        let _ = match run(digest, sender_account).await {
-            Ok(sig) => tr.send(AppEvent::SignResult(sig)),
+        let _ = match run(digest, signer_account).await {
+            Ok(sig) => tr.send(AppEvent::SignResult(signer_account, sig)),
             Err(err) => tr.send(AppEvent::SignError(err.fmt_err("SignError"))),
         };
 
-        async fn run(digest: B256, sender_account: Address) -> crate::Result<Signature> {
-            let wallet = AccountManager::load_wallet(&sender_account)?;
+        async fn run(digest: B256, signer_account: Address) -> crate::Result<Signature> {
+            let wallet = AccountManager::load_wallet(&signer_account)?;
             Ok(wallet.sign_hash(&digest).await?)
         }
     }))
@@ -204,7 +204,7 @@ impl SignTypedDataPopup {
                     Event::Mouse(_mouse_event) => {}
                     _ => {}
                 },
-                AppEvent::SignResult(signature) => {
+                AppEvent::SignResult(_, signature) => {
                     on_signature(signature)?;
                     self.status = SignStatus::Done;
 

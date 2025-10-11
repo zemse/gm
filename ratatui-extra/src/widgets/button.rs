@@ -3,7 +3,6 @@ use crate::extensions::KeyEventExt;
 use crate::extensions::MouseEventExt;
 use crate::extensions::RectExt;
 use crate::thematize::Thematize;
-use gm_utils::gm_log;
 use ratatui::crossterm::event::KeyCode;
 use ratatui::crossterm::event::MouseButton;
 use ratatui::crossterm::event::MouseEventKind;
@@ -55,10 +54,6 @@ impl Button {
                     match mouse_event.kind {
                         MouseEventKind::Moved => {
                             let new_focus = button_area.contains(mouse_event.position());
-
-                            if new_focus {
-                                gm_log!("Button hover {new_focus} in {}", self.label);
-                            }
                             on_focus_update(new_focus)?;
                             self.hover_focus = new_focus;
                         }

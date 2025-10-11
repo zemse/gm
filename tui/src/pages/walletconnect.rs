@@ -511,39 +511,36 @@ impl Component for WalletConnectPage {
             )?;
             handle_result.merge(r);
         } else if self.sign_popup.is_open() {
-            let r = self
+            if let Some(sign_popup_event) = self
                 .sign_popup
-                .handle_event((event, area, tr, ss), |sign_event| {
-                    match sign_event {
-                        SignPopupEvent::Signed(signature) => {
-                            let (req, tr_2) = get_req_tr_2()?;
-                            tr_2.send(WcEvent::Message(Box::new(req.create_response(
-                                WcData::SessionRequestResponse(Value::String(
-                                    hex::encode_prefixed(signature.as_bytes()),
-                                )),
-                                None,
-                            ))))?;
-                            remove_current_request = true;
-                        }
-                        SignPopupEvent::Rejected => {
-                            let (req, tr_2) = get_req_tr_2()?;
-                            tr_2.send(WcEvent::Message(Box::new(req.create_response(
-                                WcData::Error {
-                                    message: "User denied msg signing".to_string(),
-                                    code: 5000,
-                                    data: None,
-                                },
-                                Some(IrnTag::SessionRequestResponse),
-                            ))))?;
-                            remove_current_request_2 = true;
-                        }
-                        SignPopupEvent::EscapedBeforeSigning
-                        | SignPopupEvent::EscapedAfterSigning => {}
+                .handle_event((event, area, tr, ss), &mut handle_result)?
+            {
+                match sign_popup_event {
+                    SignPopupEvent::Signed(_, signature) => {
+                        let (req, tr_2) = get_req_tr_2()?;
+                        tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                            WcData::SessionRequestResponse(Value::String(hex::encode_prefixed(
+                                signature.as_bytes(),
+                            ))),
+                            None,
+                        ))))?;
+                        remove_current_request = true;
                     }
-
-                    Ok(())
-                })?;
-            handle_result.merge(r);
+                    SignPopupEvent::Rejected => {
+                        let (req, tr_2) = get_req_tr_2()?;
+                        tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                            WcData::Error {
+                                message: "User denied msg signing".to_string(),
+                                code: 5000,
+                                data: None,
+                            },
+                            Some(IrnTag::SessionRequestResponse),
+                        ))))?;
+                        remove_current_request_2 = true;
+                    }
+                    SignPopupEvent::EscapedBeforeSigning | SignPopupEvent::EscapedAfterSigning => {}
+                }
+            }
         } else if self.sign_typed_data_popup.is_open() {
             let r = self.sign_typed_data_popup.handle_event(
                 (event, area, tr, ss),

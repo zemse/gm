@@ -32,17 +32,17 @@ pub fn sign_thread(
 ) -> crate::Result<JoinHandle<()>> {
     let message = message.to_string();
     let tr = tr.clone();
-    let sender_account = shared_state.try_current_account()?;
+    let signer_account = shared_state.try_current_account()?;
 
     Ok(tokio::spawn(async move {
-        let _ = match run(message, sender_account).await {
-            Ok(sig) => tr.send(AppEvent::SignResult(sig)),
+        let _ = match run(message, signer_account).await {
+            Ok(sig) => tr.send(AppEvent::SignResult(signer_account, sig)),
             // TODO have `run` return a scoped error so we don't have to send back string
             Err(err) => tr.send(AppEvent::SignError(format!("{err:?}"))),
         };
 
-        async fn run(message: String, sender_account: Address) -> crate::Result<Signature> {
-            let wallet = AccountManager::load_wallet(&sender_account)?;
+        async fn run(message: String, signer_account: Address) -> crate::Result<Signature> {
+            let wallet = AccountManager::load_wallet(&signer_account)?;
 
             let data = match hex::decode(&message) {
                 Ok(bytes) => bytes,
@@ -63,7 +63,7 @@ enum SignStatus {
 }
 
 pub enum SignPopupEvent {
-    Signed(Signature),
+    Signed(Address, Signature),
     Rejected,
     EscapedBeforeSigning,
     EscapedAfterSigning,
@@ -120,6 +120,11 @@ impl SignPopup {
         self.reset();
     }
 
+    pub fn set_msg_utf8(&mut self, msg: String) {
+        self.text.text = msg;
+        self.reset();
+    }
+
     fn reset(&mut self) {
         self.is_confirm_focused = false;
         self.status = SignStatus::Idle;
@@ -128,73 +133,74 @@ impl SignPopup {
         }
     }
 
-    pub fn handle_event<F>(
+    pub fn handle_event(
         &mut self,
         (event, area, tr, ss): (&AppEvent, Rect, &mpsc::Sender<AppEvent>, &SharedState),
-        mut on_event: F,
-    ) -> crate::Result<PostHandleEventActions>
-    where
-        F: FnMut(SignPopupEvent) -> crate::Result<()>,
-    {
-        let mut result = PostHandleEventActions::default();
+        actions: &mut PostHandleEventActions,
+    ) -> crate::Result<Option<SignPopupEvent>> {
+        let mut result = None;
 
-        self.text.handle_event(event.key_event(), area);
+        if self.is_open() {
+            self.text.handle_event(event.key_event(), area);
 
-        match event {
-            AppEvent::Input(input_event) => match input_event {
-                Event::Key(key_event) => {
-                    if key_event.kind == KeyEventKind::Press {
-                        match self.status {
-                            SignStatus::Idle => match key_event.code {
-                                KeyCode::Left => {
-                                    self.is_confirm_focused = false;
-                                }
-                                KeyCode::Right => {
-                                    self.is_confirm_focused = true;
-                                }
-                                KeyCode::Enter => {
-                                    if self.is_confirm_focused {
-                                        self.status = SignStatus::Signing;
-                                        self.sign_thread =
-                                            Some(sign_thread(&self.text.text, tr, ss)?);
-                                    } else {
-                                        self.close();
-                                        on_event(SignPopupEvent::Rejected)?;
+            match event {
+                AppEvent::Input(input_event) => match input_event {
+                    Event::Key(key_event) => {
+                        if key_event.kind == KeyEventKind::Press {
+                            match self.status {
+                                SignStatus::Idle => match key_event.code {
+                                    KeyCode::Left => {
+                                        self.is_confirm_focused = false;
                                     }
-                                }
-                                KeyCode::Esc => {
-                                    self.close();
-                                    on_event(SignPopupEvent::EscapedBeforeSigning)?;
-                                }
-                                _ => {}
-                            },
-                            SignStatus::Signing => {}
-                            SignStatus::Done | SignStatus::Failed => {
-                                if key_event.code == KeyCode::Esc {
-                                    self.close();
-                                    on_event(SignPopupEvent::EscapedAfterSigning)?;
+                                    KeyCode::Right => {
+                                        self.is_confirm_focused = true;
+                                    }
+                                    KeyCode::Enter => {
+                                        if self.is_confirm_focused {
+                                            self.status = SignStatus::Signing;
+                                            self.sign_thread =
+                                                Some(sign_thread(&self.text.text, tr, ss)?);
+                                        } else {
+                                            self.close();
+                                            result = Some(SignPopupEvent::Rejected);
+                                        }
+                                    }
+                                    KeyCode::Esc => {
+                                        self.close();
+                                        result = Some(SignPopupEvent::EscapedBeforeSigning);
+                                    }
+                                    _ => {}
+                                },
+                                SignStatus::Signing => {}
+                                SignStatus::Done | SignStatus::Failed => {
+                                    if key_event.code == KeyCode::Esc {
+                                        self.close();
+                                        result = Some(SignPopupEvent::EscapedAfterSigning);
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                Event::Mouse(_mouse_event) => {}
-                _ => {}
-            },
-            AppEvent::SignResult(signature) => {
-                on_event(SignPopupEvent::Signed(*signature))?;
-                self.status = SignStatus::Done;
+                    Event::Mouse(_mouse_event) => {}
+                    _ => {}
+                },
+                AppEvent::SignResult(addr, signature) => {
+                    result = Some(SignPopupEvent::Signed(*addr, *signature));
+                    self.status = SignStatus::Done;
 
-                if let Some(thread) = self.sign_thread.take() {
-                    thread.abort();
+                    if let Some(thread) = self.sign_thread.take() {
+                        thread.abort();
+                    }
                 }
+                AppEvent::SignError(_) => {
+                    self.status = SignStatus::Failed;
+                }
+                _ => {}
             }
-            AppEvent::SignError(_) => {
-                self.status = SignStatus::Failed;
-            }
-            _ => {}
+
+            actions.ignore_esc();
         }
-        result.ignore_esc();
+
         Ok(result)
     }
 

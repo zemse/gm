@@ -47,6 +47,11 @@ impl ConfirmPopup {
         }
     }
 
+    pub fn open_already(mut self) -> Self {
+        self.open();
+        self
+    }
+
     pub fn is_open(&self) -> bool {
         self.open
     }

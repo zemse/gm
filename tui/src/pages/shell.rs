@@ -575,33 +575,31 @@ impl Component for ShellPage {
                     }
 
                     // TODO sign should also take shutdown signal
-                    self.sign_popup
-                        .handle_event((event, area, tr, ss), |sign_event| {
-                            // oneshot's sender is consumed here, cannot be used again
-                            match sign_event {
-                                SignPopupEvent::Signed(signature) => {
-                                    let reply_to = request.reply_to.take().ok_or(
-                                        crate::Error::ValueAlreadyTaken("UserRequest.reply_to"),
-                                    )?;
-                                    reply_to
-                                        .send(ResponsePayload::Success(
-                                            json!(signature.to_string()),
-                                        ))
-                                        .map_err(|_| crate::Error::OneshotSendFailed)?;
-                                }
-                                SignPopupEvent::Rejected | SignPopupEvent::EscapedBeforeSigning => {
-                                    let reply_to = request.reply_to.take().ok_or(
-                                        crate::Error::ValueAlreadyTaken("UserRequest.reply_to"),
-                                    )?;
-                                    reply_to
-                                        .send(ResponsePayload::Error(ErrorObj::user_denied()))
-                                        .map_err(|_| crate::Error::OneshotSendFailed)?;
-                                }
-                                SignPopupEvent::EscapedAfterSigning => {}
+                    if let Some(sign_popup_event) = self
+                        .sign_popup
+                        .handle_event((event, area, tr, ss), &mut actions)?
+                    {
+                        // oneshot's sender is consumed here, cannot be used again
+                        match sign_popup_event {
+                            SignPopupEvent::Signed(_, signature) => {
+                                let reply_to = request.reply_to.take().ok_or(
+                                    crate::Error::ValueAlreadyTaken("UserRequest.reply_to"),
+                                )?;
+                                reply_to
+                                    .send(ResponsePayload::Success(json!(signature.to_string())))
+                                    .map_err(|_| crate::Error::OneshotSendFailed)?;
                             }
-
-                            Ok(())
-                        })?;
+                            SignPopupEvent::Rejected | SignPopupEvent::EscapedBeforeSigning => {
+                                let reply_to = request.reply_to.take().ok_or(
+                                    crate::Error::ValueAlreadyTaken("UserRequest.reply_to"),
+                                )?;
+                                reply_to
+                                    .send(ResponsePayload::Error(ErrorObj::user_denied()))
+                                    .map_err(|_| crate::Error::OneshotSendFailed)?;
+                            }
+                            SignPopupEvent::EscapedAfterSigning => {}
+                        }
+                    }
 
                     // If sign popup is closed during this moment, remove the request from the queue
                     if !self.sign_popup.is_open() {

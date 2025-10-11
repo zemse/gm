@@ -3,11 +3,11 @@ use std::{collections::HashMap, marker::PhantomData};
 
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, MouseEventKind};
 use ratatui::layout::{Constraint, Layout, Position};
+use ratatui::text::Span;
 use ratatui::widgets::WidgetRef;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::Stylize,
     text::Text,
     widgets::{Paragraph, Wrap},
 };
@@ -17,7 +17,7 @@ use super::{button::Button, input_box_owned::InputBoxOwned};
 use crate::act::Act;
 use crate::boolean_input::BooleanInput;
 use crate::event::WidgetEvent;
-use crate::extensions::{MouseEventExt, RectExt, WidgetHeight};
+use crate::extensions::{MouseEventExt, RectExt, RenderTextWrapped, WidgetHeight};
 use crate::widgets::scroll_bar::CustomScrollBar;
 use crate::{thematize::Thematize, widgets::filter_select_popup::FilterSelectPopup};
 
@@ -99,7 +99,9 @@ impl FormWidget {
 
             FormWidget::BooleanInput { .. } => 3,
             FormWidget::Button { .. } => 3,
-            FormWidget::Heading(_) | FormWidget::StaticText(_) => 2,
+            FormWidget::Heading(text) | FormWidget::StaticText(text) => {
+                (text.len() as u16).div_ceil(area.width) + 1
+            }
             FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
                 if text.is_empty() {
                     0
@@ -637,11 +639,15 @@ impl<
             // Render all form items in our virtual buffer.
             match item {
                 FormWidget::Heading(heading) => {
-                    heading.bold().render_ref(virtual_area, &mut virtual_buf);
+                    Span::raw(*heading)
+                        .style(theme.style())
+                        .render_wrapped(virtual_area, &mut virtual_buf);
                     virtual_area.consume_height(item.height(virtual_area));
                 }
                 FormWidget::StaticText(text) => {
-                    text.render_ref(virtual_area, &mut virtual_buf);
+                    Span::raw(*text)
+                        .style(theme.style_dim())
+                        .render_wrapped(virtual_area, &mut virtual_buf);
                     virtual_area.consume_height(item.height(virtual_area));
                 }
                 FormWidget::InputBox { widget, .. } => {

@@ -6,7 +6,8 @@ use ratatui::{
         MouseEventKind,
     },
     layout::{Position, Rect},
-    widgets::{Block, WidgetRef},
+    text::{Span, Text, ToLine},
+    widgets::{Block, Paragraph, Widget, WidgetRef, Wrap},
 };
 
 use crate::thematize::Thematize;
@@ -62,6 +63,60 @@ impl<T: WidgetRef> BorderedWidget<()> for T {
             .margin_h(if leave_horizontal_space { 1 } else { 0 });
         block.render_ref(area, buf);
         self.render_ref(inner_area, buf);
+    }
+}
+
+pub trait RenderTextWrapped {
+    fn render_wrapped(&self, area: Rect, buf: &mut Buffer);
+}
+
+impl RenderTextWrapped for &str {
+    fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
+        Paragraph::new(Text::raw(*self))
+            .wrap(Wrap { trim: false })
+            .to_owned()
+            .render(area, buf);
+    }
+}
+
+impl RenderTextWrapped for String {
+    fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
+        Paragraph::new(Text::raw(self.as_str()))
+            .wrap(Wrap { trim: false })
+            .to_owned()
+            .render(area, buf);
+    }
+}
+
+impl RenderTextWrapped for Vec<&str> {
+    fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
+        Paragraph::new(Text::raw(self.join("\n").as_str()))
+            .wrap(Wrap { trim: false })
+            .to_owned()
+            .render(area, buf);
+    }
+}
+
+impl RenderTextWrapped for Vec<String> {
+    fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
+        Paragraph::new(Text::raw(self.join("\n").as_str()))
+            .wrap(Wrap { trim: false })
+            .to_owned()
+            .render(area, buf);
+    }
+}
+
+impl<'a> RenderTextWrapped for Span<'a> {
+    fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
+        let mut text = Text::default();
+        let style = self.style;
+
+        text.push_line(self.to_line().style(style));
+
+        Paragraph::new(text)
+            .wrap(Wrap { trim: false })
+            .to_owned()
+            .render(area, buf);
     }
 }
 

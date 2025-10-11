@@ -1,4 +1,4 @@
-use reqwest::RequestBuilder;
+use reqwest::{header::HeaderMap, RequestBuilder};
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 use url::Url;
@@ -76,8 +76,18 @@ impl Reqwest {
         })
     }
 
+    pub fn headers(mut self, headers: HeaderMap) -> Self {
+        self.builder = self.builder.headers(headers);
+        self
+    }
+
     pub fn query<T: serde::Serialize + Debug>(mut self, query: &T) -> Self {
         self.builder = self.builder.query(query);
+        self
+    }
+
+    pub fn text_body(mut self, body: String) -> Self {
+        self.builder = self.builder.body(body);
         self
     }
 

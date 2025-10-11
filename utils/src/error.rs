@@ -143,6 +143,9 @@ pub enum UtilsError {
 
     #[error("Not able to query any prices, please check internet connection")]
     NoPrices,
+
+    #[error("Could not get the published URL from Etherscan response. (Full response: {0})")]
+    EtherscanPublishURLNotFound(String),
 }
 
 impl UtilsError {
