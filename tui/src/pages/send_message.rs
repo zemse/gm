@@ -6,7 +6,7 @@ use crate::widgets::{address_book_popup, networks_popup, AddressBookPopup, Netwo
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::button::Button;
 use gm_ratatui_extra::form::{Form, FormEvent, FormWidget};
-use gm_ratatui_extra::input_box_owned::InputBoxOwned;
+use gm_ratatui_extra::input_box::InputBox;
 use gm_ratatui_extra::thematize::Thematize;
 use gm_ratatui_extra::widgets::form::FormItemIndex;
 use gm_utils::alloy::StringExt;
@@ -43,15 +43,14 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Send a Message"),
             FormItem::To => FormWidget::InputBox {
-                widget: InputBoxOwned::new("To")
+                widget: InputBox::new("To")
                     .with_empty_text("press SPACE to select from address book"),
             },
             FormItem::Message => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Message").with_empty_text("Type message to send"),
+                widget: InputBox::new("Message").with_empty_text("Type message to send"),
             },
             FormItem::Network => FormWidget::DisplayBox {
-                widget: InputBoxOwned::new("Network")
-                    .with_empty_text("press SPACE to select network"),
+                widget: InputBox::new("Network").with_empty_text("press SPACE to select network"),
             },
             FormItem::SendMessageButton => FormWidget::Button {
                 widget: Button::new("Send Message"),
@@ -89,7 +88,7 @@ impl Component for SendMessagePage {
         &mut self,
         event: &AppEvent,
         area: Rect,
-        _popup_area: Rect,
+        popup_area: Rect,
         tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
         ss: &SharedState,
@@ -113,9 +112,9 @@ impl Component for SendMessagePage {
         }
 
         if self.address_book_popup.is_open() {
-            if let Some(selection) = self
-                .address_book_popup
-                .handle_event(event.key_event(), &mut actions)
+            if let Some(selection) =
+                self.address_book_popup
+                    .handle_event(event.input_event(), popup_area, &mut actions)
             {
                 self.form
                     .set_text(FormItem::To, selection.address()?.to_string());
@@ -123,9 +122,9 @@ impl Component for SendMessagePage {
                 self.form.advance_cursor();
             }
         } else if self.networks_popup.is_open() {
-            if let Some(selection) = self
-                .networks_popup
-                .handle_event(event.key_event(), &mut actions)
+            if let Some(selection) =
+                self.networks_popup
+                    .handle_event(event.input_event(), popup_area, &mut actions)
             {
                 self.form
                     .set_text(FormItem::Network, selection.name.clone());
@@ -157,10 +156,12 @@ impl Component for SendMessagePage {
                 self.networks_popup.open();
                 self.networks_popup
                     .set_items(Some(NetworkStore::load()?.filter(ss.testnet_mode)));
-            } else if let Some(FormEvent::ButtonPressed(label)) =
-                self.form
-                    .handle_event(event.widget_event().as_ref(), area, &mut actions)?
-            {
+            } else if let Some(FormEvent::ButtonPressed(label)) = self.form.handle_event(
+                event.widget_event().as_ref(),
+                area,
+                popup_area,
+                &mut actions,
+            )? {
                 if label == FormItem::SendMessageButton {
                     let to = self.form.get_text(FormItem::To);
                     let message = self.form.get_text(FormItem::Message);

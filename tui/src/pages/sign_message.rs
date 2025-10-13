@@ -6,7 +6,7 @@ use gm_ratatui_extra::{
     confirm_popup::{ConfirmPopup, ConfirmResult},
     extensions::RenderTextWrapped,
     form::{Form, FormEvent, FormItemIndex, FormWidget},
-    input_box_owned::InputBoxOwned,
+    input_box::InputBox,
 };
 use gm_utils::etherscan::publish_signature_to_etherscan;
 use ratatui::{buffer::Buffer, layout::Rect};
@@ -69,7 +69,7 @@ impl TryFrom<FormItem> for FormWidget {
                 "You can also publish this signature to a public URL on Etherscan for free. This can be used to prove to someone that you own this address using a custom message.",
             ),
             FormItem::MessageInput => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Message").with_empty_text("Type message to sign"),
+                widget: InputBox::new("Message").with_empty_text("Type message to sign"),
             },
             FormItem::SignMessageButton => FormWidget::Button {
                 widget: Button::new("Sign Message"),
@@ -151,9 +151,12 @@ impl Component for SignMessagePage {
                     }
                 } else {
                     // Handle form events
-                    if let Some(FormEvent::ButtonPressed(item)) =
-                        form.handle_event(event.widget_event().as_ref(), area, &mut actions)?
-                    {
+                    if let Some(FormEvent::ButtonPressed(item)) = form.handle_event(
+                        event.widget_event().as_ref(),
+                        area,
+                        popup_area,
+                        &mut actions,
+                    )? {
                         if item == FormItem::SignMessageButton {
                             let message = form.get_text(FormItem::MessageInput);
                             *sign_popup = SignPopup::new_with_message_utf8(message.to_string());

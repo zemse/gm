@@ -9,7 +9,7 @@ use alloy::primitives::Address;
 use gm_ratatui_extra::button::Button;
 use gm_ratatui_extra::confirm_popup::{ConfirmPopup, ConfirmResult};
 use gm_ratatui_extra::form::{Form, FormEvent, FormItemIndex, FormWidget};
-use gm_ratatui_extra::input_box_owned::InputBoxOwned;
+use gm_ratatui_extra::input_box::InputBox;
 use gm_ratatui_extra::thematize::Thematize;
 use gm_utils::disk_storage::DiskStorageInterface;
 use gm_utils::network::{Network, NetworkStore, Token};
@@ -43,16 +43,16 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Edit Network"),
             FormItem::Name => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Name"),
+                widget: InputBox::new("Name"),
             },
             FormItem::Symbol => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Symbol"),
+                widget: InputBox::new("Symbol"),
             },
             FormItem::Decimals => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Decimals"),
+                widget: InputBox::new("Decimals"),
             },
             FormItem::ContractAddress => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Contract Address"),
+                widget: InputBox::new("Contract Address"),
             },
             FormItem::SaveButton => FormWidget::Button {
                 widget: Button::new("Save"),
@@ -136,7 +136,7 @@ impl Component for TokenCreatePage {
         &mut self,
         event: &AppEvent,
         area: Rect,
-        _popup_area: Rect,
+        popup_area: Rect,
         _transmitter: &Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
@@ -163,10 +163,12 @@ impl Component for TokenCreatePage {
             }
         }
 
-        if let Some(FormEvent::ButtonPressed(label)) =
-            self.form
-                .handle_event(event.widget_event().as_ref(), area, &mut actions)?
-        {
+        if let Some(FormEvent::ButtonPressed(label)) = self.form.handle_event(
+            event.widget_event().as_ref(),
+            area,
+            popup_area,
+            &mut actions,
+        )? {
             if label == FormItem::SaveButton {
                 let token = Self::token(&self.form);
                 if self.network.tokens.get(self.token_index).is_some() {

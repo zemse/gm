@@ -13,7 +13,7 @@ use ratatui::{
 };
 use strum::IntoEnumIterator;
 
-use super::{button::Button, input_box_owned::InputBoxOwned};
+use super::{button::Button, input_box::InputBox};
 use crate::act::Act;
 use crate::boolean_input::BooleanInput;
 use crate::button::ButtonResult;
@@ -47,18 +47,18 @@ pub enum FormWidget {
     StaticText(&'static str),
 
     /// Take user input as a string
-    InputBox { widget: InputBoxOwned },
+    InputBox { widget: InputBox },
 
     /// Provide a switch to input a boolean
     BooleanInput { widget: BooleanInput },
 
     /// Display as a input immutable
     // TODO explore if this can be removed
-    DisplayBox { widget: InputBoxOwned },
+    DisplayBox { widget: InputBox },
 
     /// Renders a popup to select an option from
     SelectInput {
-        widget: InputBoxOwned,
+        widget: InputBox,
         popup: FilterSelectPopup<String>,
     },
 
@@ -413,6 +413,7 @@ impl<
         &mut self,
         event: Option<&WidgetEvent>,
         area: Rect,
+        popup_area: Rect,
         actions: &mut A,
     ) -> crate::Result<Option<FormEvent<T>>>
     where
@@ -496,7 +497,9 @@ impl<
 
                     widget.handle_event(Some(event), area, actions);
 
-                    if let Some(selection) = popup.handle_event(event.key_event(), actions) {
+                    if let Some(selection) =
+                        popup.handle_event(event.input_event(), popup_area, actions)
+                    {
                         widget.set_text(selection.to_string());
                     }
 

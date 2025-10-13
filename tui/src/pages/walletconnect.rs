@@ -11,7 +11,7 @@ use gm_ratatui_extra::{
     confirm_popup::{ConfirmPopup, ConfirmResult},
     cursor::Cursor,
     form::{Form, FormEvent, FormItemIndex, FormWidget},
-    input_box_owned::InputBoxOwned,
+    input_box::InputBox,
     select::Select,
     thematize::Thematize,
 };
@@ -141,7 +141,7 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Wallet Connect"),
             FormItem::UriInput => FormWidget::InputBox {
-                widget: InputBoxOwned::new("URL")
+                widget: InputBox::new("URL")
                     .with_empty_text("Paste Walletconnect URI from dapp"),
             },
             FormItem::ConnectButton => FormWidget::Button {
@@ -282,7 +282,7 @@ impl Component for WalletConnectPage {
         &mut self,
         event: &AppEvent,
         area: Rect,
-        _popup_area: Rect,
+        popup_area: Rect,
         tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
         ss: &SharedState,
@@ -578,10 +578,12 @@ impl Component for WalletConnectPage {
                 actions.page_pop();
             }
         } else if self.status == WalletConnectStatus::Idle {
-            if let Some(FormEvent::ButtonPressed(item)) =
-                self.form
-                    .handle_event(event.widget_event().as_ref(), area, &mut actions)?
-            {
+            if let Some(FormEvent::ButtonPressed(item)) = self.form.handle_event(
+                event.widget_event().as_ref(),
+                area,
+                popup_area,
+                &mut actions,
+            )? {
                 if item == FormItem::ConnectButton {
                     let uri_input = self.form.get_text(FormItem::UriInput).to_string();
                     let current_account = ss.current_account.unwrap(); // TODO ensure we can see this page only if account exists

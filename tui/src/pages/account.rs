@@ -34,13 +34,8 @@ impl Display for AccountSelect {
     }
 }
 
-#[derive(Debug)]
-pub struct AccountPage {
-    select: SelectOwned<AccountSelect>,
-}
-
-impl AccountPage {
-    pub fn new() -> crate::Result<Self> {
+impl AccountSelect {
+    fn get_list() -> crate::Result<Vec<AccountSelect>> {
         let mut list = vec![AccountSelect::Create, AccountSelect::Import];
         list.extend(
             AccountManager::get_account_list()?
@@ -48,20 +43,30 @@ impl AccountPage {
                 .map(AccountSelect::Existing)
                 .collect::<Vec<_>>(),
         );
+        Ok(list)
+    }
+}
+
+#[derive(Debug)]
+pub struct AccountPage {
+    select: SelectOwned<AccountSelect>,
+}
+
+impl AccountPage {
+    pub fn new() -> crate::Result<Self> {
         Ok(AccountPage {
-            select: SelectOwned::new(Some(list), false),
+            select: SelectOwned::new(Some(AccountSelect::get_list()?), false),
         })
     }
 }
 
 impl Component for AccountPage {
     fn set_focus(&mut self, focus: bool) {
-        self.select.focus = focus;
+        self.select.set_focus(focus);
     }
 
     fn reload(&mut self, _ss: &SharedState) -> crate::Result<()> {
-        let fresh = Self::new()?;
-        self.select.list = fresh.select.list;
+        self.select.update_list(Some(AccountSelect::get_list()?));
         Ok(())
     }
 

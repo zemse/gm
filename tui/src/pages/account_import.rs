@@ -14,13 +14,23 @@ use crate::{
 };
 use gm_utils::account::AccountManager;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct AccountImportPage {
     pub screen: usize,
-    pub input: String,
-    pub text_cursor: usize,
+    pub input_box: InputBox,
     pub display: Option<String>,
     pub success: bool,
+}
+
+impl Default for AccountImportPage {
+    fn default() -> Self {
+        Self {
+            screen: 0,
+            input_box: InputBox::new("Private key or Mnemonic phrase"),
+            display: None,
+            success: false,
+        }
+    }
 }
 
 impl Component for AccountImportPage {
@@ -37,31 +47,30 @@ impl Component for AccountImportPage {
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<PostHandleEventActions> {
-        let mut result = PostHandleEventActions::default();
+        let mut actions = PostHandleEventActions::default();
 
-        InputBox::handle_event(
-            event.input_event(),
-            area,
-            &mut self.input,
-            &mut self.text_cursor,
-        );
+        self.input_box
+            .handle_event(event.widget_event().as_ref(), area, &mut actions);
 
         if let AppEvent::Input(input_event) = event {
             if self.display.is_some() {
                 if self.success {
-                    result.page_pop();
-                    result.reload();
+                    actions.page_pop();
+                    actions.reload();
                 } else {
                     self.display = None;
                 }
-                return Ok(result);
+                return Ok(actions);
             }
 
             match input_event {
                 Event::Key(key_event) => {
                     if key_event.code == KeyCode::Enter {
-                        let import_result = AccountManager::import_mnemonic_wallet(&self.input)
-                            .or_else(|_| AccountManager::import_private_key(&self.input));
+                        let import_result =
+                            AccountManager::import_mnemonic_wallet(self.input_box.get_text())
+                                .or_else(|_| {
+                                    AccountManager::import_private_key(self.input_box.get_text())
+                                });
 
                         match import_result {
                             Ok(address) => {
@@ -80,7 +89,7 @@ impl Component for AccountImportPage {
             }
         }
 
-        Ok(result)
+        Ok(actions)
     }
 
     fn render_component(
@@ -93,14 +102,7 @@ impl Component for AccountImportPage {
     where
         Self: Sized,
     {
-        InputBox {
-            focus: true,
-            label: "Private key or Mnemonic phrase",
-            text: &self.input,
-            empty_text: None,
-            currency: None,
-        }
-        .render(area, buf, &self.text_cursor, &shared_state.theme);
+        self.input_box.render(area, buf, true, &shared_state.theme);
 
         if let Some(display) = &self.display {
             display.render_ref(area.offset(Offset { x: 0, y: 4 }), buf);

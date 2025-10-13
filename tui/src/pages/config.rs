@@ -16,7 +16,7 @@ use gm_ratatui_extra::{
     boolean_input::BooleanInput,
     button::Button,
     form::FormEvent,
-    input_box_owned::InputBoxOwned,
+    input_box::InputBox,
     widgets::{
         filter_select_popup::FilterSelectPopup,
         form::{Form, FormItemIndex, FormWidget},
@@ -45,7 +45,7 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Configuration"),
             FormItem::AlchemyApiKey => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Alchemy API key")
+                widget: InputBox::new("Alchemy API key")
                     .with_empty_text("Please get an Alchemy API key from https://www.alchemy.com/"),
             },
             FormItem::TestnetMode => FormWidget::BooleanInput {
@@ -55,10 +55,11 @@ impl TryFrom<FormItem> for FormWidget {
                 widget: BooleanInput::new("Developer Mode", false),
             },
             FormItem::Theme => FormWidget::SelectInput {
-                widget: InputBoxOwned::new("Theme")
+                widget: InputBox::new("Theme")
                     .with_empty_text("Select a theme")
                     .make_immutable(true),
-                popup: FilterSelectPopup::new("Select a theme", Some("No themes available")),
+                popup: FilterSelectPopup::new("Select a theme")
+                    .with_empty_text("No themes available"),
             },
             FormItem::HeliosEnabled => FormWidget::BooleanInput {
                 // TODO remove the restart requirement for helios to be toggled from there
@@ -91,7 +92,7 @@ impl ConfigPage {
             form.set_text(FormItem::Theme, config.get_theme_name().to_string());
             let popup = form.get_popup_mut(FormItem::Theme);
             popup.set_items(Some(ThemeName::list()));
-            popup.set_cursor(&config.get_theme_name().to_string());
+            popup.set_focused_item(config.get_theme_name().to_string());
             *form.get_boolean_mut(FormItem::HeliosEnabled) = config.get_helios_enabled();
             Ok(())
         })?;
@@ -109,7 +110,7 @@ impl Component for ConfigPage {
         &mut self,
         event: &AppEvent,
         area: Rect,
-        _popup_area: Rect,
+        popup_area: Rect,
         _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
@@ -118,10 +119,12 @@ impl Component for ConfigPage {
 
         let mut handle_result = PostHandleEventActions::default();
 
-        if let Some(FormEvent::ButtonPressed(label)) =
-            self.form
-                .handle_event(event.widget_event().as_ref(), area, &mut handle_result)?
-        {
+        if let Some(FormEvent::ButtonPressed(label)) = self.form.handle_event(
+            event.widget_event().as_ref(),
+            area,
+            popup_area,
+            &mut handle_result,
+        )? {
             if label == FormItem::SaveButton {
                 handle_result.reload();
 

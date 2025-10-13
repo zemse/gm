@@ -22,22 +22,25 @@ pub struct AssetsPage {
 impl AssetsPage {
     pub fn new(assets: Option<Vec<Asset>>) -> crate::Result<Self> {
         Ok(Self {
-            select: SelectOwned::new(assets, false),
+            select: SelectOwned::new(assets, false)
+                .with_loading_text("Loading assets...")
+                .with_empty_text("No assets found in portfolio"),
         })
     }
 }
 
 impl Component for AssetsPage {
     fn set_focus(&mut self, focus: bool) {
-        self.select.focus = focus;
+        self.select.set_focus(focus);
     }
 
     fn set_cursor(&mut self, cursor: usize) {
-        self.select.cursor.current = cursor.min(self.select.len().saturating_sub(1));
+        // self.select.cursor.current = cursor.min(self.select.len().saturating_sub(1));
+        self.select.set_cursor(cursor);
     }
 
     fn get_cursor(&self) -> Option<usize> {
-        Some(self.select.cursor.current)
+        Some(self.select.cursor())
     }
 
     fn handle_event(
@@ -75,16 +78,10 @@ impl Component for AssetsPage {
     where
         Self: Sized,
     {
-        if let Some(list) = self.select.list.as_ref() {
-            if list.is_empty() {
-                "no assets on the address".render(area, buf);
-            } else {
-                self.select.render(area, buf, &shared_state.theme);
-            }
-        } else if shared_state.online == Some(false) {
+        if self.select.list_is_none() && shared_state.online == Some(false) {
             "need internet access to fetch the portfolio".render(area, buf);
         } else {
-            "loading assets...".render(area, buf);
+            self.select.render(area, buf, &shared_state.theme);
         }
 
         area

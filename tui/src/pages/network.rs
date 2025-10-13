@@ -50,7 +50,7 @@ impl NetworkPage {
 }
 impl Component for NetworkPage {
     fn set_focus(&mut self, focus: bool) {
-        self.select.focus = focus;
+        self.select.set_focus(focus);
     }
 
     fn reload(&mut self, _ss: &SharedState) -> crate::Result<()> {

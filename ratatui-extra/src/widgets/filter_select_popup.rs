@@ -1,66 +1,56 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{KeyCode, KeyEvent, KeyEventKind},
+    crossterm::event::{Event, KeyCode},
     layout::Rect,
     text::Span,
     widgets::{Block, Widget},
 };
 
-use super::{filter_select::FilterSelect, popup::Popup};
+use super::popup::Popup;
 use crate::{
     act::Act,
-    cursor::Cursor,
-    extensions::{KeyEventExt, RectExt},
+    extensions::{EventExt, RectExt},
+    filter_select::FilterSelect,
+    select_owned::SelectEvent,
     thematize::Thematize,
 };
 
-// TODO use FilterSelectOwned instead of FilterSelect
-#[derive(Clone, Debug)]
-pub struct FilterSelectPopup<Item: Display + Clone> {
+#[derive(Debug)]
+pub struct FilterSelectPopup<Item: Display + PartialEq> {
     title: &'static str,
-    empty_text: Option<&'static str>,
     open: bool,
-    items: Option<Vec<Item>>,
-    cursor: Cursor,
-    search_string: String,
+    filter_select: FilterSelect<Item>,
 }
 
-impl<Item: Display + Clone> FilterSelectPopup<Item> {
-    pub fn new(title: &'static str, empty_text: Option<&'static str>) -> Self {
+impl<Item: Display + PartialEq> FilterSelectPopup<Item> {
+    pub fn new(title: &'static str) -> Self {
         Self {
             title,
-            empty_text,
             open: false,
-            items: None,
-            cursor: Cursor::new(0),
-            search_string: String::new(),
+            filter_select: FilterSelect::default(),
         }
+    }
+
+    pub fn with_empty_text(mut self, empty_text: &'static str) -> Self {
+        self.filter_select = self.filter_select.with_empty_text(empty_text);
+        self
     }
 
     pub fn set_items(&mut self, items: Option<Vec<Item>>) {
-        self.items = items;
-    }
-
-    pub fn set_cursor(&mut self, item: &Item) {
-        if let Some(items) = &self.items {
-            if let Some(index) = items.iter().position(|i| i.to_string() == item.to_string()) {
-                self.cursor.current = index;
-            }
-        }
-    }
-
-    pub fn current_selection(&self) -> Option<&Item> {
-        self.items
-            .as_ref()
-            .and_then(|items| items.get(self.cursor.current))
+        self.filter_select.set_items(items);
     }
 
     pub fn display_selection(&self) -> String {
-        self.current_selection()
+        self.filter_select
+            .get_focussed_item()
             .map(|s| s.to_string())
             .unwrap_or_default()
+    }
+
+    pub fn set_focused_item(&mut self, item: Item) {
+        self.filter_select.select.set_focussed_item(Arc::new(item));
     }
 
     pub fn is_open(&self) -> bool {
@@ -70,8 +60,7 @@ impl<Item: Display + Clone> FilterSelectPopup<Item> {
     // Opens the popup with the fresh items.
     pub fn open(&mut self) {
         self.open = true;
-        self.cursor.reset();
-        self.search_string.clear();
+        self.filter_select.reset();
     }
 
     pub fn close(&mut self) {
@@ -80,46 +69,48 @@ impl<Item: Display + Clone> FilterSelectPopup<Item> {
 
     pub fn handle_event<'a, A>(
         &'a mut self,
-        key_event: Option<&KeyEvent>,
+        input_event: Option<&Event>,
+        popup_area: Rect,
         actions: &mut A,
-    ) -> Option<&'a Item>
+    ) -> Option<&'a Arc<Item>>
     where
         A: Act,
     {
         let mut result = None;
 
         if self.open {
-            if key_event.is_pressed(KeyCode::Esc) {
+            // TODO handle using popup widget
+            if input_event.is_some_and(|input_event| input_event.is_key_pressed(KeyCode::Esc)) {
                 self.close();
             }
 
-            if self.items.is_some() {
-                let cursor_max = self
-                    .items
-                    .as_ref()
-                    .map(|items| items.len())
-                    .unwrap_or_else(|| unreachable!());
-                self.cursor.handle(key_event, cursor_max);
-
-                if let Some(key_event) = key_event {
-                    if key_event.kind == KeyEventKind::Press {
-                        match key_event.code {
-                            KeyCode::Char(char) => {
-                                self.search_string.push(char);
-                            }
-                            KeyCode::Backspace => {
-                                self.search_string.pop();
-                            }
-                            KeyCode::Enter => {
-                                self.close();
-                                let items = self.items.as_ref().unwrap();
-                                result = Some(&items[self.cursor.current]);
-                            }
-                            _ => {}
-                        }
-                    }
-                }
+            if let Some(SelectEvent::Select(item)) =
+                self.filter_select.handle_event(input_event, popup_area)
+            {
+                result = Some(item);
             }
+
+            // if self.items.is_some() {
+
+            //     if let Some(key_event) = key_event {
+            //         if key_event.kind == KeyEventKind::Press {
+            //             match key_event.code {
+            //                 KeyCode::Char(char) => {
+            //                     self.search_string.push(char);
+            //                 }
+            //                 KeyCode::Backspace => {
+            //                     self.search_string.pop();
+            //                 }
+            //                 KeyCode::Enter => {
+            //                     self.close();
+            //                     let items = self.items.as_ref().unwrap();
+            //                     result = Some(&items[self.cursor.current]);
+            //                 }
+            //                 _ => {}
+            //             }
+            //         }
+            //     }
+            // }
 
             actions.ignore_esc();
         }
@@ -147,25 +138,7 @@ impl<Item: Display + Clone> FilterSelectPopup<Item> {
             Span::raw(self.title).render(inner_area, buf);
             inner_area.consume_height(2);
 
-            if let Some(items) = &self.items {
-                if items.is_empty() {
-                    if let Some(empty_text) = self.empty_text {
-                        empty_text.render(inner_area, buf);
-                    } else {
-                        "The list is empty.".render(inner_area, buf);
-                    }
-                } else {
-                    FilterSelect {
-                        full_list: items,
-                        cursor: &self.cursor,
-                        search_string: &self.search_string,
-                        focus: true,
-                    }
-                    .render(inner_area, buf, &theme);
-                }
-            } else {
-                "Loading...".render(inner_area, buf);
-            }
+            self.filter_select.render(inner_area, buf, &theme);
         }
     }
 }

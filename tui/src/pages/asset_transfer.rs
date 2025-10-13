@@ -10,7 +10,7 @@ use alloy::rpc::types::TransactionRequest;
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::button::Button;
 use gm_ratatui_extra::form::{Form, FormEvent, FormItemIndex, FormWidget};
-use gm_ratatui_extra::input_box_owned::InputBoxOwned;
+use gm_ratatui_extra::input_box::InputBox;
 use gm_utils::alloy::StringExt;
 use gm_utils::assets::{Asset, TokenAddress};
 use gm_utils::erc20;
@@ -42,15 +42,15 @@ impl TryFrom<FormItem> for FormWidget {
     fn try_from(value: FormItem) -> crate::Result<Self> {
         let widget = match value {
             FormItem::To => FormWidget::InputBox {
-                widget: InputBoxOwned::new("To")
+                widget: InputBox::new("To")
                     .with_empty_text("press SPACE to select from address book"),
             },
             FormItem::AssetType => FormWidget::DisplayBox {
-                widget: InputBoxOwned::new("Asset Type")
+                widget: InputBox::new("Asset Type")
                     .with_empty_text("press SPACE to select from your assets"),
             },
             FormItem::Amount => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Amount"),
+                widget: InputBox::new("Amount"),
             },
             FormItem::ErrorText => FormWidget::ErrorText(String::new()),
             FormItem::TransferButton => FormWidget::Button {
@@ -115,7 +115,7 @@ impl Component for AssetTransferPage {
         &mut self,
         event: &AppEvent,
         area: Rect,
-        _popup_area: Rect,
+        popup_area: Rect,
         tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
         ss: &SharedState,
@@ -123,20 +123,20 @@ impl Component for AssetTransferPage {
         let mut actions = PostHandleEventActions::default();
 
         if self.address_book_popup.is_open() {
-            if let Some(selection) = self
-                .address_book_popup
-                .handle_event(event.key_event(), &mut actions)
+            if let Some(selection) =
+                self.address_book_popup
+                    .handle_event(event.input_event(), popup_area, &mut actions)
             {
                 self.form
                     .set_text(FormItem::To, selection.address()?.to_string());
                 self.form.advance_cursor();
             }
         } else if self.asset_popup.is_open() {
-            if let Some(selection) = self
-                .asset_popup
-                .handle_event(event.key_event(), &mut actions)
+            if let Some(selection) =
+                self.asset_popup
+                    .handle_event(event.input_event(), popup_area, &mut actions)
             {
-                self.asset = Some(selection.clone());
+                self.asset = Some(selection.as_ref().clone());
 
                 self.form
                     .set_text(FormItem::AssetType, format!("{}", selection.r#type));
@@ -184,10 +184,12 @@ impl Component for AssetTransferPage {
                 actions.ignore_esc();
             } else {
                 // Handle form events
-                if let Some(FormEvent::ButtonPressed(label)) =
-                    self.form
-                        .handle_event(event.widget_event().as_ref(), area, &mut actions)?
-                {
+                if let Some(FormEvent::ButtonPressed(label)) = self.form.handle_event(
+                    event.widget_event().as_ref(),
+                    area,
+                    popup_area,
+                    &mut actions,
+                )? {
                     if label == FormItem::TransferButton {
                         let to = self.form.get_text(FormItem::To);
                         let asset = self.asset.as_ref().ok_or(crate::Error::AssetNotSelected)?;

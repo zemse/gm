@@ -510,12 +510,12 @@ impl App {
             if let Some(page) = self.context.last_mut() {
                 page.set_focus(false);
             }
-            self.main_menu.focus = true;
+            self.main_menu.set_focus(true);
         } else if self.focus == Focus::Body {
             if let Some(page) = self.context.last_mut() {
                 page.set_focus(true);
             }
-            self.main_menu.focus = false;
+            self.main_menu.set_focus(false);
         }
     }
 
@@ -728,7 +728,7 @@ impl App {
                         if self.focus == Focus::Menu {
                             self.update_focus(Focus::Body);
                             if let Some(page) = self.context.last_mut() {
-                                page.set_cursor(self.main_menu.cursor.current);
+                                page.set_cursor(self.main_menu.cursor());
                             }
                         }
                     }
@@ -740,9 +740,9 @@ impl App {
                                 .context
                                 .last()
                                 .and_then(|page| page.get_cursor())
-                                .or(self.main_menu.external_cursor)
+                                .or(self.main_menu.hover_cursor())
                             {
-                                self.main_menu.cursor.current = cursor;
+                                self.main_menu.set_cursor(cursor);
                             }
                             self.update_focus(Focus::Menu);
                         }

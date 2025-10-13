@@ -9,7 +9,7 @@ use gm_ratatui_extra::boolean_input::BooleanInput;
 use gm_ratatui_extra::button::Button;
 use gm_ratatui_extra::confirm_popup::{ConfirmPopup, ConfirmResult};
 use gm_ratatui_extra::form::{Form, FormEvent, FormItemIndex, FormWidget};
-use gm_ratatui_extra::input_box_owned::InputBoxOwned;
+use gm_ratatui_extra::input_box::InputBox;
 use gm_ratatui_extra::thematize::Thematize;
 use gm_utils::disk_storage::DiskStorageInterface;
 use gm_utils::network::{Network, NetworkStore, Token};
@@ -57,49 +57,49 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Edit Network"),
             FormItem::Name => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Name"),
+                widget: InputBox::new("Name"),
             },
             FormItem::NameAlchemy => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Name Alchemy"),
+                widget: InputBox::new("Name Alchemy"),
             },
             FormItem::NameAliases => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Name Aliases"),
+                widget: InputBox::new("Name Aliases"),
             },
             FormItem::ChainId => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Chain Id"),
+                widget: InputBox::new("Chain Id"),
             },
             FormItem::Symbol => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Symbol"),
+                widget: InputBox::new("Symbol"),
             },
             FormItem::NativeDecimals => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Native Decimals"),
+                widget: InputBox::new("Native Decimals"),
             },
             FormItem::PriceTicker => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Price Ticker"),
+                widget: InputBox::new("Price Ticker"),
             },
             FormItem::RpcUrl => FormWidget::InputBox {
-                widget: InputBoxOwned::new("RPC Url"),
+                widget: InputBox::new("RPC Url"),
             },
             FormItem::RpcAlchemy => FormWidget::InputBox {
-                widget: InputBoxOwned::new("RPC Alchemy Url"),
+                widget: InputBox::new("RPC Alchemy Url"),
             },
             FormItem::RpcInfura => FormWidget::InputBox {
-                widget: InputBoxOwned::new("RPC Infura Url"),
+                widget: InputBox::new("RPC Infura Url"),
             },
             FormItem::ExplorerUrl => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Explorer Url"),
+                widget: InputBox::new("Explorer Url"),
             },
             FormItem::IsTestnet => FormWidget::BooleanInput {
                 widget: BooleanInput::new("Is Testnet", false),
             },
             FormItem::RpcPort => FormWidget::InputBox {
-                widget: InputBoxOwned::new("RPC Port"),
+                widget: InputBox::new("RPC Port"),
             },
             FormItem::ChainlinkNativePriceFeed => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Chainlink Native Price Feed"),
+                widget: InputBox::new("Chainlink Native Price Feed"),
             },
             FormItem::ChainlinkNativePriceFeedDecimals => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Chainlink Native Price Feed Decimals"),
+                widget: InputBox::new("Chainlink Native Price Feed Decimals"),
             },
             FormItem::TokensButton => FormWidget::Button {
                 widget: Button::new("Tokens"),
@@ -301,10 +301,12 @@ impl Component for NetworkCreatePage {
                 actions.reload();
             }
         }
-        if let Some(FormEvent::ButtonPressed(label)) =
-            self.form
-                .handle_event(event.widget_event().as_ref(), area, &mut actions)?
-        {
+        if let Some(FormEvent::ButtonPressed(label)) = self.form.handle_event(
+            event.widget_event().as_ref(),
+            area,
+            popup_area,
+            &mut actions,
+        )? {
             match label {
                 FormItem::SaveButton => {
                     if self.form.get_text(FormItem::Name).is_empty() {

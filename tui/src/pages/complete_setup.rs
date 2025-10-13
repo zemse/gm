@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use gm_ratatui_extra::{
     button::Button,
     form::{Form, FormEvent, FormItemIndex, FormWidget},
-    input_box_owned::InputBoxOwned,
+    input_box::InputBox,
 };
 use gm_utils::{config::Config, disk_storage::DiskStorageInterface};
 use ratatui::{buffer::Buffer, layout::Rect};
@@ -43,7 +43,7 @@ impl TryFrom<FormItem> for FormWidget {
                 widget: Button::new("Create or Import Wallet"),
             },
             FormItem::AlchemyApiKey => FormWidget::InputBox {
-                widget: InputBoxOwned::new("Alchemy API key")
+                widget: InputBox::new("Alchemy API key")
                     .with_empty_text("Please get an Alchemy API key from https://www.alchemy.com/"),
             },
             FormItem::Save => FormWidget::Button {
@@ -97,7 +97,7 @@ impl Component for CompleteSetupPage {
         &mut self,
         event: &AppEvent,
         area: Rect,
-        _popup_area: Rect,
+        popup_area: Rect,
         transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
@@ -106,10 +106,12 @@ impl Component for CompleteSetupPage {
 
         let mut handle_result = PostHandleEventActions::default();
 
-        if let Some(FormEvent::ButtonPressed(label)) =
-            self.form
-                .handle_event(event.widget_event().as_ref(), area, &mut handle_result)?
-        {
+        if let Some(FormEvent::ButtonPressed(label)) = self.form.handle_event(
+            event.widget_event().as_ref(),
+            area,
+            popup_area,
+            &mut handle_result,
+        )? {
             if label == FormItem::CreateOrImportWallet {
                 handle_result.page_insert(Page::Account(AccountPage::new()?));
             } else {

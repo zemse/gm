@@ -1,7 +1,7 @@
 use std::{fmt::Display, sync::mpsc};
 
 use alloy::primitives::Address;
-use gm_ratatui_extra::{filter_select_owned::FilterSelectOwned, select_owned::SelectEvent};
+use gm_ratatui_extra::{filter_select::FilterSelect, select_owned::SelectEvent};
 use ratatui::{buffer::Buffer, layout::Rect};
 use tokio_util::sync::CancellationToken;
 
@@ -104,13 +104,13 @@ impl AddressBookMenuItem {
 
 #[derive(Debug)]
 pub struct AddressBookPage {
-    filter_select: FilterSelectOwned<AddressBookMenuItem>,
+    filter_select: FilterSelect<AddressBookMenuItem>,
 }
 
 impl AddressBookPage {
     pub fn new() -> crate::Result<Self> {
         let filter_select =
-            FilterSelectOwned::new(Some(AddressBookMenuItem::get_menu(true, None)?));
+            FilterSelect::default().with_items(AddressBookMenuItem::get_menu(true, None)?);
 
         Ok(Self { filter_select })
     }
@@ -118,12 +118,12 @@ impl AddressBookPage {
 
 impl Component for AddressBookPage {
     fn set_focus(&mut self, focus: bool) {
-        self.filter_select.select.focus = focus;
+        self.filter_select.select.set_focus(focus);
     }
 
     fn reload(&mut self, _ss: &SharedState) -> crate::Result<()> {
-        let fresh = Self::new()?;
-        self.filter_select.set_items(fresh.filter_select.full_list);
+        self.filter_select
+            .set_items(Some(AddressBookMenuItem::get_menu(true, None)?));
         Ok(())
     }
 

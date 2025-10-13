@@ -21,9 +21,7 @@ use std::{
 };
 
 use alloy::{hex, primitives::Address, rpc::types::TransactionRequest};
-use gm_ratatui_extra::{
-    act::Act, extensions::ThemedWidget, input_box::InputBox, text_scroll::TextScroll,
-};
+use gm_ratatui_extra::{act::Act, extensions::ThemedWidget, input_box, text_scroll::TextScroll};
 use gm_rpc_proxy::{
     error::RpcProxyError,
     rpc_types::{ErrorObj, ResponsePayload},
@@ -329,11 +327,12 @@ impl Component for ShellPage {
 
                         if let Some((text_input, text_cursor)) = self.get_user_input_mut() {
                             // Keyboard handling for input
-                            scroll_to_bottom = InputBox::handle_event(
-                                Some(input_event),
-                                area,
+                            scroll_to_bottom = input_box::handle_input_event(
+                                input_event,
                                 text_input,
                                 text_cursor,
+                                area,
+                                &mut actions,
                             );
 
                             // Additional handling on top of InputBox
@@ -493,11 +492,12 @@ impl Component for ShellPage {
                     Event::Mouse(_mouse_event) => {
                         if let Some((text_input, text_cursor)) = self.get_user_input_mut() {
                             // Mouse handling for input
-                            let _ = InputBox::handle_event(
-                                Some(input_event),
-                                area,
+                            let _ = input_box::handle_input_event(
+                                input_event,
                                 text_input,
                                 text_cursor,
+                                area,
+                                &mut actions,
                             );
                         }
                     }

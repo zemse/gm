@@ -4,7 +4,7 @@ use crate::{
 use gm_ratatui_extra::{
     button::Button,
     form::{Form, FormEvent, FormItemIndex, FormWidget},
-    input_box_owned::InputBoxOwned,
+    input_box::InputBox,
 };
 use gm_utils::{
     address_book::{AddressBookEntry, AddressBookStore},
@@ -35,10 +35,10 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Edit AddressBook entry"),
             FormItem::Name => FormWidget::InputBox {
-                widget: InputBoxOwned::new("name"),
+                widget: InputBox::new("name"),
             },
             FormItem::Address => FormWidget::InputBox {
-                widget: InputBoxOwned::new("address"),
+                widget: InputBox::new("address"),
             },
             FormItem::SaveButton => FormWidget::Button {
                 widget: Button::new("Save"),
@@ -75,17 +75,19 @@ impl Component for AddressBookCreatePage {
         &mut self,
         event: &AppEvent,
         area: Rect,
-        _popup_area: Rect,
+        popup_area: Rect,
         _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<PostHandleEventActions> {
         let mut handle_result = PostHandleEventActions::default();
 
-        if let Some(FormEvent::ButtonPressed(label)) =
-            self.form
-                .handle_event(event.widget_event().as_ref(), area, &mut handle_result)?
-        {
+        if let Some(FormEvent::ButtonPressed(label)) = self.form.handle_event(
+            event.widget_event().as_ref(),
+            area,
+            popup_area,
+            &mut handle_result,
+        )? {
             if label == FormItem::SaveButton {
                 let name = self.form.get_text(FormItem::Name);
                 if name.is_empty() {

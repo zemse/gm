@@ -17,42 +17,60 @@ pub enum SelectEvent<'a, T> {
 
 #[derive(Debug)]
 pub struct SelectOwned<T: Display + PartialEq> {
-    /// If true, the item at cursor is applied with select_focused style from Thematize
-    pub focus: bool,
-    pub list: Option<Vec<T>>,
-    pub cursor: Cursor,
-    pub external_cursor: Option<usize>,
+    loading_text: Option<&'static str>,
+    empty_text: Option<&'static str>,
+    focus: bool,
+    list: Option<Vec<T>>,
+    cursor: Cursor,
+    hover_cursor: Option<usize>,
 }
 
 impl<T: Display + PartialEq> Default for SelectOwned<T> {
     fn default() -> Self {
         Self {
+            loading_text: None,
+            empty_text: None,
             focus: false,
             list: None,
             cursor: Cursor::new(0),
-            external_cursor: None,
+            hover_cursor: None,
         }
     }
 }
 
 impl<T: Display + PartialEq> SelectOwned<T> {
-    pub fn new(list: Option<Vec<T>>, external_cursor: bool) -> Self {
+    // TODO remove this function and use builder pattern
+    pub fn new(list: Option<Vec<T>>, hover_cursor: bool) -> Self {
         Self {
+            loading_text: None,
+            empty_text: None,
             focus: false,
             list,
             cursor: Cursor::new(0),
-            external_cursor: external_cursor.then_some(0),
+            hover_cursor: hover_cursor.then_some(0),
         }
     }
 
-    #[allow(clippy::len_without_is_empty)]
-    pub fn len(&self) -> usize {
+    pub fn with_loading_text(mut self, loading_text: &'static str) -> Self {
+        self.loading_text = Some(loading_text);
+        self
+    }
+
+    pub fn with_empty_text(mut self, empty_text: &'static str) -> Self {
+        self.empty_text = Some(empty_text);
+        self
+    }
+
+    pub fn set_focus(&mut self, focus: bool) {
+        self.focus = focus;
+    }
+
+    pub fn list_len(&self) -> usize {
         self.list.as_ref().map(|l| l.len()).unwrap_or(0)
     }
 
-    /// Returns true if the list is Some and empty
-    pub fn is_some_empty(&self) -> bool {
-        self.list.as_ref().map(|l| l.is_empty()).unwrap_or_default()
+    pub fn list_is_none(&self) -> bool {
+        self.list.is_none()
     }
 
     pub fn get_focussed_item(&self) -> Option<&T> {
@@ -68,9 +86,31 @@ impl<T: Display + PartialEq> SelectOwned<T> {
             .and_then(|list| list.iter().enumerate().find(|(_, i)| **i == item))
         {
             self.cursor.current = index;
-            if let Some(external_cursor) = self.external_cursor.as_mut() {
+            if let Some(external_cursor) = self.hover_cursor.as_mut() {
                 *external_cursor = index;
             }
+        }
+    }
+
+    pub fn cursor(&self) -> usize {
+        self.cursor.current
+    }
+
+    pub fn hover_cursor(&self) -> Option<usize> {
+        self.hover_cursor
+    }
+
+    pub fn set_cursor(&mut self, cursor: usize) {
+        self.cursor.current = cursor.min(self.list_len().saturating_sub(1));
+        if let Some(external_cursor) = self.hover_cursor.as_mut() {
+            *external_cursor = self.cursor.current;
+        }
+    }
+
+    pub fn reset_cursor(&mut self) {
+        self.cursor.reset();
+        if let Some(external_cursor) = self.hover_cursor.as_mut() {
+            *external_cursor = 0;
         }
     }
 
@@ -85,8 +125,8 @@ impl<T: Display + PartialEq> SelectOwned<T> {
             self.cursor.current = 0;
         }
 
-        if let Some(external_cursor) = self.external_cursor.as_mut() {
-            *external_cursor = self.cursor.current;
+        if let Some(hover_cursor) = self.hover_cursor.as_mut() {
+            *hover_cursor = self.cursor.current;
         }
     }
 
@@ -111,8 +151,8 @@ impl<T: Display + PartialEq> SelectOwned<T> {
                                         result =
                                             Some(SelectEvent::Select(&list[self.cursor.current]));
 
-                                        if self.external_cursor.is_some() {
-                                            self.external_cursor = Some(self.cursor.current);
+                                        if self.hover_cursor.is_some() {
+                                            self.hover_cursor = Some(self.cursor.current);
                                         }
                                     }
                                 }
@@ -129,7 +169,7 @@ impl<T: Display + PartialEq> SelectOwned<T> {
                                 cursor: &self.cursor,
                                 focus: true,
                             }
-                            .display_item(area, self.external_cursor, None::<&DefaultTheme>);
+                            .display_item(area, self.hover_cursor, None::<&DefaultTheme>);
 
                             let mut new_cursor = start_index;
                             let clicked_height = mouse_event.row.saturating_sub(area.y) as usize;
@@ -143,8 +183,8 @@ impl<T: Display + PartialEq> SelectOwned<T> {
                                         result =
                                             Some(SelectEvent::Select(&list[self.cursor.current]));
 
-                                        if self.external_cursor.is_some() {
-                                            self.external_cursor = Some(self.cursor.current);
+                                        if self.hover_cursor.is_some() {
+                                            self.hover_cursor = Some(self.cursor.current);
                                         }
                                     } else if mouse_event.is(MouseEventKind::Moved) {
                                         self.cursor.current = new_cursor;
@@ -178,14 +218,18 @@ impl<T: Display + PartialEq> ThemedWidget for SelectOwned<T> {
         Self: Sized,
     {
         if let Some(list) = self.list.as_ref() {
-            Select {
-                list,
-                cursor: &self.cursor,
-                focus: self.focus,
+            if !list.is_empty() {
+                Select {
+                    list,
+                    cursor: &self.cursor,
+                    focus: self.focus,
+                }
+                .render(area, buf, self.hover_cursor, theme);
+            } else {
+                self.empty_text.unwrap_or("no items").render(area, buf);
             }
-            .render(area, buf, self.external_cursor, theme);
         } else {
-            "no items".render(area, buf);
+            self.loading_text.unwrap_or("Loading...").render(area, buf);
         }
     }
 }
