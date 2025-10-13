@@ -127,7 +127,8 @@ impl Component for SendMessagePage {
                 .networks_popup
                 .handle_event(event.key_event(), &mut actions)
             {
-                self.form.set_text(FormItem::Network, selection.name);
+                self.form
+                    .set_text(FormItem::Network, selection.name.clone());
                 self.form.advance_cursor();
             }
         } else if self.tx_popup.is_open() {

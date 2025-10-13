@@ -78,16 +78,27 @@ impl<Item: Display + Clone> FilterSelectPopup<Item> {
         self.open = false;
     }
 
-    pub fn handle_event<A>(&mut self, key_event: Option<&KeyEvent>, actions: &mut A) -> Option<Item>
+    pub fn handle_event<'a, A>(
+        &'a mut self,
+        key_event: Option<&KeyEvent>,
+        actions: &mut A,
+    ) -> Option<&'a Item>
     where
         A: Act,
     {
         let mut result = None;
 
         if self.open {
+            if key_event.is_pressed(KeyCode::Esc) {
+                self.close();
+            }
+
             if self.items.is_some() {
-                let items = self.items.as_ref().unwrap();
-                let cursor_max = items.len();
+                let cursor_max = self
+                    .items
+                    .as_ref()
+                    .map(|items| items.len())
+                    .unwrap_or_else(|| unreachable!());
                 self.cursor.handle(key_event, cursor_max);
 
                 if let Some(key_event) = key_event {
@@ -100,17 +111,14 @@ impl<Item: Display + Clone> FilterSelectPopup<Item> {
                                 self.search_string.pop();
                             }
                             KeyCode::Enter => {
-                                result = Some(items[self.cursor.current].clone());
                                 self.close();
+                                let items = self.items.as_ref().unwrap();
+                                result = Some(&items[self.cursor.current]);
                             }
                             _ => {}
                         }
                     }
                 }
-            }
-
-            if key_event.is_pressed(KeyCode::Esc) {
-                self.close();
             }
 
             actions.ignore_esc();

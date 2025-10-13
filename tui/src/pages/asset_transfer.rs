@@ -136,6 +136,8 @@ impl Component for AssetTransferPage {
                 .asset_popup
                 .handle_event(event.key_event(), &mut actions)
             {
+                self.asset = Some(selection.clone());
+
                 self.form
                     .set_text(FormItem::AssetType, format!("{}", selection.r#type));
                 *self
@@ -143,7 +145,7 @@ impl Component for AssetTransferPage {
                     .get_currency_mut(FormItem::Amount)
                     .expect("currency not found in this input entry, please check idx") =
                     Some(selection.r#type.symbol.clone());
-                self.asset = Some(selection);
+
                 self.form.advance_cursor();
             }
         } else if self.tx_popup.is_open() {
