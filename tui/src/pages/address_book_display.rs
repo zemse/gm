@@ -2,9 +2,8 @@ use crate::{
     app::SharedState, post_handle_event::PostHandleEventActions, traits::Component, AppEvent,
 };
 use gm_ratatui_extra::{
-    act::Act,
     button::Button,
-    form::{Form, FormItemIndex, FormWidget},
+    form::{Form, FormEvent, FormItemIndex, FormWidget},
     input_box_owned::InputBoxOwned,
 };
 use gm_utils::{
@@ -85,43 +84,39 @@ impl Component for AddressBookDisplayPage {
     ) -> crate::Result<PostHandleEventActions> {
         let mut handle_result = PostHandleEventActions::default();
 
-        let r = self.form.handle_event(
-            event.widget_event().as_ref(),
-            area,
-            |_, _| Ok(()),
-            |label, form| {
-                if label == FormItem::SaveButton {
-                    let name = form.get_text(FormItem::Name);
-                    if name.is_empty() {
-                        form.set_text(
-                            FormItem::ErrorText,
-                            "Please enter name, you cannot leave it empty".to_string(),
-                        );
-                    } else {
-                        let mut address_book = AddressBookStore::load()?;
+        if let Some(FormEvent::ButtonPressed(label)) =
+            self.form
+                .handle_event(event.widget_event().as_ref(), area, &mut handle_result)?
+        {
+            if label == FormItem::SaveButton {
+                let name = self.form.get_text(FormItem::Name);
+                if name.is_empty() {
+                    self.form.set_text(
+                        FormItem::ErrorText,
+                        "Please enter name, you cannot leave it empty".to_string(),
+                    );
+                } else {
+                    let mut address_book = AddressBookStore::load()?;
 
-                        let address = form.get_text(FormItem::Address);
-                        let result = address.parse_as_address().and_then(|address| {
-                            address_book.update(
-                                self.id,
-                                AddressBookEntry {
-                                    name: name.to_string(),
-                                    address,
-                                },
-                            )
-                        });
-                        if let Err(e) = result {
-                            form.set_text(FormItem::ErrorText, format!("{e:?}"));
-                        } else {
-                            handle_result.page_pop();
-                            handle_result.reload();
-                        }
+                    let address = self.form.get_text(FormItem::Address);
+                    let result = address.parse_as_address().and_then(|address| {
+                        address_book.update(
+                            self.id,
+                            AddressBookEntry {
+                                name: name.to_string(),
+                                address,
+                            },
+                        )
+                    });
+                    if let Err(e) = result {
+                        self.form.set_text(FormItem::ErrorText, format!("{e:?}"));
+                    } else {
+                        handle_result.page_pop();
+                        handle_result.reload();
                     }
                 }
-                Ok(())
-            },
-        )?;
-        handle_result.merge(r);
+            }
+        }
 
         Ok(handle_result)
     }

@@ -1,6 +1,9 @@
 use std::sync::mpsc;
 
-use gm_ratatui_extra::{extensions::ThemedWidget, select_owned::SelectOwned};
+use gm_ratatui_extra::{
+    extensions::ThemedWidget,
+    select_owned::{SelectEvent, SelectOwned},
+};
 use gm_utils::assets::Asset;
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use tokio_util::sync::CancellationToken;
@@ -53,15 +56,11 @@ impl Component for AssetsPage {
         }
 
         let mut handle_result = PostHandleEventActions::default();
-        self.select.handle_event(
-            event.input_event(),
-            area,
-            |asset| {
-                handle_result.page_insert(Page::AssetTransfer(AssetTransferPage::new(asset)?));
-                Ok::<(), crate::Error>(())
-            },
-            |_| Ok(()),
-        )?;
+        if let Some(SelectEvent::Select(asset)) =
+            self.select.handle_event(event.input_event(), area)
+        {
+            handle_result.page_insert(Page::AssetTransfer(AssetTransferPage::new(asset)?));
+        }
 
         Ok(handle_result)
     }

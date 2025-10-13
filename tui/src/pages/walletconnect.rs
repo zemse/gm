@@ -10,7 +10,7 @@ use gm_ratatui_extra::{
     button::Button,
     confirm_popup::{ConfirmPopup, ConfirmResult},
     cursor::Cursor,
-    form::{Form, FormItemIndex, FormWidget},
+    form::{Form, FormEvent, FormItemIndex, FormWidget},
     input_box_owned::InputBoxOwned,
     select::Select,
     thematize::Thematize,
@@ -578,59 +578,55 @@ impl Component for WalletConnectPage {
                 actions.page_pop();
             }
         } else if self.status == WalletConnectStatus::Idle {
-            let r = self.form.handle_event(
-                event.widget_event().as_ref(),
-                area,
-                |_, _| Ok(()),
-                |item, form| {
-                    if item == FormItem::ConnectButton {
-                        let uri_input = form.get_text(FormItem::UriInput).to_string();
-                        let current_account = ss.current_account.unwrap(); // TODO ensure we can see this page only if account exists
-                        let tr = tr.clone();
+            if let Some(FormEvent::ButtonPressed(item)) =
+                self.form
+                    .handle_event(event.widget_event().as_ref(), area, &mut actions)?
+            {
+                if item == FormItem::ConnectButton {
+                    let uri_input = self.form.get_text(FormItem::UriInput).to_string();
+                    let current_account = ss.current_account.unwrap(); // TODO ensure we can see this page only if account exists
+                    let tr = tr.clone();
 
-                        let client_seed = [123u8; 32];
-                        let project_id: &str = "46c07e56a92e34fe567dcc951fba3f3e";
+                    let client_seed = [123u8; 32];
+                    let project_id: &str = "46c07e56a92e34fe567dcc951fba3f3e";
 
-                        let conn = Connection::new(
-                            "https://relay.walletconnect.org/rpc",
-                            "https://relay.walletconnect.org",
-                            // TODO take project ID and client seed from config
-                            project_id,
-                            client_seed,
-                            Metadata {
-                                name: "gm wallet".to_string(),
-                                description: "gm is a TUI based ethereum wallet".to_string(),
-                                url: "https://github.com/zemse/gm".to_string(),
-                                icons: vec![],
-                            },
-                        );
+                    let conn = Connection::new(
+                        "https://relay.walletconnect.org/rpc",
+                        "https://relay.walletconnect.org",
+                        // TODO take project ID and client seed from config
+                        project_id,
+                        client_seed,
+                        Metadata {
+                            name: "gm wallet".to_string(),
+                            description: "gm is a TUI based ethereum wallet".to_string(),
+                            url: "https://github.com/zemse/gm".to_string(),
+                            icons: vec![],
+                        },
+                    );
 
-                        tokio::spawn(async move {
-                            let _ = tr.send(AppEvent::WalletConnectStatus(
-                                WalletConnectStatus::Initializing,
-                            ));
+                    tokio::spawn(async move {
+                        let _ = tr.send(AppEvent::WalletConnectStatus(
+                            WalletConnectStatus::Initializing,
+                        ));
 
-                            match conn.init_pairing(&uri_input).await {
-                                Ok((pairing, proposal)) => {
-                                    let _ = tr.send(AppEvent::WalletConnectStatus(
-                                        WalletConnectStatus::ProposalReceived(Box::new((
-                                            pairing, proposal,
-                                        ))),
-                                    ));
-                                }
-                                Err(error) => {
-                                    let _ = tr.send(AppEvent::WalletConnectError(
-                                        current_account,
-                                        format!("{error:?}"),
-                                    ));
-                                }
-                            };
-                        });
-                    }
-                    Ok(())
-                },
-            )?;
-            actions.merge(r);
+                        match conn.init_pairing(&uri_input).await {
+                            Ok((pairing, proposal)) => {
+                                let _ = tr.send(AppEvent::WalletConnectStatus(
+                                    WalletConnectStatus::ProposalReceived(Box::new((
+                                        pairing, proposal,
+                                    ))),
+                                ));
+                            }
+                            Err(error) => {
+                                let _ = tr.send(AppEvent::WalletConnectError(
+                                    current_account,
+                                    format!("{error:?}"),
+                                ));
+                            }
+                        };
+                    });
+                }
+            }
         } else if self.status == WalletConnectStatus::SessionSettleDone {
             self.cursor
                 .handle(event.key_event(), self.session_requests.len());

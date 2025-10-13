@@ -5,7 +5,7 @@ use crate::traits::Component;
 use crate::widgets::{address_book_popup, networks_popup, AddressBookPopup, NetworksPopup};
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::button::Button;
-use gm_ratatui_extra::form::{Form, FormWidget};
+use gm_ratatui_extra::form::{Form, FormEvent, FormWidget};
 use gm_ratatui_extra::input_box_owned::InputBoxOwned;
 use gm_ratatui_extra::thematize::Thematize;
 use gm_ratatui_extra::widgets::form::FormItemIndex;
@@ -94,7 +94,7 @@ impl Component for SendMessagePage {
         sd: &CancellationToken,
         ss: &SharedState,
     ) -> Result<PostHandleEventActions> {
-        let mut result = PostHandleEventActions::default();
+        let mut actions = PostHandleEventActions::default();
 
         #[allow(clippy::single_match)]
         match event {
@@ -113,26 +113,23 @@ impl Component for SendMessagePage {
         }
 
         if self.address_book_popup.is_open() {
-            result.merge(self.address_book_popup.handle_event(
-                event.key_event(),
-                |entry| -> crate::Result<()> {
-                    self.form
-                        .set_text(FormItem::To, entry.address()?.to_string());
+            if let Some(selection) = self
+                .address_book_popup
+                .handle_event(event.key_event(), &mut actions)
+            {
+                self.form
+                    .set_text(FormItem::To, selection.address()?.to_string());
 
-                    self.form.advance_cursor();
-                    Ok(())
-                },
-            )?);
+                self.form.advance_cursor();
+            }
         } else if self.networks_popup.is_open() {
-            result.merge(self.networks_popup.handle_event(
-                event.key_event(),
-                |network| -> crate::Result<()> {
-                    self.form.set_text(FormItem::Network, network.name.clone());
-
-                    self.form.advance_cursor();
-                    Ok(())
-                },
-            )?);
+            if let Some(selection) = self
+                .networks_popup
+                .handle_event(event.key_event(), &mut actions)
+            {
+                self.form.set_text(FormItem::Network, selection.name);
+                self.form.advance_cursor();
+            }
         } else if self.tx_popup.is_open() {
             let r = self.tx_popup.handle_event(
                 (event, area, tr, sd, ss),
@@ -142,7 +139,7 @@ impl Component for SendMessagePage {
                 || Ok(()),
                 || Ok(()),
             )?;
-            result.merge(r);
+            actions.merge(r);
         } else {
             // Handle form events
             if self.form.is_focused(FormItem::To)
@@ -159,39 +156,32 @@ impl Component for SendMessagePage {
                 self.networks_popup.open();
                 self.networks_popup
                     .set_items(Some(NetworkStore::load()?.filter(ss.testnet_mode)));
-            } else {
-                let r = self.form.handle_event(
-                    event.widget_event().as_ref(),
-                    area,
-                    |_, _| Ok(()),
-                    |label, form| {
-                        if label == FormItem::SendMessageButton {
-                            let to = form.get_text(FormItem::To);
-                            let message = form.get_text(FormItem::Message);
-                            let network_name = form.get_text(FormItem::Network);
-                            if message.is_empty() {
-                                return Err(crate::Error::CannotBeEmpty("Message".to_string()));
-                            }
+            } else if let Some(FormEvent::ButtonPressed(label)) =
+                self.form
+                    .handle_event(event.widget_event().as_ref(), area, &mut actions)?
+            {
+                if label == FormItem::SendMessageButton {
+                    let to = self.form.get_text(FormItem::To);
+                    let message = self.form.get_text(FormItem::Message);
+                    let network_name = self.form.get_text(FormItem::Network);
+                    if message.is_empty() {
+                        return Err(crate::Error::CannotBeEmpty("Message".to_string()));
+                    }
 
-                            self.tx_popup.set_tx_req(
-                                Network::from_name(&network_name)?,
-                                TransactionRequest::default()
-                                    .to(to.parse_as_address()?)
-                                    .input(TransactionInput::from(Bytes::from(
-                                        message.to_string().into_bytes(),
-                                    ))),
-                            );
-                            self.tx_popup.open();
-                        }
-
-                        Ok(())
-                    },
-                )?;
-                result.merge(r);
+                    self.tx_popup.set_tx_req(
+                        Network::from_name(&network_name)?,
+                        TransactionRequest::default()
+                            .to(to.parse_as_address()?)
+                            .input(TransactionInput::from(Bytes::from(
+                                message.to_string().into_bytes(),
+                            ))),
+                    );
+                    self.tx_popup.open();
+                }
             }
         }
 
-        Ok(result)
+        Ok(actions)
     }
 
     fn render_component(

@@ -9,7 +9,7 @@ use alloy::primitives::{Bytes, U256};
 use alloy::rpc::types::TransactionRequest;
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::button::Button;
-use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
+use gm_ratatui_extra::form::{Form, FormEvent, FormItemIndex, FormWidget};
 use gm_ratatui_extra::input_box_owned::InputBoxOwned;
 use gm_utils::alloy::StringExt;
 use gm_utils::assets::{Asset, TokenAddress};
@@ -120,34 +120,32 @@ impl Component for AssetTransferPage {
         sd: &CancellationToken,
         ss: &SharedState,
     ) -> Result<PostHandleEventActions> {
-        let mut result = PostHandleEventActions::default();
+        let mut actions = PostHandleEventActions::default();
 
         if self.address_book_popup.is_open() {
-            result.merge(self.address_book_popup.handle_event(
-                event.key_event(),
-                |entry| -> crate::Result<()> {
-                    self.form
-                        .set_text(FormItem::To, entry.address()?.to_string());
-                    self.form.advance_cursor();
-                    Ok(())
-                },
-            )?);
+            if let Some(selection) = self
+                .address_book_popup
+                .handle_event(event.key_event(), &mut actions)
+            {
+                self.form
+                    .set_text(FormItem::To, selection.address()?.to_string());
+                self.form.advance_cursor();
+            }
         } else if self.asset_popup.is_open() {
-            result.merge(self.asset_popup.handle_event(
-                event.key_event(),
-                |asset| -> crate::Result<()> {
-                    self.asset = Some(asset.clone());
-                    self.form
-                        .set_text(FormItem::AssetType, format!("{}", asset.r#type));
-                    *self
-                        .form
-                        .get_currency_mut(FormItem::Amount)
-                        .expect("currency not found in this input entry, please check idx") =
-                        Some(asset.r#type.symbol.clone());
-                    self.form.advance_cursor();
-                    Ok(())
-                },
-            )?);
+            if let Some(selection) = self
+                .asset_popup
+                .handle_event(event.key_event(), &mut actions)
+            {
+                self.form
+                    .set_text(FormItem::AssetType, format!("{}", selection.r#type));
+                *self
+                    .form
+                    .get_currency_mut(FormItem::Amount)
+                    .expect("currency not found in this input entry, please check idx") =
+                    Some(selection.r#type.symbol.clone());
+                self.asset = Some(selection);
+                self.form.advance_cursor();
+            }
         } else if self.tx_popup.is_open() {
             let is_confirmed = self.tx_popup.is_confirmed();
             let r = self.tx_popup.handle_event(
@@ -158,12 +156,12 @@ impl Component for AssetTransferPage {
                 || Ok(()),
                 || {
                     if is_confirmed {
-                        result.page_pop();
+                        actions.page_pop();
                     }
                     Ok(())
                 },
             )?;
-            result.merge(r);
+            actions.merge(r);
         } else {
             // Handle form events
             if self.form.is_focused(FormItem::To)
@@ -176,58 +174,54 @@ impl Component for AssetTransferPage {
                         false,
                         ss.recent_addresses.clone(),
                     )?));
-                result.ignore_esc();
+                actions.ignore_esc();
             } else if self.form.is_focused(FormItem::AssetType) && event.is_space_or_enter_pressed()
             {
                 self.asset_popup.open();
                 self.asset_popup.set_items(ss.assets_read()?);
-                result.ignore_esc();
+                actions.ignore_esc();
             } else {
-                let r = self.form.handle_event(
-                    event.widget_event().as_ref(),
-                    area,
-                    |_, _| Ok(()),
-                    |label, form| {
-                        if label == FormItem::TransferButton {
-                            let to = form.get_text(FormItem::To);
-                            let asset =
-                                self.asset.as_ref().ok_or(crate::Error::AssetNotSelected)?;
-                            let amount = parse_units(
-                                &form.get_text(FormItem::Amount),
-                                asset.r#type.decimals,
-                            )?;
+                // Handle form events
+                if let Some(FormEvent::ButtonPressed(label)) =
+                    self.form
+                        .handle_event(event.widget_event().as_ref(), area, &mut actions)?
+                {
+                    if label == FormItem::TransferButton {
+                        let to = self.form.get_text(FormItem::To);
+                        let asset = self.asset.as_ref().ok_or(crate::Error::AssetNotSelected)?;
+                        let amount = parse_units(
+                            &self.form.get_text(FormItem::Amount),
+                            asset.r#type.decimals,
+                        )?;
 
-                            // TODO change erc20 logic here
-                            let (to, calldata, value) = match asset.r#type.token_address {
-                                TokenAddress::Native => {
-                                    (to.parse_as_address()?, Bytes::new(), amount.get_absolute())
-                                }
-                                TokenAddress::Contract(address) => (
-                                    address,
-                                    erc20::encode_transfer(
-                                        to.parse_as_address()?,
-                                        amount.get_absolute(),
-                                    ),
-                                    U256::ZERO,
-                                ),
-                            };
-
-                            if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
-                                self.tx_popup.set_tx_req(
-                                    Network::from_name(&asset.r#type.network)?,
-                                    TransactionRequest::default()
-                                        .to(to)
-                                        .value(value)
-                                        .input(calldata.into()),
-                                );
+                        // TODO change erc20 logic here
+                        let (to, calldata, value) = match asset.r#type.token_address {
+                            TokenAddress::Native => {
+                                (to.parse_as_address()?, Bytes::new(), amount.get_absolute())
                             }
+                            TokenAddress::Contract(address) => (
+                                address,
+                                erc20::encode_transfer(
+                                    to.parse_as_address()?,
+                                    amount.get_absolute(),
+                                ),
+                                U256::ZERO,
+                            ),
+                        };
 
-                            self.tx_popup.open();
+                        if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
+                            self.tx_popup.set_tx_req(
+                                Network::from_name(&asset.r#type.network)?,
+                                TransactionRequest::default()
+                                    .to(to)
+                                    .value(value)
+                                    .input(calldata.into()),
+                            );
                         }
-                        Ok(())
-                    },
-                )?;
-                result.merge(r);
+
+                        self.tx_popup.open();
+                    }
+                }
             }
         }
 
@@ -250,7 +244,7 @@ impl Component for AssetTransferPage {
             }
         }
 
-        Ok(result)
+        Ok(actions)
     }
 
     fn render_component(

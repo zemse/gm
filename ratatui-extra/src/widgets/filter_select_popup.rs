@@ -16,8 +16,9 @@ use crate::{
     thematize::Thematize,
 };
 
+// TODO use FilterSelectOwned instead of FilterSelect
 #[derive(Clone, Debug)]
-pub struct FilterSelectPopup<Item: Display> {
+pub struct FilterSelectPopup<Item: Display + Clone> {
     title: &'static str,
     empty_text: Option<&'static str>,
     open: bool,
@@ -26,7 +27,7 @@ pub struct FilterSelectPopup<Item: Display> {
     search_string: String,
 }
 
-impl<Item: Display> FilterSelectPopup<Item> {
+impl<Item: Display + Clone> FilterSelectPopup<Item> {
     pub fn new(title: &'static str, empty_text: Option<&'static str>) -> Self {
         Self {
             title,
@@ -77,16 +78,11 @@ impl<Item: Display> FilterSelectPopup<Item> {
         self.open = false;
     }
 
-    pub fn handle_event<A, E, F>(
-        &mut self,
-        key_event: Option<&KeyEvent>,
-        mut on_enter: F,
-    ) -> Result<A, E>
+    pub fn handle_event<A>(&mut self, key_event: Option<&KeyEvent>, actions: &mut A) -> Option<Item>
     where
         A: Act,
-        F: FnMut(&Item) -> Result<(), E>,
     {
-        let mut act = A::default();
+        let mut result = None;
 
         if self.open {
             if self.items.is_some() {
@@ -104,7 +100,7 @@ impl<Item: Display> FilterSelectPopup<Item> {
                                 self.search_string.pop();
                             }
                             KeyCode::Enter => {
-                                on_enter(&items[self.cursor.current])?;
+                                result = Some(items[self.cursor.current].clone());
                                 self.close();
                             }
                             _ => {}
@@ -117,10 +113,10 @@ impl<Item: Display> FilterSelectPopup<Item> {
                 self.close();
             }
 
-            act.ignore_esc();
+            actions.ignore_esc();
         }
 
-        Ok(act)
+        result
     }
     pub fn render(&self, popup_area: Rect, buf: &mut Buffer, theme: &impl Thematize)
     where

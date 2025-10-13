@@ -1,5 +1,5 @@
 use gm_ratatui_extra::extensions::ThemedWidget;
-use gm_ratatui_extra::select_owned::SelectOwned;
+use gm_ratatui_extra::select_owned::{SelectEvent, SelectOwned};
 use gm_utils::disk_storage::DiskStorageInterface;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -70,38 +70,33 @@ impl Component for NetworkPage {
     ) -> crate::Result<PostHandleEventActions> {
         let mut result = PostHandleEventActions::default();
 
-        self.select.handle_event(
-            event.input_event(),
-            area,
-            |item| {
-                let network_store = NetworkStore::load()?;
-                match item {
-                    NetworkSelect::Create => {
-                        let network_index = network_store.networks.len();
-                        result.page_insert(Page::NetworkCreate(NetworkCreatePage::new(
-                            true,
-                            network_index,
-                            Network::default(),
-                        )?));
-                    }
-
-                    NetworkSelect::Existing(name) => {
-                        let network_index = network_store
-                            .networks
-                            .iter()
-                            .position(|n| n.name == name.name)
-                            .unwrap();
-                        result.page_insert(Page::NetworkCreate(NetworkCreatePage::new(
-                            false,
-                            network_index,
-                            *name.clone(),
-                        )?));
-                    }
+        if let Some(SelectEvent::Select(item)) = self.select.handle_event(event.input_event(), area)
+        {
+            let network_store = NetworkStore::load()?;
+            match item {
+                NetworkSelect::Create => {
+                    let network_index = network_store.networks.len();
+                    result.page_insert(Page::NetworkCreate(NetworkCreatePage::new(
+                        true,
+                        network_index,
+                        Network::default(),
+                    )?));
                 }
-                Ok::<(), crate::Error>(())
-            },
-            |_| Ok(()),
-        )?;
+
+                NetworkSelect::Existing(name) => {
+                    let network_index = network_store
+                        .networks
+                        .iter()
+                        .position(|n| n.name == name.name)
+                        .unwrap();
+                    result.page_insert(Page::NetworkCreate(NetworkCreatePage::new(
+                        false,
+                        network_index,
+                        *name.clone(),
+                    )?));
+                }
+            }
+        }
 
         Ok(result)
     }

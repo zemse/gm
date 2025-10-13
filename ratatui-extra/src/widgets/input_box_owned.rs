@@ -112,38 +112,40 @@ impl InputBoxOwned {
         self.text_cursor = self.text_input.len();
     }
 
-    pub fn handle_event<A: Act>(&mut self, widget_event: Option<&WidgetEvent>, area: Rect) -> A {
-        let mut act = A::default();
-
+    pub fn handle_event<A: Act>(
+        &mut self,
+        widget_event: Option<&WidgetEvent>,
+        area: Rect,
+        actions: &mut A,
+    ) {
         match widget_event {
             Some(WidgetEvent::Tick) => {
                 self.cursor_blink_visible = !self.cursor_blink_visible;
             }
             Some(WidgetEvent::InputEvent(input_event)) => {
+                // Only handle input events if this box is not immutable
                 if !self.is_immutable {
-                    // Only handle any input events if not immutable
-
                     match input_event {
                         Event::Key(key_event) => match key_event.code {
                             KeyCode::Left => {
                                 if key_event.modifiers == KeyModifiers::ALT {
                                     option_left(&self.text_input, &mut self.text_cursor);
-                                    act.ignore_left();
+                                    actions.ignore_left();
                                     self.last_move = Instant::now();
                                 } else if self.text_cursor > 0 {
                                     self.text_cursor -= 1;
-                                    act.ignore_left();
+                                    actions.ignore_left();
                                     self.last_move = Instant::now();
                                 }
                             }
                             KeyCode::Right => {
                                 if key_event.modifiers == KeyModifiers::ALT {
                                     option_right(&self.text_input, &mut self.text_cursor);
-                                    act.ignore_right();
+                                    actions.ignore_right();
                                     self.last_move = Instant::now();
                                 } else if self.text_cursor < self.text_input.len() {
                                     self.text_cursor += 1;
-                                    act.ignore_right();
+                                    actions.ignore_right();
                                     self.last_move = Instant::now();
                                 }
                             }
@@ -245,8 +247,6 @@ impl InputBoxOwned {
             }
             _ => {}
         }
-
-        act
     }
 
     pub fn render(&self, area: Rect, buf: &mut Buffer, focus: bool, theme: &impl Thematize)

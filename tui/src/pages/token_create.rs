@@ -5,10 +5,10 @@ use crate::post_handle_event::PostHandleEventActions;
 use crate::traits::Component;
 use crate::AppEvent;
 use alloy::primitives::Address;
-use gm_ratatui_extra::act::Act;
+
 use gm_ratatui_extra::button::Button;
 use gm_ratatui_extra::confirm_popup::{ConfirmPopup, ConfirmResult};
-use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
+use gm_ratatui_extra::form::{Form, FormEvent, FormItemIndex, FormWidget};
 use gm_ratatui_extra::input_box_owned::InputBoxOwned;
 use gm_ratatui_extra::thematize::Thematize;
 use gm_utils::disk_storage::DiskStorageInterface;
@@ -163,38 +163,34 @@ impl Component for TokenCreatePage {
             }
         }
 
-        let r = self.form.handle_event(
-            event.widget_event().as_ref(),
-            area,
-            |_, _| Ok(()),
-            |label, form| {
-                if label == FormItem::SaveButton {
-                    let token = Self::token(form);
-                    if self.network.tokens.get(self.token_index).is_some() {
-                        self.network.tokens[self.token_index] = token;
-                    } else {
-                        self.network.tokens.push(token);
-                    }
-
-                    let mut config = NetworkStore::load()?;
-                    config.networks[self.network_index] = self.network.clone();
-                    config.save()?;
-
-                    actions.page_pop();
-                    actions.page_insert(Page::Token(TokenPage::new(
-                        self.network_index,
-                        self.network.clone(),
-                    )?));
-                    actions.reload();
-                }
-                if label == FormItem::RemoveButton {
-                    self.remove_popup.open();
+        if let Some(FormEvent::ButtonPressed(label)) =
+            self.form
+                .handle_event(event.widget_event().as_ref(), area, &mut actions)?
+        {
+            if label == FormItem::SaveButton {
+                let token = Self::token(&self.form);
+                if self.network.tokens.get(self.token_index).is_some() {
+                    self.network.tokens[self.token_index] = token;
+                } else {
+                    self.network.tokens.push(token);
                 }
 
-                Ok(())
-            },
-        )?;
-        actions.merge(r);
+                let mut config = NetworkStore::load()?;
+                config.networks[self.network_index] = self.network.clone();
+                config.save()?;
+
+                actions.page_pop();
+                actions.page_insert(Page::Token(TokenPage::new(
+                    self.network_index,
+                    self.network.clone(),
+                )?));
+                actions.reload();
+            }
+            if label == FormItem::RemoveButton {
+                self.remove_popup.open();
+            }
+        }
+
         Ok(actions)
     }
     fn render_component(

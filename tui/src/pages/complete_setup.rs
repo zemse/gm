@@ -1,9 +1,8 @@
 use std::sync::mpsc;
 
 use gm_ratatui_extra::{
-    act::Act,
     button::Button,
-    form::{Form, FormItemIndex, FormWidget},
+    form::{Form, FormEvent, FormItemIndex, FormWidget},
     input_box_owned::InputBoxOwned,
 };
 use gm_utils::{config::Config, disk_storage::DiskStorageInterface};
@@ -107,27 +106,24 @@ impl Component for CompleteSetupPage {
 
         let mut handle_result = PostHandleEventActions::default();
 
-        let r = self.form.handle_event(
-            event.widget_event().as_ref(),
-            area,
-            |_, _| Ok(()),
-            |label, form| {
-                if label == FormItem::CreateOrImportWallet {
-                    handle_result.page_insert(Page::Account(AccountPage::new()?));
-                } else {
-                    handle_result.reload();
+        if let Some(FormEvent::ButtonPressed(label)) =
+            self.form
+                .handle_event(event.widget_event().as_ref(), area, &mut handle_result)?
+        {
+            if label == FormItem::CreateOrImportWallet {
+                handle_result.page_insert(Page::Account(AccountPage::new()?));
+            } else {
+                handle_result.reload();
 
-                    Config::set_alchemy_api_key(
-                        form.get_text(FormItem::AlchemyApiKey).to_string(),
-                    )?;
-                    transmitter.send(AppEvent::ConfigUpdate)?;
+                Config::set_alchemy_api_key(
+                    self.form.get_text(FormItem::AlchemyApiKey).to_string(),
+                )?;
+                transmitter.send(AppEvent::ConfigUpdate)?;
 
-                    form.set_text(FormItem::Display, "Configuration saved".to_string());
-                }
-                Ok(())
-            },
-        )?;
-        handle_result.merge(r);
+                self.form
+                    .set_text(FormItem::Display, "Configuration saved".to_string());
+            }
+        }
 
         if self.form.valid_count() == 0 {
             handle_result.page_pop();

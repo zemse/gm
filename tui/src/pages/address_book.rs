@@ -1,7 +1,7 @@
 use std::{fmt::Display, sync::mpsc};
 
 use alloy::primitives::Address;
-use gm_ratatui_extra::filter_select_owned::FilterSelectOwned;
+use gm_ratatui_extra::{filter_select_owned::FilterSelectOwned, select_owned::SelectEvent};
 use ratatui::{buffer::Buffer, layout::Rect};
 use tokio_util::sync::CancellationToken;
 
@@ -18,7 +18,7 @@ use super::{
     address_book_create::AddressBookCreatePage, address_book_display::AddressBookDisplayPage, Page,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AddressBookMenuItem {
     Create,
     View(AddressBookEntry),
@@ -138,34 +138,35 @@ impl Component for AddressBookPage {
     ) -> crate::Result<PostHandleEventActions> {
         let mut result = PostHandleEventActions::default();
 
-        self.filter_select
-            .handle_event(event.input_event(), area, |ab_menu_item| {
-                result.page_insert(match ab_menu_item.as_ref() {
-                    AddressBookMenuItem::Create => Page::AddressBookCreate(
-                        AddressBookCreatePage::new(String::new(), String::new())?,
-                    ),
-                    AddressBookMenuItem::View(entry) => {
-                        let (id, entry) = AddressBookStore::load()?
-                            .find(&None, &Some(entry.address), &Some(&entry.name))?
-                            .ok_or(crate::Error::AddressBookEntryNotFound(
-                                entry.address,
-                                entry.name.clone(),
-                            ))?;
-                        Page::AddressBookDisplay(AddressBookDisplayPage::new(
-                            id,
-                            entry.name,
-                            entry.address.to_string(),
-                        )?)
-                    }
-                    AddressBookMenuItem::UnnamedOwned(address) => Page::AddressBookCreate(
-                        AddressBookCreatePage::new(String::new(), address.to_string())?,
-                    ),
-                    AddressBookMenuItem::RecentlyInteracted(address) => Page::AddressBookCreate(
-                        AddressBookCreatePage::new(String::new(), address.to_string())?,
-                    ),
-                });
-                Ok::<(), crate::Error>(())
-            })?;
+        if let Some(SelectEvent::Select(ab_menu_item)) =
+            self.filter_select.handle_event(event.input_event(), area)
+        {
+            result.page_insert(match ab_menu_item.as_ref() {
+                AddressBookMenuItem::Create => Page::AddressBookCreate(AddressBookCreatePage::new(
+                    String::new(),
+                    String::new(),
+                )?),
+                AddressBookMenuItem::View(entry) => {
+                    let (id, entry) = AddressBookStore::load()?
+                        .find(&None, &Some(entry.address), &Some(&entry.name))?
+                        .ok_or(crate::Error::AddressBookEntryNotFound(
+                            entry.address,
+                            entry.name.clone(),
+                        ))?;
+                    Page::AddressBookDisplay(AddressBookDisplayPage::new(
+                        id,
+                        entry.name,
+                        entry.address.to_string(),
+                    )?)
+                }
+                AddressBookMenuItem::UnnamedOwned(address) => Page::AddressBookCreate(
+                    AddressBookCreatePage::new(String::new(), address.to_string())?,
+                ),
+                AddressBookMenuItem::RecentlyInteracted(address) => Page::AddressBookCreate(
+                    AddressBookCreatePage::new(String::new(), address.to_string())?,
+                ),
+            });
+        }
 
         Ok(result)
     }

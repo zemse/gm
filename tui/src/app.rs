@@ -29,7 +29,7 @@ use alloy::primitives::Address;
 use gm_ratatui_extra::{
     act::Act,
     extensions::{RectExt, ThemedWidget},
-    select_owned::SelectOwned,
+    select_owned::{SelectEvent, SelectOwned},
     text_popup::TextPopup,
     thematize::Thematize,
 };
@@ -671,34 +671,24 @@ impl App {
             // If focus is on menu, handle all events. However if focus is not on menu
             // then handle all but key events. This allows to handle mouse clicks.
             if self.focus == Focus::Menu || !is_key_event {
-                let mut focus_update_1 = None;
-                let mut focus_update_2 = None;
-                self.main_menu.handle_event(
-                    event.input_event(),
-                    areas.menu,
-                    |item| {
+                match self.main_menu.handle_event(event.input_event(), areas.menu) {
+                    Some(SelectEvent::Select(item)) => {
                         let mut page = item.get_page(&self.shared_state)?;
                         page.set_focus(true);
                         actions.page_pop_all();
                         actions.page_insert(page);
 
-                        focus_update_1 = Some(Focus::Body);
-
-                        Ok::<(), crate::Error>(())
-                    },
-                    |hover_in| {
-                        if hover_in {
-                            focus_update_2 = Some(Focus::Menu);
+                        self.update_focus(Focus::Body);
+                    }
+                    Some(SelectEvent::Hover { on_list_area }) => {
+                        if on_list_area {
+                            self.update_focus(Focus::Menu);
                         } else {
-                            focus_update_2 = Some(Focus::Body);
+                            // TODO this is not right solution. we should update focus to body if mouse hovers on body
+                            self.update_focus(Focus::Body);
                         }
-
-                        Ok(())
-                    },
-                )?;
-
-                if let Some(new_focus) = focus_update_1.or(focus_update_2) {
-                    self.update_focus(new_focus);
+                    }
+                    None => {}
                 }
             }
         };

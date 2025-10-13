@@ -13,9 +13,9 @@ use crate::{
     AppEvent,
 };
 use gm_ratatui_extra::{
-    act::Act,
     boolean_input::BooleanInput,
     button::Button,
+    form::FormEvent,
     input_box_owned::InputBoxOwned,
     widgets::{
         filter_select_popup::FilterSelectPopup,
@@ -118,34 +118,31 @@ impl Component for ConfigPage {
 
         let mut handle_result = PostHandleEventActions::default();
 
-        let r = self.form.handle_event(
-            event.widget_event().as_ref(),
-            area,
-            |_, _| Ok(()),
-            |_, form| {
+        if let Some(FormEvent::ButtonPressed(label)) =
+            self.form
+                .handle_event(event.widget_event().as_ref(), area, &mut handle_result)?
+        {
+            if label == FormItem::SaveButton {
                 handle_result.reload();
 
                 let mut config = Config::load()?;
                 config.set_values(
-                    Some(form.get_text(FormItem::AlchemyApiKey).to_string()),
-                    form.get_boolean(FormItem::TestnetMode),
-                    form.get_boolean(FormItem::DeveloperMode),
+                    Some(self.form.get_text(FormItem::AlchemyApiKey).to_string()),
+                    self.form.get_boolean(FormItem::TestnetMode),
+                    self.form.get_boolean(FormItem::DeveloperMode),
                     {
-                        let theme_name = form.get_text(FormItem::Theme);
+                        let theme_name = self.form.get_text(FormItem::Theme);
                         theme::ThemeName::from_str(&theme_name)
                             .unwrap_or_default()
                             .to_string()
                     },
-                    form.get_boolean(FormItem::HeliosEnabled),
+                    self.form.get_boolean(FormItem::HeliosEnabled),
                 )?;
 
-                form.set_text(FormItem::DisplayText, "Configuration saved".to_string());
-
-                Ok(())
-            },
-        )?;
-
-        handle_result.merge(r);
+                self.form
+                    .set_text(FormItem::DisplayText, "Configuration saved".to_string());
+            }
+        }
 
         Ok(handle_result)
     }

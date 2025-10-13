@@ -4,11 +4,11 @@ use crate::pages::Page;
 use crate::post_handle_event::PostHandleEventActions;
 use crate::traits::Component;
 use crate::AppEvent;
-use gm_ratatui_extra::act::Act;
+
 use gm_ratatui_extra::boolean_input::BooleanInput;
 use gm_ratatui_extra::button::Button;
 use gm_ratatui_extra::confirm_popup::{ConfirmPopup, ConfirmResult};
-use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
+use gm_ratatui_extra::form::{Form, FormEvent, FormItemIndex, FormWidget};
 use gm_ratatui_extra::input_box_owned::InputBoxOwned;
 use gm_ratatui_extra::thematize::Thematize;
 use gm_utils::disk_storage::DiskStorageInterface;
@@ -301,52 +301,48 @@ impl Component for NetworkCreatePage {
                 actions.reload();
             }
         }
-        let r = self.form.handle_event(
-            event.widget_event().as_ref(),
-            area,
-            |_, _| Ok(()),
-            |label, form| {
-                match label {
-                    FormItem::SaveButton => {
-                        if form.get_text(FormItem::Name).is_empty() {
-                            form.set_text(
-                                FormItem::ErrorText,
-                                "Please enter name, you cannot leave it empty".to_string(),
-                            );
-                        } else if form.get_text(FormItem::ChainId).is_empty() {
-                            form.set_text(
-                                FormItem::ErrorText,
-                                "Please enter chain id, you cannot leave it empty".to_string(),
-                            );
+        if let Some(FormEvent::ButtonPressed(label)) =
+            self.form
+                .handle_event(event.widget_event().as_ref(), area, &mut actions)?
+        {
+            match label {
+                FormItem::SaveButton => {
+                    if self.form.get_text(FormItem::Name).is_empty() {
+                        self.form.set_text(
+                            FormItem::ErrorText,
+                            "Please enter name, you cannot leave it empty".to_string(),
+                        );
+                    } else if self.form.get_text(FormItem::ChainId).is_empty() {
+                        self.form.set_text(
+                            FormItem::ErrorText,
+                            "Please enter chain id, you cannot leave it empty".to_string(),
+                        );
+                    } else {
+                        let mut config = NetworkStore::load()?;
+                        if config.networks.get(self.network_index).is_some() {
+                            config.networks[self.network_index] =
+                                Self::network(&self.form, &self.tokens)?;
                         } else {
-                            let mut config = NetworkStore::load()?;
-                            if config.networks.get(self.network_index).is_some() {
-                                config.networks[self.network_index] =
-                                    Self::network(form, &self.tokens)?;
-                            } else {
-                                config.networks.push(Self::network(form, &self.tokens)?);
-                            }
-                            let _ = config.save();
-                            actions.page_pop();
-                            actions.reload();
+                            config
+                                .networks
+                                .push(Self::network(&self.form, &self.tokens)?);
                         }
+                        let _ = config.save();
+                        actions.page_pop();
+                        actions.reload();
                     }
-                    FormItem::TokensButton => {
-                        let network = Self::network(form, &self.tokens)?;
-                        actions
-                            .page_insert(Page::Token(TokenPage::new(self.network_index, network)?));
-                        // TODO should not allow going to tokens if network is not saved, do something about this
-                    }
-                    FormItem::RemoveButton => {
-                        self.remove_popup.open();
-                    }
-                    _ => {}
                 }
-
-                Ok(())
-            },
-        )?;
-        actions.merge(r);
+                FormItem::TokensButton => {
+                    let network = Self::network(&self.form, &self.tokens)?;
+                    actions.page_insert(Page::Token(TokenPage::new(self.network_index, network)?));
+                    // TODO should not allow going to tokens if network is not saved, do something about this
+                }
+                FormItem::RemoveButton => {
+                    self.remove_popup.open();
+                }
+                _ => {}
+            }
+        }
 
         Ok(actions)
     }

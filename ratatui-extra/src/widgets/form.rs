@@ -16,10 +16,16 @@ use strum::IntoEnumIterator;
 use super::{button::Button, input_box_owned::InputBoxOwned};
 use crate::act::Act;
 use crate::boolean_input::BooleanInput;
+use crate::button::ButtonResult;
 use crate::event::WidgetEvent;
 use crate::extensions::{MouseEventExt, RectExt, RenderTextWrapped, WidgetHeight};
 use crate::widgets::scroll_bar::CustomScrollBar;
 use crate::{thematize::Thematize, widgets::filter_select_popup::FilterSelectPopup};
+
+pub enum FormEvent<T> {
+    ValueChanged(T),
+    ButtonPressed(T),
+}
 
 enum CursorAction {
     Prev,
@@ -31,28 +37,42 @@ pub trait FormItemIndex {
     fn index(self) -> usize;
 }
 
+/// Types of widgets that can be handled and rendered by Form.
 #[derive(Debug)]
 pub enum FormWidget {
+    /// Displays texts with a stronger style
     Heading(&'static str),
+
+    /// Displays text with a dimmer style
     StaticText(&'static str),
-    InputBox {
-        widget: InputBoxOwned,
-    },
-    BooleanInput {
-        widget: BooleanInput,
-    },
-    DisplayBox {
-        widget: InputBoxOwned,
-    },
+
+    /// Take user input as a string
+    InputBox { widget: InputBoxOwned },
+
+    /// Provide a switch to input a boolean
+    BooleanInput { widget: BooleanInput },
+
+    /// Display as a input immutable
+    // TODO explore if this can be removed
+    DisplayBox { widget: InputBoxOwned },
+
+    /// Renders a popup to select an option from
     SelectInput {
         widget: InputBoxOwned,
         popup: FilterSelectPopup<String>,
     },
-    Button {
-        widget: Button,
-    },
+
+    /// Button to interact
+    Button { widget: Button },
+
+    /// Displays text with a dimmer style
+    // TODO explore if this can be combined with StaticText
     DisplayText(String),
+
+    /// Displays error text with a red style
     ErrorText(String),
+
+    /// Simply renders a new line to keep space between two elements
     LineBreak,
 }
 
@@ -380,29 +400,25 @@ impl<
         matches!(self.items[self.cursor], FormWidget::SelectInput { .. })
     }
 
-    pub fn current_label_enum(&self) -> Result<T, E> {
-        T::iter().nth(self.cursor).ok_or_else(|| {
-            crate::error::RatatuiExtraError::FormLabelNotAvailable {
+    pub fn current_label_enum(&self) -> crate::Result<T> {
+        T::iter()
+            .nth(self.cursor)
+            .ok_or_else(|| crate::Error::FormLabelNotAvailable {
                 cursor: self.cursor,
                 available: T::iter().map(|t| t.to_string()).collect(),
-            }
-            .into()
-        })
+            })
     }
 
-    pub fn handle_event<A, F1, F2>(
+    pub fn handle_event<A>(
         &mut self,
         event: Option<&WidgetEvent>,
         area: Rect,
-        mut on_value_change: F2,
-        mut on_button_press: F1,
-    ) -> Result<A, E>
+        actions: &mut A,
+    ) -> crate::Result<Option<FormEvent<T>>>
     where
         A: Act,
-        F1: FnMut(T, &mut Self) -> Result<(), E>,
-        F2: FnMut(T, &mut Self) -> Result<(), E>,
     {
-        let mut result = A::default();
+        let mut result = None;
 
         if let Some(event) = event {
             match event {
@@ -443,13 +459,13 @@ impl<
                             if self.scroll_y + form_area.height < virtual_form_height {
                                 self.scroll_y = self.scroll_y.saturating_add(1);
                             }
-                        }
-                        // TODO remove this feature is implemented in the button event handler
-                        else if mouse_event.is(MouseEventKind::Moved) {
+                        } else if mouse_event.is(MouseEventKind::Moved) {
                             let item_idx = self.get_clicked_item(area, mouse_event.position());
                             if item_idx.is_some_and(|idx| self.is_button_idx(idx)) {
+                                // Highlight the button if mouse hovers it
                                 *self.get_button_hover_mut_idx(item_idx.unwrap()) = true;
                             } else {
+                                // Remove highlight from all the buttons in this form
                                 for i in 0..self.items.len() {
                                     if self.is_button_idx(i) {
                                         *self.get_button_hover_mut_idx(i) = false;
@@ -467,27 +483,22 @@ impl<
             let item_area = self.get_area_for_item(area, self.cursor);
             match &mut self.items[self.cursor] {
                 FormWidget::InputBox { widget, .. } => {
-                    let r = widget.handle_event(Some(event), item_area);
-                    result.merge(r);
+                    widget.handle_event(Some(event), item_area, actions);
                 }
                 FormWidget::DisplayBox { .. } => {
                     // we don't have to handle this as parent component will do it
                 }
                 FormWidget::BooleanInput { widget, .. } => {
-                    let r = widget.handle_event(event.input_event(), item_area);
-                    result.merge(r);
+                    widget.handle_event(event.input_event(), item_area, actions);
                 }
                 FormWidget::SelectInput { widget, popup } => {
                     let is_open = popup.is_open();
 
-                    let r = widget.handle_event(Some(event), area);
-                    result.merge(r);
+                    widget.handle_event(Some(event), area, actions);
 
-                    let r = popup.handle_event(event.key_event(), |selected| {
-                        widget.set_text(selected.to_string());
-                        Ok(())
-                    })?;
-                    result.merge(r);
+                    if let Some(selection) = popup.handle_event(event.key_event(), actions) {
+                        widget.set_text(selection.to_string());
+                    }
 
                     if !is_open {
                         if let Some(key_event) = event.key_event() {
@@ -502,19 +513,10 @@ impl<
                     }
                 }
                 FormWidget::Button { widget } => {
-                    let mut is_pressed = false;
-                    widget.handle_event(
-                        event.input_event(),
-                        item_area,
-                        self.form_focus,
-                        || {
-                            is_pressed = true;
-                            Ok(())
-                        },
-                        |_| Ok(()),
-                    )?;
-                    if is_pressed {
-                        on_button_press(self.current_label_enum()?, self)?;
+                    if let Some(ButtonResult::Pressed) =
+                        widget.handle_event(event.input_event(), item_area, self.form_focus)
+                    {
+                        result = Some(FormEvent::ButtonPressed(self.current_label_enum()?));
                     }
                 }
                 _ => {}
@@ -522,7 +524,7 @@ impl<
 
             let value_after = self.items[self.cursor].to_value();
             if value_after != value_before {
-                on_value_change(self.current_label_enum()?, self)?;
+                result = Some(FormEvent::ValueChanged(self.current_label_enum()?));
             }
         }
 
@@ -537,15 +539,15 @@ impl<
             .fold(0, |acc, (_, w)| acc + w.height(area))
     }
 
-    /// Returns -> (form_area, is_form_overflow, virtual_form_height)
+    // TODO combine with areas function and return a struct
     fn get_form_area(&self, area: Rect) -> (Rect, bool, u16) {
         let virtual_form_height = self.calc_virtual_form_height(area);
         let is_form_overflow = area.height < virtual_form_height;
         if is_form_overflow {
             let [left_area, _] = Self::areas(area);
-            (left_area, true, virtual_form_height)
+            (left_area, is_form_overflow, virtual_form_height)
         } else {
-            (area, false, virtual_form_height)
+            (area, is_form_overflow, virtual_form_height)
         }
     }
 

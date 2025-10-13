@@ -10,7 +10,7 @@ use ratatui::{
 
 use crate::{
     extensions::{RectExt, ThemedWidget},
-    select_owned::SelectOwned,
+    select_owned::{SelectEvent, SelectOwned},
     thematize::Thematize,
 };
 
@@ -49,21 +49,14 @@ impl<T: Display + PartialEq> FilterSelectOwned<T> {
         });
     }
 
-    pub fn handle_event<E, F>(
-        &mut self,
+    pub fn handle_event<'a>(
+        &'a mut self,
         input_event: Option<&Event>,
         area: Rect,
-        on_enter: F,
-    ) -> Result<(), E>
-    where
-        F: FnMut(&Arc<T>) -> Result<(), E>,
-    {
-        if self.full_list.is_some() {
-            if let Some(list_area) = area.height_consumed(2) {
-                self.select
-                    .handle_event(input_event, list_area, on_enter, |_| Ok(()))?;
-            }
+    ) -> Option<SelectEvent<'a, Arc<T>>> {
+        let mut result: Option<SelectEvent<'_, Arc<T>>> = None;
 
+        if self.full_list.is_some() {
             let search_string_prev = self.search_string.clone();
             if let Some(Event::Key(key_event)) = input_event {
                 if key_event.kind == KeyEventKind::Press {
@@ -82,9 +75,13 @@ impl<T: Display + PartialEq> FilterSelectOwned<T> {
             if search_string_prev != self.search_string {
                 self.update_select_list();
             }
+
+            if let Some(list_area) = area.height_consumed(2) {
+                result = self.select.handle_event(input_event, list_area);
+            }
         }
 
-        Ok(())
+        result
     }
 
     pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &impl Thematize)

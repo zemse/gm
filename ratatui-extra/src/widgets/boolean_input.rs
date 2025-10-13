@@ -27,9 +27,12 @@ impl BooleanInput {
         self.value = !self.value;
     }
 
-    pub fn handle_event<A: Act>(&mut self, input_event: Option<&Event>, area: Rect) -> A {
-        let mut act = A::default();
-
+    pub fn handle_event<A: Act>(
+        &mut self,
+        input_event: Option<&Event>,
+        area: Rect,
+        actions: &mut A,
+    ) {
         if let Some(input_event) = input_event {
             match input_event {
                 Event::Key(key_event) => {
@@ -39,7 +42,7 @@ impl BooleanInput {
                                 self.value = false;
 
                                 // Signal that we are consuming left key
-                                act.ignore_left();
+                                actions.ignore_left();
                             }
                         }
                         KeyCode::Right => {
@@ -47,7 +50,7 @@ impl BooleanInput {
                                 self.value = true;
 
                                 // Signal that we are consuming left key
-                                act.ignore_right();
+                                actions.ignore_right();
                             }
                         }
                         _ => {}
@@ -62,8 +65,6 @@ impl BooleanInput {
                 _ => {}
             }
         }
-
-        act
     }
 
     pub fn render(&self, area: Rect, buf: &mut Buffer, focus: bool, theme: &impl Thematize) {

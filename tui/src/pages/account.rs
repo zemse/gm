@@ -4,7 +4,10 @@ use crate::{
     app::SharedState, post_handle_event::PostHandleEventActions, traits::Component, AppEvent,
 };
 use alloy::primitives::Address;
-use gm_ratatui_extra::{extensions::ThemedWidget, select_owned::SelectOwned};
+use gm_ratatui_extra::{
+    extensions::ThemedWidget,
+    select_owned::{SelectEvent, SelectOwned},
+};
 use gm_utils::{
     account::{AccountManager, AccountUtils},
     config::Config,
@@ -65,7 +68,7 @@ impl Component for AccountPage {
     fn handle_event(
         &mut self,
         event: &AppEvent,
-        _area: Rect,
+        area: Rect,
         _popup_area: Rect,
         transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
@@ -73,28 +76,24 @@ impl Component for AccountPage {
     ) -> crate::Result<PostHandleEventActions> {
         let mut result = PostHandleEventActions::default();
 
-        self.select.handle_event(
-            event.input_event(),
-            _area,
-            |account_select| {
-                match account_select {
-                    AccountSelect::Create => {
-                        result.page_insert(Page::AccountCreate(AccountCreatePage::default()));
-                    }
-                    AccountSelect::Import => {
-                        result.page_insert(Page::AccountImport(AccountImportPage::default()));
-                    }
-                    AccountSelect::Existing(address) => {
-                        Config::set_current_account(*address)?;
-                        transmitter.send(AppEvent::AccountChange(*address))?;
-                        transmitter.send(AppEvent::ConfigUpdate)?;
-                        result.page_pop();
-                    }
+        if let Some(SelectEvent::Select(account_selected)) =
+            self.select.handle_event(event.input_event(), area)
+        {
+            match account_selected {
+                AccountSelect::Create => {
+                    result.page_insert(Page::AccountCreate(AccountCreatePage::default()));
                 }
-                Ok::<(), crate::Error>(())
-            },
-            |_| Ok(()),
-        )?;
+                AccountSelect::Import => {
+                    result.page_insert(Page::AccountImport(AccountImportPage::default()));
+                }
+                AccountSelect::Existing(address) => {
+                    Config::set_current_account(*address)?;
+                    transmitter.send(AppEvent::AccountChange(*address))?;
+                    transmitter.send(AppEvent::ConfigUpdate)?;
+                    result.page_pop();
+                }
+            }
+        }
 
         Ok(result)
     }

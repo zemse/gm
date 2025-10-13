@@ -10,6 +10,11 @@ use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, MouseEventKind};
 use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 
+pub enum SelectEvent<'a, T> {
+    Select(&'a T),
+    Hover { on_list_area: bool },
+}
+
 #[derive(Debug)]
 pub struct SelectOwned<T: Display + PartialEq> {
     /// If true, the item at cursor is applied with select_focused style from Thematize
@@ -85,17 +90,13 @@ impl<T: Display + PartialEq> SelectOwned<T> {
         }
     }
 
-    pub fn handle_event<E, F, F2>(
-        &mut self,
+    pub fn handle_event<'a>(
+        &'a mut self,
         input_event: Option<&Event>,
         area: Rect,
-        mut on_select: F,
-        mut on_hover: F2,
-    ) -> Result<(), E>
-    where
-        F: FnMut(&T) -> Result<(), E>,
-        F2: FnMut(bool) -> Result<(), E>,
-    {
+    ) -> Option<SelectEvent<'a, T>> {
+        let mut result = None;
+
         if let Some(input_event) = input_event {
             match input_event {
                 Event::Key(key_event) => {
@@ -107,7 +108,9 @@ impl<T: Display + PartialEq> SelectOwned<T> {
                             match key_event.code {
                                 KeyCode::Enter => {
                                     if !list.is_empty() {
-                                        on_select(&list[self.cursor.current])?;
+                                        result =
+                                            Some(SelectEvent::Select(&list[self.cursor.current]));
+
                                         if self.external_cursor.is_some() {
                                             self.external_cursor = Some(self.cursor.current);
                                         }
@@ -136,13 +139,17 @@ impl<T: Display + PartialEq> SelectOwned<T> {
                                 if height <= clicked_height && clicked_height < height + item_height
                                 {
                                     if mouse_event.is_left_click() {
-                                        on_select(&list[self.cursor.current])?;
+                                        // on_select(&list[self.cursor.current])?;
+                                        result =
+                                            Some(SelectEvent::Select(&list[self.cursor.current]));
+
                                         if self.external_cursor.is_some() {
                                             self.external_cursor = Some(self.cursor.current);
                                         }
                                     } else if mouse_event.is(MouseEventKind::Moved) {
                                         self.cursor.current = new_cursor;
-                                        on_hover(true)?;
+                                        // on_hover(true)?;
+                                        result = Some(SelectEvent::Hover { on_list_area: true });
                                     }
                                 }
 
@@ -151,14 +158,17 @@ impl<T: Display + PartialEq> SelectOwned<T> {
                             }
                         }
                     } else {
-                        on_hover(false)?;
+                        // on_hover(false)?;
+                        result = Some(SelectEvent::Hover {
+                            on_list_area: false,
+                        });
                     }
                 }
                 _ => {}
             }
         }
 
-        Ok(())
+        result
     }
 }
 

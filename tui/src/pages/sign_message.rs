@@ -2,11 +2,10 @@ use std::sync::mpsc;
 
 use alloy::{hex, primitives::Address, signers::Signature};
 use gm_ratatui_extra::{
-    act::Act,
     button::Button,
     confirm_popup::{ConfirmPopup, ConfirmResult},
     extensions::RenderTextWrapped,
-    form::{Form, FormItemIndex, FormWidget},
+    form::{Form, FormEvent, FormItemIndex, FormWidget},
     input_box_owned::InputBoxOwned,
 };
 use gm_utils::etherscan::publish_signature_to_etherscan;
@@ -151,20 +150,16 @@ impl Component for SignMessagePage {
                         }
                     }
                 } else {
-                    let form_actions = form.handle_event(
-                        event.widget_event().as_ref(),
-                        area,
-                        |_, _| Ok(()),
-                        |item, form| {
-                            if item == FormItem::SignMessageButton {
-                                let message = form.get_text(FormItem::MessageInput);
-                                *sign_popup = SignPopup::new_with_message_utf8(message.to_string());
-                                sign_popup.open();
-                            }
-                            Ok(())
-                        },
-                    )?;
-                    actions.merge(form_actions);
+                    // Handle form events
+                    if let Some(FormEvent::ButtonPressed(item)) =
+                        form.handle_event(event.widget_event().as_ref(), area, &mut actions)?
+                    {
+                        if item == FormItem::SignMessageButton {
+                            let message = form.get_text(FormItem::MessageInput);
+                            *sign_popup = SignPopup::new_with_message_utf8(message.to_string());
+                            sign_popup.open();
+                        }
+                    }
                 }
             }
             Self::PublishToEtherscan {

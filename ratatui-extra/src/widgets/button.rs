@@ -9,6 +9,11 @@ use ratatui::crossterm::event::MouseEventKind;
 use ratatui::widgets::WidgetRef;
 use ratatui::{crossterm::event::Event, layout::Rect, text::Line, widgets::Block};
 
+pub enum ButtonResult {
+    Pressed,
+    HoverIn(bool),
+}
+
 #[derive(Debug)]
 pub struct Button {
     pub hover_focus: bool,
@@ -30,38 +35,34 @@ impl Button {
         self
     }
 
-    pub fn handle_event<E, F, F2>(
+    pub fn handle_event(
         &mut self,
         event: Option<&Event>,
         area: Rect,
         focus: bool,
-        on_press: F,
-        on_focus_update: F2,
-    ) -> Result<(), E>
-    where
-        F: FnOnce() -> Result<(), E>,
-        F2: FnOnce(bool) -> Result<(), E>,
-    {
+    ) -> Option<ButtonResult> {
+        let mut result = None;
+
         if let Some(event) = event {
             match event {
                 Event::Key(key_event) => {
                     if focus && key_event.is_pressed(KeyCode::Enter) {
-                        on_press()?;
+                        result = Some(ButtonResult::Pressed);
                     }
                 }
                 Event::Mouse(mouse_event) => {
                     let button_area = self.area(area);
 
                     match mouse_event.kind {
-                        MouseEventKind::Moved => {
-                            let new_focus = button_area.contains(mouse_event.position());
-                            on_focus_update(new_focus)?;
-                            self.hover_focus = new_focus;
-                        }
                         MouseEventKind::Down(MouseButton::Left) => {
                             if button_area.contains(mouse_event.position()) {
-                                on_press()?;
+                                result = Some(ButtonResult::Pressed);
                             }
+                        }
+                        MouseEventKind::Moved => {
+                            let new_focus = button_area.contains(mouse_event.position());
+                            self.hover_focus = new_focus;
+                            result = Some(ButtonResult::HoverIn(new_focus));
                         }
                         _ => {}
                     }
@@ -70,7 +71,7 @@ impl Button {
             };
         }
 
-        Ok(())
+        result
     }
 
     pub fn area(&self, area: Rect) -> Rect {

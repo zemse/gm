@@ -9,6 +9,7 @@ use ratatui::{
 
 use crate::{
     act::Act,
+    button::ButtonResult,
     extensions::{EventExt, RectExt, ThemedWidget},
     thematize::Thematize,
 };
@@ -109,39 +110,41 @@ impl ConfirmPopup {
                 self.text
                     .handle_event(input_event.key_event(), areas.body_area);
 
-                self.confirm_button.handle_event(
+                if let Some(button_event) = self.confirm_button.handle_event(
                     Some(input_event),
                     areas.confirm_button_area,
                     self.is_confirm_focused,
-                    || {
-                        result = Some(ConfirmResult::Confirmed);
-                        self.open = false;
-                        Ok(())
-                    },
-                    |is_focused| {
-                        if is_focused {
-                            self.is_confirm_focused = true;
+                ) {
+                    match button_event {
+                        ButtonResult::Pressed => {
+                            result = Some(ConfirmResult::Confirmed);
+                            self.open = false;
                         }
-                        Ok(())
-                    },
-                )?;
+                        ButtonResult::HoverIn(is_focused) => {
+                            if is_focused {
+                                self.is_confirm_focused = true;
+                            }
+                        }
+                    }
+                }
 
-                self.cancel_button.handle_event(
+                if let Some(button_event) = self.cancel_button.handle_event(
                     Some(input_event),
                     areas.cancel_button_area,
                     !self.is_confirm_focused,
-                    || {
-                        result = Some(ConfirmResult::Canceled);
-                        self.open = false;
-                        Ok(())
-                    },
-                    |is_focused| {
-                        if is_focused {
-                            self.is_confirm_focused = false;
+                ) {
+                    match button_event {
+                        ButtonResult::Pressed => {
+                            result = Some(ConfirmResult::Canceled);
+                            self.open = false;
                         }
-                        Ok(())
-                    },
-                )?;
+                        ButtonResult::HoverIn(is_focused) => {
+                            if is_focused {
+                                self.is_confirm_focused = false;
+                            }
+                        }
+                    }
+                }
 
                 if let Event::Key(key_event) = input_event {
                     if key_event.kind == KeyEventKind::Press {
