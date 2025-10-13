@@ -34,6 +34,7 @@ impl Button {
         &mut self,
         event: Option<&Event>,
         area: Rect,
+        focus: bool,
         on_press: F,
         on_focus_update: F2,
     ) -> Result<(), E>
@@ -44,7 +45,7 @@ impl Button {
         if let Some(event) = event {
             match event {
                 Event::Key(key_event) => {
-                    if key_event.is_pressed(KeyCode::Enter) {
+                    if focus && key_event.is_pressed(KeyCode::Enter) {
                         on_press()?;
                     }
                 }

@@ -506,6 +506,7 @@ impl<
                     widget.handle_event(
                         event.input_event(),
                         item_area,
+                        self.form_focus,
                         || {
                             is_pressed = true;
                             Ok(())

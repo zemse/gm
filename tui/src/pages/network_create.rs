@@ -7,7 +7,7 @@ use crate::AppEvent;
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::boolean_input::BooleanInput;
 use gm_ratatui_extra::button::Button;
-use gm_ratatui_extra::confirm_popup::ConfirmPopup;
+use gm_ratatui_extra::confirm_popup::{ConfirmPopup, ConfirmResult};
 use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
 use gm_ratatui_extra::input_box_owned::InputBoxOwned;
 use gm_ratatui_extra::thematize::Thematize;
@@ -286,24 +286,20 @@ impl Component for NetworkCreatePage {
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<PostHandleEventActions> {
-        let mut handle_result = PostHandleEventActions::default();
+        let mut actions = PostHandleEventActions::default();
         if self.remove_popup.is_open() {
-            let r = self.remove_popup.handle_event(
-                event.input_event(),
-                popup_area,
-                || -> crate::Result<()> {
-                    let mut config = NetworkStore::load()?;
-                    if config.networks.get(self.network_index).is_some() {
-                        config.networks.remove(self.network_index);
-                    }
-                    let _ = config.save();
-                    handle_result.page_pop();
-                    handle_result.reload();
-                    Ok(())
-                },
-                || Ok(()),
-            )?;
-            handle_result.merge(r);
+            if let Some(ConfirmResult::Confirmed) =
+                self.remove_popup
+                    .handle_event(event.input_event(), popup_area, &mut actions)?
+            {
+                let mut config = NetworkStore::load()?;
+                if config.networks.get(self.network_index).is_some() {
+                    config.networks.remove(self.network_index);
+                }
+                let _ = config.save();
+                actions.page_pop();
+                actions.reload();
+            }
         }
         let r = self.form.handle_event(
             event.widget_event().as_ref(),
@@ -331,13 +327,13 @@ impl Component for NetworkCreatePage {
                                 config.networks.push(Self::network(form, &self.tokens)?);
                             }
                             let _ = config.save();
-                            handle_result.page_pop();
-                            handle_result.reload();
+                            actions.page_pop();
+                            actions.reload();
                         }
                     }
                     FormItem::TokensButton => {
                         let network = Self::network(form, &self.tokens)?;
-                        handle_result
+                        actions
                             .page_insert(Page::Token(TokenPage::new(self.network_index, network)?));
                         // TODO should not allow going to tokens if network is not saved, do something about this
                     }
@@ -350,9 +346,9 @@ impl Component for NetworkCreatePage {
                 Ok(())
             },
         )?;
-        handle_result.merge(r);
+        actions.merge(r);
 
-        Ok(handle_result)
+        Ok(actions)
     }
     fn render_component(
         &self,

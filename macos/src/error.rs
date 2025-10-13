@@ -4,6 +4,9 @@ pub type Result<T> = std::result::Result<T, MacosError>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MacosError {
+    #[error(transparent)]
+    CommonError(#[from] gm_common::Error),
+
     #[error("Not able to find the account {0} in your keychain. (Error: {1:?})")]
     AccountNotFoundInKeychain(Address, security_framework::base::Error),
 
@@ -22,6 +25,9 @@ pub enum MacosError {
     #[error("Please add a password or setup TouchID on your mac.")]
     AuthNotAvailable,
 
-    #[error("Auth failed")]
+    #[error("Authentication failed because user denied permission.")]
     AuthFailed,
+
+    #[error("Message signing failed. (Error: {0})")]
+    MessageSigningFailed(alloy::signers::Error),
 }

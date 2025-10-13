@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 alloy = { workspace = true }
 serde = { workspace = true }
+thiserror = { workspace = true }

@@ -46,7 +46,7 @@ fn spawn_sign_thread(
         };
 
         async fn run(digest: B256, signer_account: Address) -> crate::Result<Signature> {
-            let wallet = AccountManager::load_wallet(&signer_account)?;
+            let wallet = AccountManager::load_wallet(signer_account)?;
             Ok(wallet.sign_hash(&digest).await?)
         }
     }))

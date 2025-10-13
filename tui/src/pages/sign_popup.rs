@@ -1,66 +1,20 @@
 use std::sync::mpsc;
 
-use alloy::{
-    hex,
-    primitives::Address,
-    signers::{Signature, Signer},
-};
+use alloy::{hex, primitives::Address, signers::Signature};
 
 use gm_ratatui_extra::{
     act::Act,
-    button::Button,
-    extensions::{CustomRender, RectExt, ThemedWidget},
-    popup::Popup,
+    confirm_popup::{ConfirmPopup, ConfirmResult},
+    extensions::{CustomRender, ThemedWidget},
+    text_popup::TextPopup,
     text_scroll::TextScroll,
     thematize::Thematize,
 };
-use gm_utils::account::AccountManager;
-use ratatui::{
-    buffer::Buffer,
-    crossterm::event::{Event, KeyCode, KeyEventKind},
-    layout::{Constraint, Layout, Rect},
-    widgets::{Block, Widget},
-};
-use tokio::task::JoinHandle;
+use gm_utils::{account::AccountManager, gm_log};
+use ratatui::{buffer::Buffer, layout::Rect, text::Span, widgets::Widget};
+use tokio::{sync::oneshot, task::JoinHandle};
 
 use crate::{app::SharedState, post_handle_event::PostHandleEventActions, theme::Theme, AppEvent};
-
-pub fn sign_thread(
-    message: &str,
-    tr: &mpsc::Sender<AppEvent>,
-    shared_state: &SharedState,
-) -> crate::Result<JoinHandle<()>> {
-    let message = message.to_string();
-    let tr = tr.clone();
-    let signer_account = shared_state.try_current_account()?;
-
-    Ok(tokio::spawn(async move {
-        let _ = match run(message, signer_account).await {
-            Ok(sig) => tr.send(AppEvent::SignResult(signer_account, sig)),
-            // TODO have `run` return a scoped error so we don't have to send back string
-            Err(err) => tr.send(AppEvent::SignError(format!("{err:?}"))),
-        };
-
-        async fn run(message: String, signer_account: Address) -> crate::Result<Signature> {
-            let wallet = AccountManager::load_wallet(&signer_account)?;
-
-            let data = match hex::decode(&message) {
-                Ok(bytes) => bytes,
-                Err(_) => message.as_bytes().to_vec(),
-            };
-            Ok(wallet.sign_message(&data).await?)
-        }
-    }))
-}
-
-#[derive(Default, Debug)]
-enum SignStatus {
-    #[default]
-    Idle,
-    Signing,
-    Done,
-    Failed,
-}
 
 pub enum SignPopupEvent {
     Signed(Address, Signature),
@@ -70,186 +24,251 @@ pub enum SignPopupEvent {
 }
 
 #[derive(Debug)]
-pub struct SignPopup {
-    msg_hex: String,
-    text: TextScroll,
-    open: bool,
-    confirm_button: Button,
-    cancel_button: Button,
-    is_confirm_focused: bool,
-    status: SignStatus,
-    sign_thread: Option<JoinHandle<()>>,
+pub enum SignPopup {
+    /// Step 1 - User confirms or rejects signing
+    Confirm { confirm_popup: ConfirmPopup },
+
+    /// Step 2 - Signing in progress
+    Signing {
+        signer_account: Address,
+        text_popup: TextPopup,
+        sign_thread: JoinHandle<()>,
+        receiver: oneshot::Receiver<gm_utils::Result<Signature>>,
+    },
+
+    /// Step 3 - Signing is done or failed
+    Result {
+        text_popup: TextPopup, // TODO replace with Popup once it is stateful
+        signature: Option<Signature>,
+    },
 }
 
 impl Default for SignPopup {
     fn default() -> Self {
-        Self {
-            msg_hex: String::new(),
-            text: TextScroll::default(),
-            open: false,
-            confirm_button: Button::new("Confirm"),
-            cancel_button: Button::new("Cancel"),
-            is_confirm_focused: true,
-            status: SignStatus::Idle,
-            sign_thread: None,
-        }
+        Self::confirm_screen()
     }
 }
 
 impl SignPopup {
-    pub fn is_open(&self) -> bool {
-        self.open
+    /// Create a new SignPopup with the given hex message to sign
+    pub fn new_with_message_hex(msg_hex: &str) -> crate::Result<Self> {
+        let mut popup = Self::confirm_screen();
+        popup.set_msg_hex(msg_hex)?;
+        Ok(popup)
     }
 
+    /// Create a new SignPopup with the given utf8 message to sign
+    pub fn new_with_message_utf8(msg: String) -> Self {
+        let mut popup = Self::confirm_screen();
+        popup.set_msg_utf8(msg);
+        popup
+    }
+
+    fn confirm_screen() -> Self {
+        Self::Confirm {
+            confirm_popup: ConfirmPopup::new("Sign Message", String::new(), "Sign", "Cancel", true),
+        }
+    }
+
+    fn signing_screen(
+        signer_account: Address,
+        message: TextScroll,
+        sign_thread: JoinHandle<()>,
+        receiver: oneshot::Receiver<gm_utils::Result<Signature>>,
+    ) -> Self {
+        Self::Signing {
+            signer_account,
+            // TODO enable initialising TextPopup with TextScroll
+            text_popup: TextPopup::new("Signing Message", true).with_text(message.text),
+            sign_thread,
+            receiver,
+        }
+    }
+
+    fn result_screen(signature: Option<Signature>) -> Self {
+        Self::Result {
+            text_popup: TextPopup::new(
+                if signature.is_some() {
+                    "Sign Message Result"
+                } else {
+                    "Sign Message Failed"
+                },
+                true,
+            ),
+            signature,
+        }
+    }
+
+    pub fn is_open(&self) -> bool {
+        match self {
+            SignPopup::Confirm { confirm_popup } => confirm_popup.is_open(),
+            SignPopup::Signing { text_popup, .. } => text_popup.is_open(),
+            SignPopup::Result { text_popup, .. } => text_popup.is_open(),
+        }
+    }
+
+    #[track_caller]
     pub fn open(&mut self) {
-        self.open = true;
-        self.is_confirm_focused = true;
+        match self {
+            SignPopup::Confirm { confirm_popup } => {
+                confirm_popup.open();
+            }
+            SignPopup::Signing { .. } | SignPopup::Result { .. } => {
+                // The code that calls open() should prepare a fresh "Confirm" and then open.
+                unreachable!("Cannot open sign_popup in this state")
+            }
+        }
     }
 
     pub fn close(&mut self) {
-        self.open = false;
+        match self {
+            SignPopup::Confirm { confirm_popup } => {
+                confirm_popup.close();
+            }
+            SignPopup::Signing { text_popup, .. } => {
+                text_popup.clear();
+            }
+            SignPopup::Result { text_popup, .. } => {
+                text_popup.clear();
+            }
+        }
     }
 
-    pub fn set_msg_hex(&mut self, msg_hex: &str) {
-        self.msg_hex = msg_hex.to_string();
-        let utf8_str = hex::decode(msg_hex)
-            .map_err(crate::Error::FromHexError)
-            .and_then(|bytes| String::from_utf8(bytes).map_err(crate::Error::FromUtf8Error));
+    /// Set the message to sign, given in hex format.
+    ///
+    /// Note: This is marked private intentionally because we reuse an existing SignPopup by updating
+    /// text on it because of internal state issue. Specifically, the button might have hover_focus true
+    /// on the "cancel" button, so if we reuse the same SignPopup instance, the popup that gets opened
+    /// has the cursor on "confirm" so it is focused, and "cancel" is also focused due to previous hover.
+    #[track_caller]
+    fn set_msg_hex(&mut self, msg_hex: &str) -> crate::Result<()> {
+        match self {
+            SignPopup::Confirm { confirm_popup } => {
+                let utf8_str = hex::decode(msg_hex)
+                    .map_err(crate::Error::FromHexError)
+                    .and_then(|bytes| {
+                        String::from_utf8(bytes).map_err(crate::Error::FromUtf8Error)
+                    })?;
 
-        self.text.text = utf8_str.unwrap_or(self.msg_hex.clone());
-        self.reset();
+                *confirm_popup.text_mut() = utf8_str;
+            }
+            SignPopup::Signing { .. } | SignPopup::Result { .. } => {
+                unreachable!("Cannot change message data in this state")
+            }
+        }
+
+        Ok(())
     }
 
-    pub fn set_msg_utf8(&mut self, msg: String) {
-        self.text.text = msg;
-        self.reset();
-    }
-
-    fn reset(&mut self) {
-        self.is_confirm_focused = false;
-        self.status = SignStatus::Idle;
-        if let Some(thread) = self.sign_thread.take() {
-            thread.abort();
+    /// Set the message to sign, given in utf8 format.
+    ///
+    /// Note: <similar to the comment in set_msg_hex>
+    #[track_caller]
+    fn set_msg_utf8(&mut self, msg: String) {
+        match self {
+            SignPopup::Confirm { confirm_popup } => {
+                *confirm_popup.text_mut() = msg;
+            }
+            SignPopup::Signing { .. } | SignPopup::Result { .. } => {
+                unreachable!("Cannot change message data in this state")
+            }
         }
     }
 
     pub fn handle_event(
         &mut self,
-        (event, area, tr, ss): (&AppEvent, Rect, &mpsc::Sender<AppEvent>, &SharedState),
+        (event, popup_area, _tr, ss): (&AppEvent, Rect, &mpsc::Sender<AppEvent>, &SharedState),
         actions: &mut PostHandleEventActions,
     ) -> crate::Result<Option<SignPopupEvent>> {
         let mut result = None;
 
         if self.is_open() {
-            self.text.handle_event(event.key_event(), area);
+            actions.ignore_esc();
 
-            match event {
-                AppEvent::Input(input_event) => match input_event {
-                    Event::Key(key_event) => {
-                        if key_event.kind == KeyEventKind::Press {
-                            match self.status {
-                                SignStatus::Idle => match key_event.code {
-                                    KeyCode::Left => {
-                                        self.is_confirm_focused = false;
-                                    }
-                                    KeyCode::Right => {
-                                        self.is_confirm_focused = true;
-                                    }
-                                    KeyCode::Enter => {
-                                        if self.is_confirm_focused {
-                                            self.status = SignStatus::Signing;
-                                            self.sign_thread =
-                                                Some(sign_thread(&self.text.text, tr, ss)?);
-                                        } else {
-                                            self.close();
-                                            result = Some(SignPopupEvent::Rejected);
-                                        }
-                                    }
-                                    KeyCode::Esc => {
-                                        self.close();
-                                        result = Some(SignPopupEvent::EscapedBeforeSigning);
-                                    }
-                                    _ => {}
-                                },
-                                SignStatus::Signing => {}
-                                SignStatus::Done | SignStatus::Failed => {
-                                    if key_event.code == KeyCode::Esc {
-                                        self.close();
-                                        result = Some(SignPopupEvent::EscapedAfterSigning);
-                                    }
+            match self {
+                SignPopup::Confirm { confirm_popup } => {
+                    match confirm_popup.handle_event(event.input_event(), popup_area, actions)? {
+                        Some(ConfirmResult::Confirmed) => {
+                            gm_log!("User confirmed signing the message");
+                            let text_scroll = confirm_popup.into_text_scroll();
+
+                            let signer_account = ss.try_current_account()?;
+                            let data = {
+                                let message = text_scroll.text.clone();
+                                match hex::decode(&message) {
+                                    Ok(bytes) => bytes,
+                                    Err(_) => message.as_bytes().to_vec(),
                                 }
+                            };
+
+                            let (tr, rc) = oneshot::channel::<gm_utils::Result<Signature>>();
+                            let thread = tokio::spawn(async move {
+                                let _ = tr.send(
+                                    AccountManager::sign_message_async(signer_account, data).await,
+                                );
+                            });
+                            *self = Self::signing_screen(signer_account, text_scroll, thread, rc);
+                        }
+                        Some(ConfirmResult::Canceled) => {
+                            self.close();
+                            result = Some(SignPopupEvent::Rejected);
+                        }
+                        None => {}
+                    }
+                }
+                SignPopup::Signing {
+                    sign_thread,
+                    receiver,
+                    signer_account,
+                    ..
+                } => {
+                    if let Ok(sign_result) = receiver.try_recv() {
+                        match sign_result {
+                            Ok(signature) => {
+                                result = Some(SignPopupEvent::Signed(*signer_account, signature));
+                                sign_thread.abort();
+
+                                *self = Self::result_screen(Some(signature));
+                            }
+                            Err(err) => {
+                                sign_thread.abort();
+                                self.close();
+                                return Err(err.into());
                             }
                         }
                     }
-                    Event::Mouse(_mouse_event) => {}
-                    _ => {}
-                },
-                AppEvent::SignResult(addr, signature) => {
-                    result = Some(SignPopupEvent::Signed(*addr, *signature));
-                    self.status = SignStatus::Done;
-
-                    if let Some(thread) = self.sign_thread.take() {
-                        thread.abort();
-                    }
                 }
-                AppEvent::SignError(_) => {
-                    self.status = SignStatus::Failed;
+                SignPopup::Result { text_popup, .. } => {
+                    text_popup.handle_event(event.key_event(), popup_area, actions);
                 }
-                _ => {}
             }
-
-            actions.ignore_esc();
         }
 
         Ok(result)
     }
 
-    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme)
+    pub fn render(&self, popup_area: Rect, buf: &mut Buffer, theme: &Theme)
     where
         Self: Sized,
     {
         if self.is_open() {
-            let theme = theme.popup();
-
-            Popup.render(area, buf, &theme);
-
-            let inner_area = Popup::inner_area(area);
-            let block = Block::bordered().title("Sign Message");
-            let block_inner_area = block.inner(inner_area);
-            block.render(inner_area, buf);
-
-            let [text_area, button_area] =
-                Layout::vertical([Constraint::Min(1), Constraint::Length(3)])
-                    .areas(block_inner_area);
-
-            self.text.render(text_area, buf, &theme);
-
-            let [left_area, right_area] =
-                Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
-                    .areas(button_area);
-
-            match self.status {
-                SignStatus::Idle => {
-                    self.cancel_button
-                        .render(left_area, buf, !self.is_confirm_focused, &theme);
-
-                    self.confirm_button
-                        .render(right_area, buf, !self.is_confirm_focused, &theme);
+            match self {
+                SignPopup::Confirm { confirm_popup } => {
+                    confirm_popup.render(popup_area, buf, theme);
                 }
+                SignPopup::Signing { text_popup, .. } => {
+                    // TODO change this into a simple popup without text
+                    text_popup.render(popup_area, buf, theme);
 
-                SignStatus::Signing => {
-                    "Signing message...".render(button_area.margin_top(1), buf);
+                    Span::raw("Signing message...")
+                        .style(theme.style_dim())
+                        .render(text_popup.get_areas(popup_area).body_area, buf);
                 }
-                SignStatus::Done => {
+                SignPopup::Result { text_popup, .. } => {
+                    text_popup.render(popup_area, buf, theme);
+
                     ["Signature is done.", "Press ESC to close"].render(
-                        button_area.margin_top(1),
-                        buf,
-                        (),
-                    );
-                }
-                SignStatus::Failed => {
-                    ["Signing failed.", "Press ESC to close"].render(
-                        button_area.margin_top(1),
+                        text_popup.get_areas(popup_area).body_area,
                         buf,
                         (),
                     );

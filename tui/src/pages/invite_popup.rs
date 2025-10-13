@@ -145,9 +145,8 @@ impl InvitePopup {
         event: &AppEvent,
         tr: &mpsc::Sender<AppEvent>,
         ss: &SharedState,
-    ) -> crate::Result<PostHandleEventActions> {
-        let mut result = PostHandleEventActions::default();
-
+        actions: &mut PostHandleEventActions,
+    ) -> crate::Result<()> {
         if self.check_thread.is_none() {
             if let Some(invite_code) = self.invite_code.as_ref() {
                 let check_thread = start_check_thread(invite_code, tr)?;
@@ -176,7 +175,7 @@ impl InvitePopup {
                             }
                             KeyCode::Esc => {
                                 self.close();
-                                result.ignore_esc();
+                                actions.ignore_esc();
                             }
                             _ => {}
                         }
@@ -193,8 +192,9 @@ impl InvitePopup {
             }
             _ => {}
         }
-        result.ignore_esc();
-        Ok(result)
+        actions.ignore_esc();
+
+        Ok(())
     }
 
     pub fn render(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState)

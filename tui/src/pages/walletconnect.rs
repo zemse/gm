@@ -8,7 +8,7 @@ use alloy::{hex, rpc::types::TransactionRequest};
 use gm_ratatui_extra::{
     act::Act,
     button::Button,
-    confirm_popup::ConfirmPopup,
+    confirm_popup::{ConfirmPopup, ConfirmResult},
     cursor::Cursor,
     form::{Form, FormItemIndex, FormWidget},
     input_box_owned::InputBoxOwned,
@@ -230,7 +230,7 @@ impl WalletConnectPage {
                 self.tx_popup.open();
             }
             SessionRequestData::PersonalSign { message, .. } => {
-                self.sign_popup.set_msg_hex(message);
+                self.sign_popup = SignPopup::new_with_message_hex(message)?;
                 self.sign_popup.open();
             }
             SessionRequestData::EthSignTypedDataV4 {
@@ -287,7 +287,7 @@ impl Component for WalletConnectPage {
         sd: &CancellationToken,
         ss: &SharedState,
     ) -> crate::Result<PostHandleEventActions> {
-        let mut handle_result = PostHandleEventActions::default();
+        let mut actions = PostHandleEventActions::default();
 
         let any_popup_open_before = self.confirm_popup.is_open()
             || self.exit_popup.is_open()
@@ -357,10 +357,11 @@ impl Component for WalletConnectPage {
 
         // Handle based on what's active on the UI
         if self.confirm_popup.is_open() {
-            let r = self.confirm_popup.handle_event(
-                event.input_event(),
-                area,
-                || -> crate::Result<()> {
+            match self
+                .confirm_popup
+                .handle_event(event.input_event(), area, &mut actions)?
+            {
+                Some(ConfirmResult::Confirmed) => {
                     let pairing = self
                         .status
                         .proposal()
@@ -454,17 +455,14 @@ impl Component for WalletConnectPage {
                             }
                         }));
                     }
-
-                    Ok(())
-                },
-                || {
+                }
+                Some(ConfirmResult::Canceled) => {
                     let _ = tr.send(AppEvent::WalletConnectStatus(
                         WalletConnectStatus::SessionSettleCancelled,
                     ));
-                    Ok(())
-                },
-            )?;
-            handle_result.merge(r);
+                }
+                None => {}
+            }
         } else if self.tx_popup.is_open() {
             let r = self.tx_popup.handle_event(
                 (event, area, tr, sd, ss),
@@ -509,11 +507,11 @@ impl Component for WalletConnectPage {
                 },
                 || Ok(()),
             )?;
-            handle_result.merge(r);
+            actions.merge(r);
         } else if self.sign_popup.is_open() {
             if let Some(sign_popup_event) = self
                 .sign_popup
-                .handle_event((event, area, tr, ss), &mut handle_result)?
+                .handle_event((event, area, tr, ss), &mut actions)?
             {
                 match sign_popup_event {
                     SignPopupEvent::Signed(_, signature) => {
@@ -570,19 +568,15 @@ impl Component for WalletConnectPage {
                 },
                 || Ok(()),
             )?;
-            handle_result.merge(r);
+            actions.merge(r);
         } else if self.exit_popup.is_open() {
-            let r = self.exit_popup.handle_event(
-                event.input_event(),
-                area,
-                || Ok(()),
-                || -> crate::Result<()> {
-                    go_back = true;
-                    handle_result.page_pop();
-                    Ok(())
-                },
-            )?;
-            handle_result.merge(r);
+            if let Some(ConfirmResult::Canceled) =
+                self.exit_popup
+                    .handle_event(event.input_event(), area, &mut actions)?
+            {
+                go_back = true;
+                actions.page_pop();
+            }
         } else if self.status == WalletConnectStatus::Idle {
             let r = self.form.handle_event(
                 event.widget_event().as_ref(),
@@ -636,7 +630,7 @@ impl Component for WalletConnectPage {
                     Ok(())
                 },
             )?;
-            handle_result.merge(r);
+            actions.merge(r);
         } else if self.status == WalletConnectStatus::SessionSettleDone {
             self.cursor
                 .handle(event.key_event(), self.session_requests.len());
@@ -679,10 +673,10 @@ impl Component for WalletConnectPage {
         }
 
         if !go_back && self.status != WalletConnectStatus::Idle {
-            handle_result.ignore_esc();
+            actions.ignore_esc();
         }
 
-        Ok(handle_result)
+        Ok(actions)
     }
 
     fn render_component(

@@ -10,6 +10,9 @@ pub type Result<T> = std::result::Result<T, UtilsError>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum UtilsError {
+    #[error(transparent)]
+    CommonError(#[from] gm_common::Error),
+
     #[cfg(target_os = "macos")]
     #[error(transparent)]
     MacosError(#[from] gm_macos::Error),
@@ -146,6 +149,9 @@ pub enum UtilsError {
 
     #[error("Could not get the published URL from Etherscan response. (Full response: {0})")]
     EtherscanPublishURLNotFound(String),
+
+    #[error("Message signing failed. (Error: {0})")]
+    MessageSigningFailed(alloy::signers::Error),
 }
 
 impl UtilsError {

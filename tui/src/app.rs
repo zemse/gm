@@ -539,9 +539,11 @@ impl App {
         }
 
         #[cfg(feature = "demo")]
-        let demo_popup_shown = self.demo_popup.is_shown();
+        let demo_popup_shown = self.demo_popup.is_open();
         #[cfg(not(feature = "demo"))]
         let demo_popup_shown = false;
+
+        let fatal_error_popup_open = self.fatal_error_popup.is_open();
 
         // Update state based on events
         match &event {
@@ -627,21 +629,29 @@ impl App {
             _ => {}
         }
 
+        let mut actions = PostHandleEventActions::default();
+
         // Handle the event in the relavent component
-        let result = if self.fatal_error_popup.is_shown() {
+        if fatal_error_popup_open {
             self.fatal_error_popup
-                .handle_event::<PostHandleEventActions>(event.key_event(), areas.popup)
+                .handle_event::<PostHandleEventActions>(
+                    event.key_event(),
+                    areas.popup,
+                    &mut actions,
+                );
         } else if self.invite_popup.is_open() {
             self.invite_popup
-                .handle_event(&event, tr, &self.shared_state)?
+                .handle_event(&event, tr, &self.shared_state, &mut actions)?
         } else if demo_popup_shown {
             #[cfg(not(feature = "demo"))]
             unreachable!();
             #[cfg(feature = "demo")]
-            self.demo_popup
-                .handle_event::<PostHandleEventActions>(event.key_event(), areas.popup)
+            self.demo_popup.handle_event::<PostHandleEventActions>(
+                event.key_event(),
+                areas.popup,
+                &mut actions,
+            );
         } else {
-            let mut result = PostHandleEventActions::default();
             let is_key_event = event.key_event().is_some();
             let mut body_area = areas.body;
 
@@ -655,7 +665,7 @@ impl App {
                 let page = self.context.last_mut().unwrap();
                 let r =
                     page.handle_event(&event, body_area, areas.popup, tr, sd, &self.shared_state)?;
-                result.merge(r);
+                actions.merge(r);
             }
 
             // If focus is on menu, handle all events. However if focus is not on menu
@@ -669,8 +679,8 @@ impl App {
                     |item| {
                         let mut page = item.get_page(&self.shared_state)?;
                         page.set_focus(true);
-                        result.page_pop_all();
-                        result.page_insert(page);
+                        actions.page_pop_all();
+                        actions.page_insert(page);
 
                         focus_update_1 = Some(Focus::Body);
 
@@ -691,11 +701,9 @@ impl App {
                     self.update_focus(new_focus);
                 }
             }
-
-            result
         };
 
-        let (ignore_esc, ignore_ctrlc, ignore_left) = self.process_result(result).await?;
+        let (ignore_esc, ignore_ctrlc, ignore_left) = self.process_result(actions).await?;
 
         // Context is empty (due to pressing ESC)
         if self.context.is_empty() {
@@ -750,22 +758,22 @@ impl App {
                         }
                     }
                     KeyCode::Esc => {
-                        if self.fatal_error_popup.is_shown() {
-                            self.fatal_error_popup.clear();
-                        } else if self.context.len() == 1 && self.focus != Focus::Menu {
-                            self.update_focus(Focus::Menu);
-                        } else if !ignore_esc {
-                            let page = self.context.pop();
-
-                            if self.context.is_empty() {
-                                self.exit = true;
-                            }
-
-                            if let Some(mut page) = page {
-                                page.exit_threads().await;
+                        if !ignore_esc {
+                            if self.context.len() == 1 && self.focus != Focus::Menu {
+                                self.update_focus(Focus::Menu);
+                            } else {
+                                let page = self.context.pop();
 
                                 if self.context.is_empty() {
-                                    self.context.push(page); // Push it back to prevent empty screen while exiting
+                                    self.exit = true;
+                                }
+
+                                if let Some(mut page) = page {
+                                    page.exit_threads().await;
+
+                                    if self.context.is_empty() {
+                                        self.context.push(page); // Push it back to prevent empty screen while exiting
+                                    }
                                 }
                             }
                         }

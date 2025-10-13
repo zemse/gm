@@ -8,7 +8,7 @@ use std::{
 use alloy::primitives::{address, Address};
 use gm_ratatui_extra::{
     act::Act,
-    confirm_popup::ConfirmPopup,
+    confirm_popup::{ConfirmPopup, ConfirmResult},
     extensions::{MouseEventExt, RectExt},
     thematize::Thematize,
 };
@@ -139,20 +139,16 @@ impl Component for AccountCreatePage {
         _shutdown_signal: &CancellationToken,
         shared_state: &SharedState,
     ) -> crate::Result<PostHandleEventActions> {
-        let mut result = PostHandleEventActions::default();
+        let mut actions = PostHandleEventActions::default();
 
         if self.exit_popup.is_open() {
-            let r = self.exit_popup.handle_event(
-                event.input_event(),
-                area,
-                || Ok(()),
-                || -> crate::Result<()> {
-                    result.page_pop();
-                    result.reload();
-                    Ok(())
-                },
-            )?;
-            result.merge(r);
+            if let Some(ConfirmResult::Canceled) =
+                self.exit_popup
+                    .handle_event(event.input_event(), area, &mut actions)?
+            {
+                actions.page_pop();
+                actions.reload();
+            }
         }
 
         let cursor_max = self.mask.len();
@@ -227,7 +223,7 @@ impl Component for AccountCreatePage {
                                     }
                                     KeyCode::Esc => {
                                         // When context goes back to previous page, it should reload state
-                                        result.reload();
+                                        actions.reload();
                                     }
                                     _ => {}
                                 }
@@ -254,7 +250,7 @@ impl Component for AccountCreatePage {
                     Stage::Mining => {
                         if let Event::Key(key_event) = input_event {
                             if key_event.code == KeyCode::Esc {
-                                result.ignore_esc();
+                                actions.ignore_esc();
                                 self.exit_popup.open();
                             }
                         }
@@ -262,18 +258,18 @@ impl Component for AccountCreatePage {
                     Stage::Result => match input_event {
                         Event::Key(key_event) => match key_event.code {
                             KeyCode::Esc => {
-                                result.reload();
+                                actions.reload();
                             }
                             KeyCode::Enter => {
-                                result.reload();
-                                result.page_pop();
+                                actions.reload();
+                                actions.page_pop();
                             }
                             _ => {}
                         },
                         Event::Mouse(mouse_event) => {
                             if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
-                                result.reload();
-                                result.page_pop();
+                                actions.reload();
+                                actions.page_pop();
                             }
                         }
                         _ => {}
@@ -294,7 +290,7 @@ impl Component for AccountCreatePage {
                 if shared_state.current_account.is_none() {
                     Config::set_current_account(addr)?;
                 }
-                result.reload();
+                actions.reload();
                 self.stage = Stage::Result;
             }
             _ => {}
@@ -326,7 +322,7 @@ impl Component for AccountCreatePage {
             self.hash_rate_thread = Some(hash_rate_thread);
         }
 
-        Ok(result)
+        Ok(actions)
     }
 
     fn render_component(

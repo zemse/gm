@@ -4,7 +4,7 @@ use alloy::{hex, primitives::Address, signers::Signature};
 use gm_ratatui_extra::{
     act::Act,
     button::Button,
-    confirm_popup::ConfirmPopup,
+    confirm_popup::{ConfirmPopup, ConfirmResult},
     extensions::RenderTextWrapped,
     form::{Form, FormItemIndex, FormWidget},
     input_box_owned::InputBoxOwned,
@@ -135,33 +135,36 @@ impl Component for SignMessagePage {
 
         match self {
             Self::SignForm { form, sign_popup } => {
-                let form_actions = form.handle_event(
-                    event.widget_event().as_ref(),
-                    area,
-                    |_, _| Ok(()),
-                    |item, form| {
-                        if item == FormItem::SignMessageButton {
-                            let message = form.get_text(FormItem::MessageInput);
-                            sign_popup.set_msg_utf8(message.to_string());
-                            sign_popup.open();
+                if sign_popup.is_open() {
+                    if let Some(sign_popup_event) = sign_popup.handle_event(
+                        (event, popup_area, transmitter, shared_state),
+                        &mut actions,
+                    )? {
+                        match sign_popup_event {
+                            SignPopupEvent::Signed(address, signature) => {
+                                let message = form.get_text(FormItem::MessageInput).to_string();
+                                self.show_publish_to_etherscan_screen(address, message, signature);
+                            }
+                            SignPopupEvent::Rejected
+                            | SignPopupEvent::EscapedBeforeSigning
+                            | SignPopupEvent::EscapedAfterSigning => sign_popup.close(),
                         }
-                        Ok(())
-                    },
-                )?;
-                actions.merge(form_actions);
-
-                if let Some(sign_popup_event) = sign_popup
-                    .handle_event((event, popup_area, transmitter, shared_state), &mut actions)?
-                {
-                    match sign_popup_event {
-                        SignPopupEvent::Signed(address, signature) => {
-                            let message = form.get_text(FormItem::MessageInput).to_string();
-                            self.show_publish_to_etherscan_screen(address, message, signature);
-                        }
-                        SignPopupEvent::Rejected
-                        | SignPopupEvent::EscapedBeforeSigning
-                        | SignPopupEvent::EscapedAfterSigning => sign_popup.close(),
                     }
+                } else {
+                    let form_actions = form.handle_event(
+                        event.widget_event().as_ref(),
+                        area,
+                        |_, _| Ok(()),
+                        |item, form| {
+                            if item == FormItem::SignMessageButton {
+                                let message = form.get_text(FormItem::MessageInput);
+                                *sign_popup = SignPopup::new_with_message_utf8(message.to_string());
+                                sign_popup.open();
+                            }
+                            Ok(())
+                        },
+                    )?;
+                    actions.merge(form_actions);
                 }
             }
             Self::PublishToEtherscan {
@@ -172,26 +175,20 @@ impl Component for SignMessagePage {
                 publish_thread,
                 result_receiver,
             } => {
-                let confirm_popup_actions = confirm_popup.handle_event(
-                    event.input_event(),
-                    popup_area,
-                    || {
-                        let address = *address;
-                        let message = message.clone();
-                        let signature = *signature;
-                        let (tr, rc) = oneshot::channel::<gm_utils::Result<String>>();
-                        *publish_thread = Some(tokio::spawn(async move {
-                            let _ = tr.send(
-                                publish_signature_to_etherscan(address, message, signature).await,
-                            );
-                        }));
-                        *result_receiver = Some(rc);
-
-                        Ok::<(), crate::Error>(())
-                    },
-                    || Ok(()),
-                )?;
-                actions.merge(confirm_popup_actions);
+                if let Some(ConfirmResult::Confirmed) =
+                    confirm_popup.handle_event(event.input_event(), popup_area, &mut actions)?
+                {
+                    let address = *address;
+                    let message = message.clone();
+                    let signature = *signature;
+                    let (tr, rc) = oneshot::channel::<gm_utils::Result<String>>();
+                    *publish_thread = Some(tokio::spawn(async move {
+                        let _ = tr.send(
+                            publish_signature_to_etherscan(address, message, signature).await,
+                        );
+                    }));
+                    *result_receiver = Some(rc);
+                }
 
                 if let Some(rc) = result_receiver {
                     if let Ok(result) = rc.try_recv() {

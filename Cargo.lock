@@ -3360,6 +3360,7 @@ version = "0.0.2-alpha"
 dependencies = [
  "alloy",
  "serde",
+ "thiserror 2.0.16",
 ]
 
 [[package]]

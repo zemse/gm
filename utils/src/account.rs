@@ -7,6 +7,7 @@ use alloy::{
             ProjectivePoint, Scalar,
         },
         local::{MnemonicBuilder, PrivateKeySigner},
+        Signature, Signer,
     },
 };
 use coins_bip39::{English, Mnemonic};
@@ -29,7 +30,7 @@ pub trait AccountUtils {
 
     fn get_account_list() -> crate::Result<Vec<Address>>;
 
-    fn get_secret(address: &Address) -> crate::Result<Secret>;
+    fn get_secret(address: Address) -> crate::Result<Secret>;
 }
 
 pub struct AccountManager;
@@ -53,7 +54,7 @@ impl AccountManager {
         Ok(address)
     }
 
-    pub fn load_wallet(address: &Address) -> crate::Result<PrivateKeySigner> {
+    pub fn load_wallet(address: Address) -> crate::Result<PrivateKeySigner> {
         match Self::get_secret(address)? {
             Secret::Mnemonic(phrase) => get_signer_from_mnemonic(&phrase),
             Secret::PrivateKey(private_key) => {
@@ -61,12 +62,20 @@ impl AccountManager {
             }
         }
     }
+
+    pub async fn sign_message_async(address: Address, data: Vec<u8>) -> crate::Result<Signature> {
+        #[cfg(target_os = "macos")]
+        return Ok(gm_macos::sign_message_async(address, data).await?);
+
+        #[cfg(not(target_os = "macos"))]
+        return linux_insecure::LinuxInsecure::sign_message_async(address, data).await;
+    }
 }
 
 impl AccountUtils for AccountManager {
     fn store_mnemonic_wallet(phrase: &str, address: Address) -> crate::Result<()> {
         #[cfg(target_os = "macos")]
-        return Ok(gm_macos::Macos::store_mnemonic_wallet(phrase, address)?);
+        return Ok(gm_macos::store_mnemonic_wallet(phrase, address)?);
 
         #[cfg(not(target_os = "macos"))]
         return linux_insecure::LinuxInsecure::store_mnemonic_wallet(phrase, address);
@@ -74,7 +83,7 @@ impl AccountUtils for AccountManager {
 
     fn store_private_key(private_key: &FieldBytes, address: Address) -> crate::Result<()> {
         #[cfg(target_os = "macos")]
-        return Ok(gm_macos::Macos::store_private_key(private_key, address)?);
+        return Ok(gm_macos::store_private_key(private_key, address)?);
 
         #[cfg(not(target_os = "macos"))]
         return linux_insecure::LinuxInsecure::store_private_key(private_key, address);
@@ -82,15 +91,15 @@ impl AccountUtils for AccountManager {
 
     fn get_account_list() -> crate::Result<Vec<Address>> {
         #[cfg(target_os = "macos")]
-        return Ok(gm_macos::Macos::get_account_list()?);
+        return Ok(gm_macos::get_account_list()?);
 
         #[cfg(not(target_os = "macos"))]
         return linux_insecure::LinuxInsecure::get_account_list();
     }
 
-    fn get_secret(address: &Address) -> crate::Result<Secret> {
+    fn get_secret(address: Address) -> crate::Result<Secret> {
         #[cfg(target_os = "macos")]
-        return Ok(gm_macos::Macos::get_secret(address)?);
+        return Ok(gm_macos::get_secret(address)?);
 
         #[cfg(not(target_os = "macos"))]
         return linux_insecure::LinuxInsecure::get_secret(address);
@@ -199,6 +208,7 @@ fn eth_addr_from_affine(aff: &AffinePoint) -> [u8; 20] {
 }
 
 pub mod linux_insecure {
+
     use crate::disk_storage::{DiskStorageInterface, FileFormat};
 
     use super::*;
@@ -218,10 +228,24 @@ pub mod linux_insecure {
             Ok(InsecurePrivateKeyStore::load()?.list())
         }
 
-        fn get_secret(address: &Address) -> crate::Result<Secret> {
+        fn get_secret(address: Address) -> crate::Result<Secret> {
             InsecurePrivateKeyStore::load()?
-                .find_by_address(address)
-                .ok_or(crate::Error::SecretNotFound(*address))
+                .find_by_address(&address)
+                .ok_or(crate::Error::SecretNotFound(address))
+        }
+    }
+
+    impl LinuxInsecure {
+        pub async fn sign_message_async(
+            address: Address,
+            data: Vec<u8>,
+        ) -> crate::Result<Signature> {
+            let wallet = Self::get_secret(address)?.into_alloy_signer()?;
+
+            wallet
+                .sign_message(&data)
+                .await
+                .map_err(crate::Error::MessageSigningFailed)
         }
     }
 

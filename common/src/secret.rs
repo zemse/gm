@@ -1,10 +1,29 @@
-use alloy::{hex, signers::k256::FieldBytes};
+use alloy::{
+    hex,
+    signers::{
+        k256::FieldBytes,
+        local::{coins_bip39::English, MnemonicBuilder, PrivateKeySigner},
+    },
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
 pub enum Secret {
     Mnemonic(String),
     PrivateKey(FieldBytes),
+}
+
+impl Secret {
+    pub fn into_alloy_signer(self) -> crate::Result<PrivateKeySigner> {
+        match self {
+            Secret::Mnemonic(phrase) => MnemonicBuilder::<English>::default()
+                .phrase(phrase)
+                .build()
+                .map_err(crate::Error::MnemonicSignerBuildFailed),
+            Secret::PrivateKey(private_key) => PrivateKeySigner::from_slice(private_key.as_ref())
+                .map_err(crate::Error::PrivateKeySignerBuildFailed),
+        }
+    }
 }
 
 impl Serialize for Secret {

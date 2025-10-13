@@ -5,6 +5,7 @@ use ratatui::{
     widgets::{Block, Clear, Widget},
 };
 
+// TODO make this stateful, and handle open/close state
 pub struct Popup;
 
 impl Popup {

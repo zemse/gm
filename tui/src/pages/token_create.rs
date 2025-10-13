@@ -7,7 +7,7 @@ use crate::AppEvent;
 use alloy::primitives::Address;
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::button::Button;
-use gm_ratatui_extra::confirm_popup::ConfirmPopup;
+use gm_ratatui_extra::confirm_popup::{ConfirmPopup, ConfirmResult};
 use gm_ratatui_extra::form::{Form, FormItemIndex, FormWidget};
 use gm_ratatui_extra::input_box_owned::InputBoxOwned;
 use gm_ratatui_extra::thematize::Thematize;
@@ -141,30 +141,28 @@ impl Component for TokenCreatePage {
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<PostHandleEventActions> {
-        let mut handle_result = PostHandleEventActions::default();
+        let mut actions = PostHandleEventActions::default();
+
         if self.remove_popup.is_open() {
-            let r = self.remove_popup.handle_event(
-                event.input_event(),
-                area,
-                || -> crate::Result<()> {
-                    if self.network.tokens.get(self.token_index).is_some() {
-                        self.network.tokens.remove(self.token_index);
-                        let mut store = NetworkStore::load()?;
-                        store.networks[self.network_index] = self.network.clone();
-                        store.save()?;
-                    }
-                    handle_result.page_pop();
-                    handle_result.page_insert(Page::Token(TokenPage::new(
-                        self.network_index,
-                        self.network.clone(),
-                    )?));
-                    handle_result.reload();
-                    Ok(())
-                },
-                || Ok(()),
-            )?;
-            handle_result.merge(r);
+            if let Some(ConfirmResult::Confirmed) =
+                self.remove_popup
+                    .handle_event(event.input_event(), area, &mut actions)?
+            {
+                if self.network.tokens.get(self.token_index).is_some() {
+                    self.network.tokens.remove(self.token_index);
+                    let mut store = NetworkStore::load()?;
+                    store.networks[self.network_index] = self.network.clone();
+                    store.save()?;
+                }
+                actions.page_pop();
+                actions.page_insert(Page::Token(TokenPage::new(
+                    self.network_index,
+                    self.network.clone(),
+                )?));
+                actions.reload();
+            }
         }
+
         let r = self.form.handle_event(
             event.widget_event().as_ref(),
             area,
@@ -182,12 +180,12 @@ impl Component for TokenCreatePage {
                     config.networks[self.network_index] = self.network.clone();
                     config.save()?;
 
-                    handle_result.page_pop();
-                    handle_result.page_insert(Page::Token(TokenPage::new(
+                    actions.page_pop();
+                    actions.page_insert(Page::Token(TokenPage::new(
                         self.network_index,
                         self.network.clone(),
                     )?));
-                    handle_result.reload();
+                    actions.reload();
                 }
                 if label == FormItem::RemoveButton {
                     self.remove_popup.open();
@@ -196,8 +194,8 @@ impl Component for TokenCreatePage {
                 Ok(())
             },
         )?;
-        handle_result.merge(r);
-        Ok(handle_result)
+        actions.merge(r);
+        Ok(actions)
     }
     fn render_component(
         &self,

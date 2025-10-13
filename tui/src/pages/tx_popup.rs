@@ -381,7 +381,7 @@ pub fn send_tx_thread(
         ) -> crate::Result<SendTxResult> {
             let provider = network.get_provider()?;
 
-            let wallet = AccountManager::load_wallet(&sender_account)?;
+            let wallet = AccountManager::load_wallet(sender_account)?;
 
             let nonce = provider.get_transaction_count(sender_account).await?;
             tx.nonce = Some(nonce);
