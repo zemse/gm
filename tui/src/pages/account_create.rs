@@ -10,6 +10,7 @@ use gm_ratatui_extra::{
     act::Act,
     confirm_popup::{ConfirmPopup, ConfirmResult},
     extensions::{MouseEventExt, RectExt},
+    popup::PopupWidget,
     thematize::Thematize,
 };
 use ratatui::{

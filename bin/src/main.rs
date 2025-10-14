@@ -1,4 +1,5 @@
 use clap::Parser;
+use gm_ratatui_extra::widgets::popup::PopupWidget;
 use gm_tui::{
     pages::{shell::ShellPage, walletconnect::WalletConnectPage, Page},
     MainMenuItem,

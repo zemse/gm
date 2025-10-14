@@ -2,81 +2,73 @@ use ratatui::{
     buffer::Buffer,
     crossterm::event::{KeyCode, KeyEvent},
     layout::Rect,
-    widgets::{Block, Widget},
 };
 
 use super::{popup::Popup, text_scroll::TextScroll};
 use crate::{
     act::Act,
-    extensions::{KeyEventExt, RectExt, ThemedWidget},
+    extensions::{KeyEventExt, ThemedWidget},
+    popup::PopupWidget,
     thematize::Thematize,
 };
 
-pub struct Areas {
-    pub title_area: Rect,
-    pub body_area: Rect,
-}
-
 /// A popup that displays text content with scrolling capability.
-/// The popup does not have an explicit "open" state, it is shown only when it contains text.
-/// And if text is an empty string it renders nothing.
-#[derive(Debug)]
+/// It is shown only when it contains text. And if text is updated to
+/// empty it is closed.
+#[derive(Debug, Default)]
 pub struct TextPopup {
-    title: &'static str,
+    popup: Popup,
     text_scroll: TextScroll,
 }
 
-impl TextPopup {
-    // TODO break_words should be in builder pattern
-    pub fn new(title: &'static str, break_words: bool) -> Self {
-        let text = String::new();
-        Self {
-            title,
-            text_scroll: TextScroll::new(text, break_words),
-        }
+impl PopupWidget for TextPopup {
+    fn get_popup(&self) -> &Popup {
+        &self.popup
     }
 
-    pub fn with_text(mut self, text: String) -> Self {
-        self.text_scroll.text = text;
+    fn get_popup_mut(&mut self) -> &mut Popup {
+        &mut self.popup
+    }
+}
+
+impl TextPopup {
+    pub fn with_break_words(mut self, break_words: bool) -> Self {
+        self.text_scroll.break_words = break_words;
         self
     }
 
-    pub fn is_open(&self) -> bool {
-        !self.text_scroll.text.is_empty()
-    }
-
-    pub fn clear(&mut self) {
-        self.text_scroll.text.clear();
+    pub fn with_text(mut self, text: String) -> Self {
+        self.set_text(text);
+        self
     }
 
     pub fn set_text(&mut self, text: String) {
+        if text.is_empty() {
+            self.popup.close();
+        } else {
+            self.popup.open();
+        }
+
         self.text_scroll.text = text;
-        // self.text_scroll.scroll_offset = 0;
     }
 
-    pub fn handle_event<A>(&mut self, key_event: Option<&KeyEvent>, area: Rect, actions: &mut A)
-    where
+    pub fn handle_event<A>(
+        &mut self,
+        key_event: Option<&KeyEvent>,
+        popup_area: Rect,
+        actions: &mut A,
+    ) where
         A: Act,
     {
         if self.is_open() {
             actions.ignore_esc();
         }
 
-        let text_area = Popup::inner_area(area).block_inner();
+        let text_area = self.body_area(popup_area);
         self.text_scroll.handle_event(key_event, text_area);
 
         if key_event.is_pressed(KeyCode::Esc) || key_event.is_pressed(KeyCode::Enter) {
-            self.clear();
-        }
-    }
-
-    pub fn get_areas(&self, popup_area: Rect) -> Areas {
-        let inner = Popup::inner_area(popup_area);
-        let title_area = inner.change_height(2);
-        let body_area = inner.margin_top(2);
-        Areas {
-            title_area,
-            body_area,
+            self.close();
         }
     }
 }
@@ -91,20 +83,9 @@ impl ThemedWidget for TextPopup {
         }
         let theme = theme.popup();
 
-        Popup.render(popup_area, buf, &theme);
+        self.popup.render(popup_area, buf, &theme);
 
-        if theme.boxed() {
-            Block::bordered()
-                .style(theme.style())
-                .border_type(theme.border_type())
-                .title_bottom("press ESC or Enter to dismiss")
-                .render(popup_area, buf);
-        }
-
-        let areas = self.get_areas(popup_area);
-
-        self.title.render(areas.title_area, buf);
-
-        self.text_scroll.render(areas.body_area, buf, &theme);
+        self.text_scroll
+            .render(self.body_area(popup_area), buf, &theme);
     }
 }

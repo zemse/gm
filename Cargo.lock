@@ -3348,6 +3348,7 @@ version = "0.0.2-alpha"
 dependencies = [
  "clap",
  "console",
+ "gm-ratatui-extra",
  "gm-tui",
  "ratatui",
  "tokio",

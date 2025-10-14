@@ -17,6 +17,7 @@ use gm_ratatui_extra::{
     button::Button,
     form::FormEvent,
     input_box::InputBox,
+    popup::PopupWidget,
     widgets::{
         filter_select_popup::FilterSelectPopup,
         form::{Form, FormItemIndex, FormWidget},
@@ -58,7 +59,8 @@ impl TryFrom<FormItem> for FormWidget {
                 widget: InputBox::new("Theme")
                     .with_empty_text("Select a theme")
                     .make_immutable(true),
-                popup: FilterSelectPopup::new("Select a theme")
+                popup: FilterSelectPopup::default()
+                    .with_title("Select a theme")
                     .with_empty_text("No themes available"),
             },
             FormItem::HeliosEnabled => FormWidget::BooleanInput {

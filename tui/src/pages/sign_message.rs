@@ -7,6 +7,7 @@ use gm_ratatui_extra::{
     extensions::RenderTextWrapped,
     form::{Form, FormEvent, FormItemIndex, FormWidget},
     input_box::InputBox,
+    popup::PopupWidget,
 };
 use gm_utils::etherscan::publish_signature_to_etherscan;
 use ratatui::{buffer::Buffer, layout::Rect};
@@ -103,7 +104,7 @@ impl SignMessagePage {
                 "Publish",
                 "Skip",
                 true,
-            ).open_already(),
+            ).with_open(true),
             publish_thread: None,
             result_receiver: None,
         }

@@ -1,38 +1,39 @@
 use std::{fmt::Display, sync::Arc};
 
-use ratatui::{
-    buffer::Buffer,
-    crossterm::event::{Event, KeyCode},
-    layout::Rect,
-    text::Span,
-    widgets::{Block, Widget},
-};
+use ratatui::{buffer::Buffer, crossterm::event::Event, layout::Rect};
 
 use super::popup::Popup;
 use crate::{
-    act::Act,
-    extensions::{EventExt, RectExt},
-    filter_select::FilterSelect,
-    select::SelectEvent,
-    thematize::Thematize,
+    act::Act, extensions::ThemedWidget, filter_select::FilterSelect, popup::PopupWidget,
+    select::SelectEvent, thematize::Thematize,
 };
 
 #[derive(Debug)]
 pub struct FilterSelectPopup<Item: Display + PartialEq> {
-    title: &'static str,
-    open: bool,
+    popup: Popup,
     filter_select: FilterSelect<Item>,
 }
 
-impl<Item: Display + PartialEq> FilterSelectPopup<Item> {
-    pub fn new(title: &'static str) -> Self {
+impl<Item: Display + PartialEq> Default for FilterSelectPopup<Item> {
+    fn default() -> Self {
         Self {
-            title,
-            open: false,
-            filter_select: FilterSelect::default(),
+            popup: Popup::default(),
+            filter_select: FilterSelect::default().with_focus(true),
         }
     }
+}
 
+impl<Item: Display + PartialEq> PopupWidget for FilterSelectPopup<Item> {
+    fn get_popup(&self) -> &Popup {
+        &self.popup
+    }
+
+    fn get_popup_mut(&mut self) -> &mut Popup {
+        &mut self.popup
+    }
+}
+
+impl<Item: Display + PartialEq> FilterSelectPopup<Item> {
     pub fn with_empty_text(mut self, empty_text: &'static str) -> Self {
         self.filter_select = self.filter_select.with_empty_text(empty_text);
         self
@@ -54,17 +55,17 @@ impl<Item: Display + PartialEq> FilterSelectPopup<Item> {
     }
 
     pub fn is_open(&self) -> bool {
-        self.open
+        self.popup.is_open()
     }
 
     // Opens the popup with the fresh items.
     pub fn open(&mut self) {
-        self.open = true;
+        self.popup.open();
         self.filter_select.reset();
     }
 
     pub fn close(&mut self) {
-        self.open = false;
+        self.popup.close();
     }
 
     pub fn handle_event<'a, A>(
@@ -78,11 +79,8 @@ impl<Item: Display + PartialEq> FilterSelectPopup<Item> {
     {
         let mut result = None;
 
-        if self.open {
-            // TODO handle using popup widget
-            if input_event.is_some_and(|input_event| input_event.is_key_pressed(KeyCode::Esc)) {
-                self.close();
-            }
+        if self.is_open() {
+            self.popup.handle_event(input_event, actions);
 
             if let Some(SelectEvent::Select(item)) =
                 self.filter_select.handle_event(input_event, popup_area)?
@@ -95,28 +93,19 @@ impl<Item: Display + PartialEq> FilterSelectPopup<Item> {
 
         Ok(result)
     }
-    pub fn render(&self, popup_area: Rect, buf: &mut Buffer, theme: &impl Thematize)
+}
+
+impl<Item: Display + PartialEq> ThemedWidget for FilterSelectPopup<Item> {
+    fn render(&self, popup_area: Rect, buf: &mut Buffer, theme: &impl Thematize)
     where
         Self: Sized,
     {
         if self.is_open() {
-            let theme = theme.popup();
+            self.popup.render(popup_area, buf, theme);
 
-            Popup.render(popup_area, buf, &theme);
-
-            if theme.boxed() {
-                let block = Block::bordered()
-                    .border_type(theme.border_type())
-                    .style(theme.style());
-                block.render(popup_area, buf);
-            }
-
-            let mut inner_area = Popup::inner_area(popup_area);
-
-            Span::raw(self.title).render(inner_area, buf);
-            inner_area.consume_height(2);
-
-            self.filter_select.render(inner_area, buf, &theme);
+            // let theme = theme.popup();
+            self.filter_select
+                .render(self.body_area(popup_area), buf, theme);
         }
     }
 }

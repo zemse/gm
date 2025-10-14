@@ -8,6 +8,9 @@ pub trait Thematize {
 
     fn cursor_cancelled(&self) -> Style;
 
+    /// Calling popup once should update the style. However, is it possible that
+    /// popup is called multiple times during rendering of nested popups. The
+    /// implementation should not cause toggling but give the same result.
     fn popup(&self) -> Self;
 
     fn error_popup(&self) -> Self;
@@ -33,7 +36,7 @@ pub trait Thematize {
 
 #[derive(Default)]
 pub struct DefaultTheme {
-    reversed: bool,
+    popup: bool,
 }
 
 impl Thematize for DefaultTheme {
@@ -46,15 +49,11 @@ impl Thematize for DefaultTheme {
     }
 
     fn popup(&self) -> DefaultTheme {
-        DefaultTheme {
-            reversed: !self.reversed,
-        }
+        DefaultTheme { popup: true }
     }
 
     fn error_popup(&self) -> DefaultTheme {
-        DefaultTheme {
-            reversed: !self.reversed,
-        }
+        DefaultTheme { popup: true }
     }
 
     fn style(&self) -> Style {
@@ -70,7 +69,7 @@ impl Thematize for DefaultTheme {
     }
 
     fn button_focused(&self) -> Style {
-        if self.reversed {
+        if self.popup {
             Style::default()
                 .add_modifier(Modifier::BOLD)
                 .remove_modifier(Modifier::REVERSED)
@@ -84,7 +83,7 @@ impl Thematize for DefaultTheme {
     }
 
     fn select_focused(&self) -> Style {
-        if self.reversed {
+        if self.popup {
             Style::default()
                 .add_modifier(Modifier::BOLD)
                 .remove_modifier(Modifier::REVERSED)

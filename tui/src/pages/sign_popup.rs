@@ -6,6 +6,7 @@ use gm_ratatui_extra::{
     act::Act,
     confirm_popup::{ConfirmPopup, ConfirmResult},
     extensions::{CustomRender, ThemedWidget},
+    popup::{Popup, PopupWidget},
     text_popup::TextPopup,
     text_scroll::TextScroll,
     thematize::Thematize,
@@ -38,7 +39,7 @@ pub enum SignPopup {
 
     /// Step 3 - Signing is done or failed
     Result {
-        text_popup: TextPopup, // TODO replace with Popup once it is stateful
+        popup: Popup,
         signature: Option<Signature>,
     },
 }
@@ -79,7 +80,10 @@ impl SignPopup {
         Self::Signing {
             signer_account,
             // TODO enable initialising TextPopup with TextScroll
-            text_popup: TextPopup::new("Signing Message", true).with_text(message.text),
+            text_popup: TextPopup::default()
+                .with_title("Signing Message")
+                .with_text(message.text)
+                .with_break_words(true),
             sign_thread,
             receiver,
         }
@@ -87,14 +91,11 @@ impl SignPopup {
 
     fn result_screen(signature: Option<Signature>) -> Self {
         Self::Result {
-            text_popup: TextPopup::new(
-                if signature.is_some() {
-                    "Sign Message Result"
-                } else {
-                    "Sign Message Failed"
-                },
-                true,
-            ),
+            popup: Popup::default().with_title(if signature.is_some() {
+                "Sign Message Result"
+            } else {
+                "Sign Message Failed"
+            }),
             signature,
         }
     }
@@ -103,7 +104,7 @@ impl SignPopup {
         match self {
             SignPopup::Confirm { confirm_popup } => confirm_popup.is_open(),
             SignPopup::Signing { text_popup, .. } => text_popup.is_open(),
-            SignPopup::Result { text_popup, .. } => text_popup.is_open(),
+            SignPopup::Result { popup, .. } => popup.is_open(),
         }
     }
 
@@ -126,10 +127,10 @@ impl SignPopup {
                 confirm_popup.close();
             }
             SignPopup::Signing { text_popup, .. } => {
-                text_popup.clear();
+                text_popup.close();
             }
-            SignPopup::Result { text_popup, .. } => {
-                text_popup.clear();
+            SignPopup::Result { popup, .. } => {
+                popup.close();
             }
         }
     }
@@ -237,8 +238,8 @@ impl SignPopup {
                         }
                     }
                 }
-                SignPopup::Result { text_popup, .. } => {
-                    text_popup.handle_event(event.key_event(), popup_area, actions);
+                SignPopup::Result { popup, .. } => {
+                    popup.handle_event(event.input_event(), actions);
                 }
             }
         }
@@ -261,13 +262,13 @@ impl SignPopup {
 
                     Span::raw("Signing message...")
                         .style(theme.style_dim())
-                        .render(text_popup.get_areas(popup_area).body_area, buf);
+                        .render(text_popup.body_area(popup_area), buf);
                 }
-                SignPopup::Result { text_popup, .. } => {
-                    text_popup.render(popup_area, buf, theme);
+                SignPopup::Result { popup, .. } => {
+                    popup.render(popup_area, buf, theme);
 
                     ["Signature is done.", "Press ESC to close"].render(
-                        text_popup.get_areas(popup_area).body_area,
+                        popup.body_area(popup_area),
                         buf,
                         (),
                     );

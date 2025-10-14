@@ -18,7 +18,7 @@ use crate::act::Act;
 use crate::boolean_input::BooleanInput;
 use crate::button::ButtonResult;
 use crate::event::WidgetEvent;
-use crate::extensions::{MouseEventExt, RectExt, RenderTextWrapped, WidgetHeight};
+use crate::extensions::{MouseEventExt, RectExt, RenderTextWrapped, ThemedWidget, WidgetHeight};
 use crate::widgets::scroll_bar::CustomScrollBar;
 use crate::{thematize::Thematize, widgets::filter_select_popup::FilterSelectPopup};
 

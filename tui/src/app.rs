@@ -29,6 +29,7 @@ use alloy::primitives::Address;
 use gm_ratatui_extra::{
     act::Act,
     extensions::{RectExt, ThemedWidget},
+    popup::PopupWidget,
     select::{Select, SelectEvent},
     text_popup::TextPopup,
     thematize::Thematize,
@@ -258,7 +259,9 @@ impl App {
                 networks,
             },
 
-            fatal_error_popup: TextPopup::new("Fatal Error", true),
+            fatal_error_popup: TextPopup::default()
+                .with_title("Fatal Error")
+                .with_break_words(true),
             invite_popup: InvitePopup::default(),
             #[cfg(feature = "demo")]
             demo_popup: TextPopup::new("", false),

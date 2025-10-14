@@ -7,9 +7,9 @@ use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 #[derive(Display, Default, Debug, EnumIter, EnumString)]
 pub enum ThemeName {
-    #[default]
     Monochrome,
     MonochromeBoxed,
+    #[default]
     DarkHacker,
     DarkHackerBoxed,
 }

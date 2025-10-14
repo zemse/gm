@@ -4,21 +4,20 @@ use ratatui::{
     buffer::Buffer,
     crossterm::event::{Event, KeyCode, KeyEventKind},
     layout::{Constraint, Layout, Rect},
-    widgets::{Block, Widget},
 };
 
 use crate::{
     act::Act,
     button::ButtonResult,
     extensions::{EventExt, RectExt, ThemedWidget},
+    popup::PopupWidget,
     thematize::Thematize,
 };
 
 use super::{button::Button, popup::Popup, text_scroll::TextScroll};
 
 struct Areas {
-    title_area: Rect,
-    body_area: Rect,
+    text_area: Rect,
     confirm_button_area: Rect,
     cancel_button_area: Rect,
 }
@@ -30,13 +29,28 @@ pub enum ConfirmResult {
 
 #[derive(Debug)]
 pub struct ConfirmPopup {
-    title: &'static str,
+    popup: Popup,
     text: TextScroll,
-    open: bool,
     confirm_button: Button,
     cancel_button: Button,
     is_confirm_focused: bool,
     initial_cursor_on_confirm: bool,
+}
+
+impl PopupWidget for ConfirmPopup {
+    fn get_popup(&self) -> &Popup {
+        &self.popup
+    }
+
+    fn get_popup_mut(&mut self) -> &mut Popup {
+        &mut self.popup
+    }
+
+    // Overrides the default open to also reset the focus to the confirm button if need
+    fn open(&mut self) {
+        self.popup.open();
+        self.is_confirm_focused = self.initial_cursor_on_confirm;
+    }
 }
 
 impl ConfirmPopup {
@@ -48,33 +62,13 @@ impl ConfirmPopup {
         initial_cursor_on_confirm: bool,
     ) -> Self {
         Self {
-            title,
-            text: TextScroll::new(text, true),
+            popup: Popup::default().with_title(title),
+            text: TextScroll::new(text).with_break_words(true),
             confirm_button: Button::new(confirm_button_label).with_success_kind(true),
             cancel_button: Button::new(cancel_button_label).with_success_kind(true),
-            open: false,
             is_confirm_focused: initial_cursor_on_confirm,
             initial_cursor_on_confirm,
         }
-    }
-
-    pub fn open_already(mut self) -> Self {
-        self.open();
-        self
-    }
-
-    pub fn is_open(&self) -> bool {
-        self.open
-    }
-
-    // Opens the popup with the fresh items.
-    pub fn open(&mut self) {
-        self.open = true;
-        self.is_confirm_focused = self.initial_cursor_on_confirm;
-    }
-
-    pub fn close(&mut self) {
-        self.open = false;
     }
 
     pub fn text(&self) -> &String {
@@ -92,7 +86,7 @@ impl ConfirmPopup {
     pub fn handle_event<A>(
         &mut self,
         input_event: Option<&Event>,
-        area: Rect,
+        popup_area: Rect,
         actions: &mut A,
     ) -> Result<Option<ConfirmResult>, crate::Error>
     where
@@ -100,15 +94,15 @@ impl ConfirmPopup {
     {
         let mut result = None;
 
-        if self.open {
+        if self.is_open() {
             actions.ignore_left();
             actions.ignore_right();
 
-            let areas = self.get_areas(area);
+            let areas = self.get_areas(popup_area);
 
             if let Some(input_event) = input_event {
                 self.text
-                    .handle_event(input_event.key_event(), areas.body_area);
+                    .handle_event(input_event.key_event(), areas.text_area);
 
                 if let Some(button_event) = self.confirm_button.handle_event(
                     Some(input_event),
@@ -118,7 +112,7 @@ impl ConfirmPopup {
                     match button_event {
                         ButtonResult::Pressed => {
                             result = Some(ConfirmResult::Confirmed);
-                            self.open = false;
+                            self.close();
                         }
                         ButtonResult::HoverIn(is_focused) => {
                             if is_focused {
@@ -136,7 +130,7 @@ impl ConfirmPopup {
                     match button_event {
                         ButtonResult::Pressed => {
                             result = Some(ConfirmResult::Canceled);
-                            self.open = false;
+                            self.close();
                         }
                         ButtonResult::HoverIn(is_focused) => {
                             if is_focused {
@@ -171,40 +165,33 @@ impl ConfirmPopup {
         Ok(result)
     }
 
-    fn get_areas(&self, area: Rect) -> Areas {
-        let inner_area = Popup::inner_area(area);
+    fn get_areas(&self, popup_area: Rect) -> Areas {
+        let body_area = self.body_area(popup_area);
 
-        let [title_area, body_area, button_area] = Layout::vertical([
-            Constraint::Length(2),
-            Constraint::Min(1),
-            Constraint::Length(3),
-        ])
-        .areas(inner_area);
+        // Split the body area into text area and button area
+        let [text_area, button_area] =
+            Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(body_area);
 
         let [left_area, right_area] =
             Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
                 .areas(button_area);
         Areas {
-            title_area,
-            body_area,
+            text_area,
             confirm_button_area: right_area.button_center(self.confirm_button.label.len()),
             cancel_button_area: left_area.button_center(self.cancel_button.label.len()),
         }
     }
 
-    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &impl Thematize)
+    pub fn render(&self, popup_area: Rect, buf: &mut Buffer, theme: &impl Thematize)
     where
         Self: Sized,
     {
         if self.is_open() {
             let theme = theme.popup();
+            let areas = self.get_areas(popup_area);
 
-            Popup.render(area, buf, &theme);
-            Block::bordered().title(self.title).inner(area);
-
-            let areas = self.get_areas(area);
-            self.title.render(areas.title_area, buf);
-            self.text.render(areas.body_area, buf, &theme);
+            self.popup.render(popup_area, buf, &theme);
+            self.text.render(areas.text_area, buf, &theme);
 
             self.confirm_button.render(
                 areas.confirm_button_area,

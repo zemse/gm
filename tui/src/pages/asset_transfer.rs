@@ -1,5 +1,5 @@
 use crate::app::SharedState;
-use crate::pages::tx_popup::TxPopup;
+use crate::pages::sign_tx_popup::SignTxPopup;
 use crate::post_handle_event::PostHandleEventActions;
 use crate::traits::Component;
 use crate::widgets::{address_book_popup, assets_popup, AddressBookPopup, AssetsPopup};
@@ -9,8 +9,10 @@ use alloy::primitives::{Bytes, U256};
 use alloy::rpc::types::TransactionRequest;
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::button::Button;
+use gm_ratatui_extra::extensions::ThemedWidget;
 use gm_ratatui_extra::form::{Form, FormEvent, FormItemIndex, FormWidget};
 use gm_ratatui_extra::input_box::InputBox;
+use gm_ratatui_extra::popup::PopupWidget;
 use gm_utils::alloy::StringExt;
 use gm_utils::assets::{Asset, TokenAddress};
 use gm_utils::erc20;
@@ -67,7 +69,7 @@ pub struct AssetTransferPage {
     pub asset: Option<Asset>, // TODO see if we can avoid this here
     pub address_book_popup: AddressBookPopup,
     pub asset_popup: AssetsPopup,
-    pub tx_popup: TxPopup,
+    pub tx_popup: SignTxPopup,
 }
 
 impl AssetTransferPage {
@@ -77,7 +79,7 @@ impl AssetTransferPage {
             asset: None,
             address_book_popup: address_book_popup(),
             asset_popup: assets_popup(),
-            tx_popup: TxPopup::default(),
+            tx_popup: SignTxPopup::default(),
         })
     }
 }

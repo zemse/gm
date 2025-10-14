@@ -2,12 +2,16 @@ use std::sync::mpsc;
 
 use alloy::primitives::Address;
 
-use gm_ratatui_extra::{act::Act, extensions::CustomRender, popup::Popup, thematize::Thematize};
+use gm_ratatui_extra::{
+    act::Act,
+    extensions::{RenderTextWrapped, ThemedWidget},
+    popup::{Popup, PopupWidget},
+    thematize::Thematize,
+};
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{Event, KeyCode, KeyEventKind},
     layout::Rect,
-    widgets::{Block, Widget},
 };
 use serde_json::json;
 use tokio::task::JoinHandle;
@@ -104,27 +108,25 @@ pub fn start_claim_thread(
 
 #[derive(Default)]
 pub struct InvitePopup {
+    popup: Popup,
     invite_code: Option<String>,
     validity: InviteCodeValidity,
     claim_status: InviteCodeClaimStatus,
     check_thread: Option<JoinHandle<()>>,
     claim_thread: Option<JoinHandle<()>>,
-    open: bool,
+}
+
+impl PopupWidget for InvitePopup {
+    fn get_popup(&self) -> &Popup {
+        &self.popup
+    }
+
+    fn get_popup_mut(&mut self) -> &mut Popup {
+        &mut self.popup
+    }
 }
 
 impl InvitePopup {
-    pub fn is_open(&self) -> bool {
-        self.open
-    }
-
-    pub fn open(&mut self) {
-        self.open = true;
-    }
-
-    pub fn close(&mut self) {
-        self.open = false;
-    }
-
     pub fn set_invite_code(&mut self, text: String) {
         self.reset();
         self.invite_code = Some(text);
@@ -197,27 +199,15 @@ impl InvitePopup {
         Ok(())
     }
 
-    pub fn render(&self, area: Rect, buf: &mut Buffer, shared_state: &SharedState)
+    pub fn render(&self, popup_area: Rect, buf: &mut Buffer, shared_state: &SharedState)
     where
         Self: Sized,
     {
         if self.is_open() {
-            // if wallet address exists
-            // we will start invite process
-            // if wallet address does not exist
-            // we will suggest user to create a new account, even show a button - "go to create new account"
             let theme = shared_state.theme.popup();
+            self.popup.render(popup_area, buf, &theme);
 
-            Popup.render(area, buf, &theme);
-
-            let inner_area = Popup::inner_area(area);
-            let block = Block::bordered();
-            let block_inner_area = block.inner(inner_area);
-            block.render(inner_area, buf);
-
-            let area = block_inner_area;
-
-            [
+            vec![
                 "Welcome! And thanks for joining gm's alpha testing program!".to_string(),
                 if let Some(invite_code) = self.invite_code.as_ref() {
                     match self.validity {
@@ -254,7 +244,7 @@ impl InvitePopup {
                     }
                 },
             ]
-            .render(area, buf, true);
+            .render_wrapped(self.body_area(popup_area), buf);
         }
     }
 }

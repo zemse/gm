@@ -41,7 +41,7 @@ use crate::{
     app::SharedState,
     pages::{
         sign_popup::{SignPopup, SignPopupEvent},
-        tx_popup::TxPopup,
+        sign_tx_popup::SignTxPopup,
     },
     post_handle_event::PostHandleEventActions,
     traits::Component,
@@ -91,7 +91,7 @@ pub struct ShellPage {
     text_cursor: usize,
     env_vars: Option<HashMap<String, String>>,
     requests: Vec<UserRequest>,
-    tx_popup: TxPopup,
+    tx_popup: SignTxPopup,
     sign_popup: SignPopup,
     prevent_ctrlc_exit: bool,
 
@@ -116,7 +116,7 @@ impl Default for ShellPage {
             text_cursor: 0,
             env_vars: None,
             requests: vec![],
-            tx_popup: TxPopup::default(),
+            tx_popup: SignTxPopup::default(),
             sign_popup: SignPopup::default(),
             prevent_ctrlc_exit: true,
 

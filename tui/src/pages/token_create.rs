@@ -10,6 +10,7 @@ use gm_ratatui_extra::button::Button;
 use gm_ratatui_extra::confirm_popup::{ConfirmPopup, ConfirmResult};
 use gm_ratatui_extra::form::{Form, FormEvent, FormItemIndex, FormWidget};
 use gm_ratatui_extra::input_box::InputBox;
+use gm_ratatui_extra::popup::PopupWidget;
 use gm_ratatui_extra::thematize::Thematize;
 use gm_utils::disk_storage::DiskStorageInterface;
 use gm_utils::network::{Network, NetworkStore, Token};

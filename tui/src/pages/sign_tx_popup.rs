@@ -14,7 +14,7 @@ use gm_ratatui_extra::{
     act::Act,
     button::Button,
     extensions::{CustomRender, RectExt, ThemedWidget},
-    popup::Popup,
+    popup::{Popup, PopupWidget},
     text_scroll::TextScroll,
     thematize::Thematize,
 };
@@ -22,7 +22,7 @@ use ratatui::{
     buffer::Buffer,
     crossterm::event::{Event, KeyCode, KeyEventKind},
     layout::{Constraint, Layout, Rect},
-    widgets::{Block, Widget},
+    widgets::Widget,
 };
 use serde_json::Value;
 use tokio::task::JoinHandle;
@@ -50,11 +50,11 @@ pub enum TxStatus {
 }
 
 #[derive(Debug)]
-pub struct TxPopup {
+pub struct SignTxPopup {
     network: Network,
     tx_req: TransactionRequest,
     text: TextScroll,
-    open: bool,
+    popup: Popup,
 
     cancel_button: Button,
     confirm_button: Button,
@@ -66,13 +66,13 @@ pub struct TxPopup {
     watch_tx_thread: Option<JoinHandle<()>>,
 }
 
-impl Default for TxPopup {
+impl Default for SignTxPopup {
     fn default() -> Self {
         Self {
             network: Network::default(),
             tx_req: TransactionRequest::default(),
-            text: TextScroll::new(String::new(), true),
-            open: false,
+            text: TextScroll::default().with_break_words(true),
+            popup: Popup::default().with_title("Transaction"),
             cancel_button: Button::new("Cancel").with_success_kind(false),
             confirm_button: Button::new("Confirm").with_success_kind(true),
             is_confirm_focused: false,
@@ -84,24 +84,27 @@ impl Default for TxPopup {
     }
 }
 
-impl TxPopup {
+impl PopupWidget for SignTxPopup {
+    fn get_popup(&self) -> &Popup {
+        &self.popup
+    }
+
+    fn get_popup_mut(&mut self) -> &mut Popup {
+        &mut self.popup
+    }
+
+    // Override to ensure confirm is focused when opened
+    fn open(&mut self) {
+        self.popup.open();
+        self.is_confirm_focused = true;
+    }
+}
+
+impl SignTxPopup {
     pub fn new(network: Network, tx_req: TransactionRequest) -> Self {
         let mut tp = Self::default();
         tp.set_tx_req(network, tx_req);
         tp
-    }
-
-    pub fn is_open(&self) -> bool {
-        self.open
-    }
-
-    pub fn open(&mut self) {
-        self.open = true;
-        self.is_confirm_focused = true;
-    }
-
-    pub fn close(&mut self) {
-        self.open = false;
     }
 
     pub fn set_tx_req(&mut self, network: Network, tx_req: TransactionRequest) {
@@ -137,7 +140,7 @@ impl TxPopup {
 
     pub fn handle_event<F1, F2, F3, F4, F5>(
         &mut self,
-        (event, area, tr, sd, ss): (
+        (event, popup_area, tr, sd, ss): (
             &AppEvent,
             Rect,
             &mpsc::Sender<AppEvent>,
@@ -159,10 +162,8 @@ impl TxPopup {
     {
         let mut result = PostHandleEventActions::default();
 
-        self.text.handle_event(
-            event.key_event(),
-            Popup::inner_area(area).block_inner().margin_down(3),
-        );
+        self.text
+            .handle_event(event.key_event(), self.popup.body_area(popup_area));
 
         match event {
             AppEvent::Input(input_event) => match input_event {
@@ -256,23 +257,12 @@ impl TxPopup {
         if self.is_open() {
             let theme = theme.popup();
 
-            Popup.render(area, buf, &theme);
+            self.popup.render(area, buf, &theme);
 
-            let inner_area = Popup::inner_area(area);
+            let body_area = self.popup.body_area(area);
 
             let [text_area, button_area] =
-                Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(inner_area);
-
-            let text_area = text_area.block_inner();
-            if theme.boxed() {
-                Block::bordered()
-                    .title("Transaction")
-                    .style(theme.style_dim())
-                    .render(inner_area, buf);
-            } else {
-                let block = Block::default().title("Transaction");
-                block.render(inner_area, buf);
-            }
+                Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(body_area);
 
             self.text.render(text_area, buf, &theme);
 
@@ -514,27 +504,29 @@ fn gm_stamp(gas_price: u128) -> u128 {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn test_gm_stamp() {
-        assert_eq!(super::gm_stamp(0), 9393);
-        assert_eq!(super::gm_stamp(1), 9393);
-        assert_eq!(super::gm_stamp(100), 9393);
-        assert_eq!(super::gm_stamp(456), 9393);
+        assert_eq!(gm_stamp(0), 9393);
+        assert_eq!(gm_stamp(1), 9393);
+        assert_eq!(gm_stamp(100), 9393);
+        assert_eq!(gm_stamp(456), 9393);
 
-        assert_eq!(super::gm_stamp(9999), 19393);
-        assert_eq!(super::gm_stamp(9998), 19393);
-        assert_eq!(super::gm_stamp(9998), 19393);
+        assert_eq!(gm_stamp(9999), 19393);
+        assert_eq!(gm_stamp(9998), 19393);
+        assert_eq!(gm_stamp(9998), 19393);
 
-        assert_eq!(super::gm_stamp(10000), 19393);
-        assert_eq!(super::gm_stamp(10001), 19393);
-        assert_eq!(super::gm_stamp(10002), 19393);
-        assert_eq!(super::gm_stamp(10003), 19393);
-        assert_eq!(super::gm_stamp(10004), 19393);
+        assert_eq!(gm_stamp(10000), 19393);
+        assert_eq!(gm_stamp(10001), 19393);
+        assert_eq!(gm_stamp(10002), 19393);
+        assert_eq!(gm_stamp(10003), 19393);
+        assert_eq!(gm_stamp(10004), 19393);
 
-        assert_eq!(super::gm_stamp(19998), 29393);
-        assert_eq!(super::gm_stamp(19999), 29393);
+        assert_eq!(gm_stamp(19998), 29393);
+        assert_eq!(gm_stamp(19999), 29393);
 
-        assert_eq!(super::gm_stamp(1238999), 1239393);
-        assert_eq!(super::gm_stamp(1239999), 1249393);
+        assert_eq!(gm_stamp(1238999), 1239393);
+        assert_eq!(gm_stamp(1239999), 1249393);
     }
 }

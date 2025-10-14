@@ -21,7 +21,7 @@ use gm_utils::{
 use crate::pages::{
     invite_popup::{InviteCodeClaimStatus, InviteCodeValidity},
     shell::ShellUpdate,
-    tx_popup::TxStatus,
+    sign_tx_popup::TxStatus,
     walletconnect::WalletConnectStatus,
 };
 

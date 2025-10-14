@@ -22,12 +22,17 @@ pub struct TextScroll {
 }
 
 impl TextScroll {
-    pub fn new(text: String, break_words: bool) -> Self {
+    pub fn new(text: String) -> Self {
         Self {
             text,
             scroll_offset: 0,
-            break_words,
+            break_words: false,
         }
+    }
+
+    pub fn with_break_words(mut self, break_words: bool) -> Self {
+        self.break_words = break_words;
+        self
     }
 
     fn lines(&self, width: usize) -> Vec<Cow<'_, str>> {

@@ -10,7 +10,7 @@ use gm_ratatui_extra::{
     act::Act,
     button::Button,
     extensions::{CustomRender, RectExt, ThemedWidget},
-    popup::Popup,
+    popup::{Popup, PopupWidget},
     text_scroll::TextScroll,
     thematize::Thematize,
 };
@@ -18,7 +18,7 @@ use ratatui::{
     buffer::Buffer,
     crossterm::event::{Event, KeyCode, KeyEventKind},
     layout::{Constraint, Layout, Rect},
-    widgets::{Block, Widget},
+    widgets::Widget,
 };
 use serde_json::Value;
 use tokio::task::JoinHandle;
@@ -63,7 +63,7 @@ enum SignStatus {
 pub struct SignTypedDataPopup {
     typed_data_json: Value,
     display: TextScroll,
-    open: bool,
+    popup: Popup,
     cancel_button: Button,
     confirm_button: Button,
     is_confirm_focused: bool,
@@ -77,31 +77,33 @@ impl Default for SignTypedDataPopup {
     }
 }
 
+impl PopupWidget for SignTypedDataPopup {
+    fn get_popup(&self) -> &Popup {
+        &self.popup
+    }
+
+    fn get_popup_mut(&mut self) -> &mut Popup {
+        &mut self.popup
+    }
+
+    fn open(&mut self) {
+        self.popup.open();
+        self.is_confirm_focused = false;
+    }
+}
+
 impl SignTypedDataPopup {
     pub fn new() -> Self {
         Self {
             typed_data_json: Value::Null,
             display: TextScroll::default(),
-            open: false,
+            popup: Popup::default().with_title("Sign EIP-712 Typed Data"),
             cancel_button: Button::new("Cancel"),
             confirm_button: Button::new("Confirm"),
             is_confirm_focused: true,
             status: SignStatus::Idle,
             sign_thread: None,
         }
-    }
-
-    pub fn is_open(&self) -> bool {
-        self.open
-    }
-
-    pub fn open(&mut self) {
-        self.open = true;
-        self.is_confirm_focused = false;
-    }
-
-    pub fn close(&mut self) {
-        self.open = false;
     }
 
     pub fn set_typed_data(&mut self, v: Value) -> crate::Result<()> {
@@ -139,7 +141,7 @@ impl SignTypedDataPopup {
 
     pub fn handle_event<F1, F3, F4>(
         &mut self,
-        (event, area, tr, ss): (&AppEvent, Rect, &mpsc::Sender<AppEvent>, &SharedState),
+        (event, popup_area, tr, ss): (&AppEvent, Rect, &mpsc::Sender<AppEvent>, &SharedState),
         mut on_signature: F1,
         mut on_cancel: F3,
         mut on_esc: F4,
@@ -152,9 +154,9 @@ impl SignTypedDataPopup {
         let mut result = PostHandleEventActions::default();
 
         if self.is_open() {
-            let area = Popup::inner_area(area).block_inner().margin_down(3);
+            let body_area = self.body_area(popup_area);
 
-            self.display.handle_event(event.key_event(), area);
+            self.display.handle_event(event.key_event(), body_area);
 
             match event {
                 AppEvent::Input(input_event) => match input_event {
@@ -220,23 +222,18 @@ impl SignTypedDataPopup {
         Ok(result)
     }
 
-    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme)
+    pub fn render(&self, popup_area: Rect, buf: &mut Buffer, theme: &Theme)
     where
         Self: Sized,
     {
         if self.is_open() {
             let theme = theme.popup();
 
-            Popup.render(area, buf, &theme);
-
-            let inner_area = Popup::inner_area(area);
-            let block = Block::bordered().title("Sign EIP-712 Typed Data");
-            let block_inner_area = block.inner(inner_area);
-            block.render(inner_area, buf);
+            self.popup.render(popup_area, buf, &theme);
 
             let [text_area, button_area] =
                 Layout::vertical([Constraint::Min(1), Constraint::Length(3)])
-                    .areas(block_inner_area);
+                    .areas(self.body_area(popup_area));
 
             self.display.render(text_area, buf, &theme);
 

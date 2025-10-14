@@ -14,6 +14,7 @@ demo = ["gm-tui/demo"]
 [dependencies]
 clap = { version = "4.0", features = ["derive", "env"] }
 gm-tui = { path = "../tui" }
+gm-ratatui-extra = { path = "../ratatui-extra" }
 tokio = { workspace = true }
 walletconnect-sdk = { workspace = true }
 console = { workspace = true }

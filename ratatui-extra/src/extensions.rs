@@ -276,6 +276,7 @@ impl RectExt for Rect {
         }
     }
 
+    #[track_caller]
     fn margin_top(self, m: u16) -> Rect {
         Rect {
             x: self.x,

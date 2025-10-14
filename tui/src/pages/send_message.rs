@@ -1,12 +1,14 @@
 use crate::app::SharedState;
-use crate::pages::tx_popup::TxPopup;
+use crate::pages::sign_tx_popup::SignTxPopup;
 use crate::post_handle_event::PostHandleEventActions;
 use crate::traits::Component;
 use crate::widgets::{address_book_popup, networks_popup, AddressBookPopup, NetworksPopup};
 use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::button::Button;
+use gm_ratatui_extra::extensions::ThemedWidget;
 use gm_ratatui_extra::form::{Form, FormEvent, FormWidget};
 use gm_ratatui_extra::input_box::InputBox;
+use gm_ratatui_extra::popup::PopupWidget;
 use gm_ratatui_extra::thematize::Thematize;
 use gm_ratatui_extra::widgets::form::FormItemIndex;
 use gm_utils::alloy::StringExt;
@@ -65,7 +67,7 @@ pub struct SendMessagePage {
     pub form: Form<FormItem, crate::Error>,
     pub address_book_popup: AddressBookPopup,
     pub networks_popup: NetworksPopup,
-    pub tx_popup: TxPopup,
+    pub tx_popup: SignTxPopup,
 }
 
 impl SendMessagePage {
@@ -74,7 +76,7 @@ impl SendMessagePage {
             form: Form::init(|_| Ok(()))?,
             address_book_popup: address_book_popup(),
             networks_popup: networks_popup(),
-            tx_popup: TxPopup::default(),
+            tx_popup: SignTxPopup::default(),
         })
     }
 }

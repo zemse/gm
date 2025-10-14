@@ -50,13 +50,13 @@ pub mod send_message;
 pub mod shell;
 pub mod sign_message;
 pub mod sign_popup;
+pub mod sign_tx_popup;
 pub mod sign_typed_data_popup;
 pub mod text;
 pub mod title;
 pub mod token;
 pub mod token_create;
 pub mod trade;
-pub mod tx_popup;
 pub mod walletconnect;
 
 #[allow(clippy::large_enum_variant)]

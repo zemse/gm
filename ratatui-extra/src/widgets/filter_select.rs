@@ -42,6 +42,11 @@ impl<T: Display + PartialEq> FilterSelect<T> {
         self
     }
 
+    pub fn with_focus(mut self, focus: bool) -> Self {
+        self.select.set_focus(focus);
+        self
+    }
+
     pub fn set_items(&mut self, items: Option<Vec<T>>) {
         self.full_list = items.map(|items| items.into_iter().map(Arc::new).collect());
 
