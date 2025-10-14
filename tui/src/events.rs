@@ -31,9 +31,6 @@ pub enum AppEvent {
 
     Input(Event),
 
-    AccountChange(Address),
-    ConfigUpdate,
-
     PricesUpdate,
     PricesUpdateError(UtilsError),
 

@@ -10,7 +10,7 @@ use gm_ratatui_extra::{
     text_scroll::TextScroll,
     thematize::Thematize,
 };
-use gm_utils::{account::AccountManager, gm_log};
+use gm_utils::account::AccountManager;
 use ratatui::{buffer::Buffer, layout::Rect, text::Span, widgets::Widget};
 use tokio::{sync::oneshot, task::JoinHandle};
 
@@ -189,7 +189,6 @@ impl SignPopup {
                 SignPopup::Confirm { confirm_popup } => {
                     match confirm_popup.handle_event(event.input_event(), popup_area, actions)? {
                         Some(ConfirmResult::Confirmed) => {
-                            gm_log!("User confirmed signing the message");
                             let text_scroll = confirm_popup.into_text_scroll();
 
                             let signer_account = ss.try_current_account()?;

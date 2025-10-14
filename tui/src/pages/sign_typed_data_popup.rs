@@ -35,9 +35,7 @@ fn spawn_sign_thread(
     shared_state: &SharedState,
 ) -> crate::Result<JoinHandle<()>> {
     let tr = tr.clone();
-    let signer_account = shared_state
-        .current_account
-        .ok_or(crate::Error::CurrentAccountNotSet)?;
+    let signer_account = shared_state.try_current_account()?;
 
     Ok(tokio::spawn(async move {
         let _ = match run(digest, signer_account).await {

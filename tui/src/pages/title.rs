@@ -40,7 +40,8 @@ impl Component for Title {
         let welcome_string = format!(
             "gm {account}",
             account = shared_state
-                .current_account
+                .try_current_account()
+                .ok()
                 .map(|a| a.to_string())
                 .unwrap_or("wallet".to_string())
         );
@@ -52,7 +53,7 @@ impl Component for Title {
 
         let display = if shared_state.online == Some(false) {
             "offline".to_string()
-        } else if shared_state.testnet_mode {
+        } else if shared_state.config.get_testnet_mode() {
             "testnet".to_string()
         } else {
             shared_state

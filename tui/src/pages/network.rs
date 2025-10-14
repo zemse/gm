@@ -1,5 +1,5 @@
 use gm_ratatui_extra::extensions::ThemedWidget;
-use gm_ratatui_extra::select_owned::{SelectEvent, SelectOwned};
+use gm_ratatui_extra::select::{Select, SelectEvent};
 use gm_utils::disk_storage::DiskStorageInterface;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -31,7 +31,7 @@ impl Display for NetworkSelect {
 
 #[derive(Debug)]
 pub struct NetworkPage {
-    select: SelectOwned<NetworkSelect>,
+    select: Select<NetworkSelect>,
 }
 impl NetworkPage {
     pub fn new() -> crate::Result<Self> {
@@ -44,7 +44,7 @@ impl NetworkPage {
                 .collect::<Vec<_>>(),
         );
         Ok(Self {
-            select: SelectOwned::new(Some(list), false),
+            select: Select::new(Some(list), false),
         })
     }
 }
@@ -70,7 +70,8 @@ impl Component for NetworkPage {
     ) -> crate::Result<PostHandleEventActions> {
         let mut result = PostHandleEventActions::default();
 
-        if let Some(SelectEvent::Select(item)) = self.select.handle_event(event.input_event(), area)
+        if let Some(SelectEvent::Select(item)) =
+            self.select.handle_event(event.input_event(), area)?
         {
             let network_store = NetworkStore::load()?;
             match item {

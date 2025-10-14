@@ -13,7 +13,7 @@ use crate::{
     act::Act,
     extensions::{EventExt, RectExt},
     filter_select::FilterSelect,
-    select_owned::SelectEvent,
+    select::SelectEvent,
     thematize::Thematize,
 };
 
@@ -72,7 +72,7 @@ impl<Item: Display + PartialEq> FilterSelectPopup<Item> {
         input_event: Option<&Event>,
         popup_area: Rect,
         actions: &mut A,
-    ) -> Option<&'a Arc<Item>>
+    ) -> crate::Result<Option<&'a Arc<Item>>>
     where
         A: Act,
     {
@@ -85,37 +85,15 @@ impl<Item: Display + PartialEq> FilterSelectPopup<Item> {
             }
 
             if let Some(SelectEvent::Select(item)) =
-                self.filter_select.handle_event(input_event, popup_area)
+                self.filter_select.handle_event(input_event, popup_area)?
             {
                 result = Some(item);
             }
 
-            // if self.items.is_some() {
-
-            //     if let Some(key_event) = key_event {
-            //         if key_event.kind == KeyEventKind::Press {
-            //             match key_event.code {
-            //                 KeyCode::Char(char) => {
-            //                     self.search_string.push(char);
-            //                 }
-            //                 KeyCode::Backspace => {
-            //                     self.search_string.pop();
-            //                 }
-            //                 KeyCode::Enter => {
-            //                     self.close();
-            //                     let items = self.items.as_ref().unwrap();
-            //                     result = Some(&items[self.cursor.current]);
-            //                 }
-            //                 _ => {}
-            //             }
-            //         }
-            //     }
-            // }
-
             actions.ignore_esc();
         }
 
-        result
+        Ok(result)
     }
     pub fn render(&self, popup_area: Rect, buf: &mut Buffer, theme: &impl Thematize)
     where

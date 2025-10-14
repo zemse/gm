@@ -10,7 +10,7 @@ use ratatui::{
 
 use crate::{
     extensions::{RectExt, ThemedWidget},
-    select_owned::{SelectEvent, SelectOwned},
+    select::{Select, SelectEvent},
     thematize::Thematize,
 };
 
@@ -18,7 +18,7 @@ use crate::{
 pub struct FilterSelect<T: Display + PartialEq> {
     pub full_list: Option<Vec<Arc<T>>>,
     pub search_string: String,
-    pub select: SelectOwned<Arc<T>>,
+    pub select: Select<Arc<T>>,
 }
 
 impl<T: Display + PartialEq> Default for FilterSelect<T> {
@@ -26,7 +26,7 @@ impl<T: Display + PartialEq> Default for FilterSelect<T> {
         Self {
             full_list: None,
             search_string: String::default(),
-            select: SelectOwned::default(),
+            select: Select::default(),
         }
     }
 }
@@ -59,7 +59,7 @@ impl<T: Display + PartialEq> FilterSelect<T> {
             }));
     }
 
-    pub fn get_focussed_item(&self) -> Option<&Arc<T>> {
+    pub fn get_focussed_item(&self) -> crate::Result<&Arc<T>> {
         self.select.get_focussed_item()
     }
 
@@ -76,7 +76,7 @@ impl<T: Display + PartialEq> FilterSelect<T> {
         &'a mut self,
         input_event: Option<&Event>,
         area: Rect,
-    ) -> Option<SelectEvent<'a, Arc<T>>> {
+    ) -> crate::Result<Option<SelectEvent<'a, Arc<T>>>> {
         let mut result: Option<SelectEvent<'_, Arc<T>>> = None;
 
         if self.full_list.is_some() {
@@ -100,11 +100,11 @@ impl<T: Display + PartialEq> FilterSelect<T> {
             }
 
             if let Some(list_area) = area.height_consumed(2) {
-                result = self.select.handle_event(input_event, list_area);
+                result = self.select.handle_event(input_event, list_area)?;
             }
         }
 
-        result
+        Ok(result)
     }
 
     pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &impl Thematize)

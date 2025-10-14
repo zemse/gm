@@ -1,7 +1,7 @@
 use std::{fmt::Display, sync::mpsc};
 
 use alloy::primitives::Address;
-use gm_ratatui_extra::{filter_select::FilterSelect, select_owned::SelectEvent};
+use gm_ratatui_extra::{filter_select::FilterSelect, select::SelectEvent};
 use ratatui::{buffer::Buffer, layout::Rect};
 use tokio_util::sync::CancellationToken;
 
@@ -139,7 +139,7 @@ impl Component for AddressBookPage {
         let mut result = PostHandleEventActions::default();
 
         if let Some(SelectEvent::Select(ab_menu_item)) =
-            self.filter_select.handle_event(event.input_event(), area)
+            self.filter_select.handle_event(event.input_event(), area)?
         {
             result.page_insert(match ab_menu_item.as_ref() {
                 AddressBookMenuItem::Create => Page::AddressBookCreate(AddressBookCreatePage::new(

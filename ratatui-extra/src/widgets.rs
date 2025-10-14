@@ -10,6 +10,5 @@ pub mod input_box;
 pub mod popup;
 pub mod scroll_bar;
 pub mod select;
-pub mod select_owned;
 pub mod text_popup;
 pub mod text_scroll;

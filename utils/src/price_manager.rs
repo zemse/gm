@@ -8,7 +8,10 @@ use arc_swap::ArcSwap;
 use serde::Deserialize;
 use tokio_util::sync::CancellationToken;
 
-use crate::{alloy::StringExt, network::Network};
+use crate::{
+    alloy::StringExt,
+    network::{Network, NetworkStore},
+};
 
 /// Utility to fetch prices for different assets across networks.
 // TODO support Tokens
@@ -18,10 +21,10 @@ pub struct PriceManager {
 }
 
 impl PriceManager {
-    pub fn new(networks: Vec<Network>) -> crate::Result<Self> {
+    pub fn new(networks: &Arc<NetworkStore>) -> crate::Result<Self> {
         let mut chainlinks = Vec::new();
 
-        for n in networks {
+        for n in networks.networks.iter() {
             if n.chainlink_native_price_feed.is_some() {
                 chainlinks.push(Chainlink::from_network(n)?);
             }
@@ -165,12 +168,12 @@ pub struct Chainlink {
 }
 
 impl Chainlink {
-    fn from_network(network: Network) -> crate::Result<Self> {
+    fn from_network(network: &Network) -> crate::Result<Self> {
         let network_name = network.name.clone();
         let rpc = network.get_rpc()?;
         let addr = network
             .chainlink_native_price_feed
-            .ok_or(crate::Error::ChainlinkPriceFeedNotConfigured(network.name))?;
+            .ok_or_else(|| crate::Error::ChainlinkPriceFeedNotConfigured(network_name.clone()))?;
         Ok(Chainlink {
             network_name,
             rpc,

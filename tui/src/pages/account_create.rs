@@ -287,7 +287,7 @@ impl Component for AccountCreatePage {
                 AccountManager::store_private_key(&key.to_bytes(), addr)?;
                 self.vanity_result = Some((addr, *counter, *duration));
                 self.hash_rate = HashRateResult::None;
-                if shared_state.current_account.is_none() {
+                if shared_state.try_current_account().is_err() {
                     Config::set_current_account(addr)?;
                 }
                 actions.reload();

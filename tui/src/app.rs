@@ -29,7 +29,7 @@ use alloy::primitives::Address;
 use gm_ratatui_extra::{
     act::Act,
     extensions::{RectExt, ThemedWidget},
-    select_owned::{SelectEvent, SelectOwned},
+    select::{Select, SelectEvent},
     text_popup::TextPopup,
     thematize::Thematize,
 };
@@ -164,16 +164,14 @@ pub struct SharedState {
     pub asset_manager: Arc<RwLock<AssetManager>>,
     pub price_manager: Arc<PriceManager>,
     pub recent_addresses: Option<Vec<Address>>,
-    pub testnet_mode: bool,
-    pub developer_mode: bool,
-    pub current_account: Option<Address>,
-    pub alchemy_api_key_available: bool,
     pub theme: Theme,
+    pub config: Config,
+    pub networks: Arc<NetworkStore>,
 }
 
 impl SharedState {
     pub fn assets_read(&self) -> crate::Result<Option<Vec<Asset>>> {
-        let Some(current_account) = self.current_account else {
+        let Ok(current_account) = self.try_current_account() else {
             return Ok(None);
         };
 
@@ -192,8 +190,7 @@ impl SharedState {
     }
 
     pub fn try_current_account(&self) -> crate::Result<Address> {
-        self.current_account
-            .ok_or_else(|| crate::Error::CurrentAccountNotSet)
+        Ok(self.config.get_current_account()?)
     }
 }
 
@@ -216,7 +213,7 @@ enum Focus {
 pub struct App {
     exit: bool,
     focus: Focus,
-    pub main_menu: SelectOwned<MainMenuItem>,
+    pub main_menu: Select<MainMenuItem>,
     context: Vec<Page>,
     shared_state: SharedState,
 
@@ -238,7 +235,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> crate::Result<Self> {
-        let networks = NetworkStore::load_and_update()?;
+        let networks = Arc::new(NetworkStore::load_and_update()?);
 
         let config = Config::load()?;
         let theme_name = ThemeName::from_str(config.get_theme_name()).unwrap_or_default();
@@ -246,21 +243,19 @@ impl App {
         let mut app = Self {
             exit: false,
             focus: Focus::Menu,
-            main_menu: SelectOwned::new(
+            main_menu: Select::new(
                 Some(MainMenuItem::get_menu(config.get_developer_mode())?),
                 true,
             ),
             context: vec![Page::Assets(AssetsPage::new(None)?)],
             shared_state: SharedState {
-                asset_manager: Arc::new(RwLock::new(AssetManager::default())),
-                price_manager: Arc::new(PriceManager::new(networks.networks)?),
-                recent_addresses: None,
-                current_account: config.get_current_account().ok(),
-                developer_mode: config.get_developer_mode(),
-                alchemy_api_key_available: config.get_developer_mode(),
                 online: None,
-                testnet_mode: config.get_testnet_mode(),
+                asset_manager: Arc::new(RwLock::new(AssetManager::default())),
+                price_manager: Arc::new(PriceManager::new(&networks)?),
+                recent_addresses: None,
                 theme,
+                config,
+                networks,
             },
 
             fatal_error_popup: TextPopup::new("Fatal Error", true),
@@ -454,19 +449,20 @@ impl App {
 
     fn reload(&mut self) -> crate::Result<()> {
         let config = Config::load()?;
-        self.shared_state.testnet_mode = config.get_testnet_mode();
-        self.shared_state.alchemy_api_key_available = config.get_alchemy_api_key(false).is_ok();
-        self.shared_state.current_account = config.get_current_account().ok();
-        self.shared_state.developer_mode = config.get_developer_mode();
+
         let theme_name = ThemeName::from_str(config.get_theme_name()).unwrap_or_default();
         let theme = Theme::new(theme_name);
         self.shared_state.theme = theme;
-        for page in &mut self.context {
-            page.reload(&self.shared_state)?;
-        }
 
         self.main_menu
             .update_list(Some(MainMenuItem::get_menu(config.get_developer_mode())?));
+
+        self.shared_state.config = config;
+        self.shared_state.networks = Arc::new(NetworkStore::load()?);
+
+        for page in &mut self.context {
+            page.reload(&self.shared_state)?;
+        }
 
         Ok(())
     }
@@ -547,14 +543,6 @@ impl App {
 
         // Update state based on events
         match &event {
-            AppEvent::AccountChange(address) => {
-                self.shared_state.current_account = Some(*address);
-            }
-
-            AppEvent::ConfigUpdate => {
-                self.reload()?;
-            }
-
             AppEvent::PricesUpdate => {
                 // The prices have already been updated in the PriceManager store in shared_state
                 self.set_online(tr, sd)?;
@@ -671,7 +659,10 @@ impl App {
             // If focus is on menu, handle all events. However if focus is not on menu
             // then handle all but key events. This allows to handle mouse clicks.
             if self.focus == Focus::Menu || !is_key_event {
-                match self.main_menu.handle_event(event.input_event(), areas.menu) {
+                match self
+                    .main_menu
+                    .handle_event(event.input_event(), areas.menu)?
+                {
                     Some(SelectEvent::Select(item)) => {
                         let mut page = item.get_page(&self.shared_state)?;
                         page.set_focus(true);

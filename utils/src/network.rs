@@ -112,6 +112,7 @@ impl Network {
     }
 }
 
+// TODO rename to Networks
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct NetworkStore {
     pub networks: Vec<Network>,

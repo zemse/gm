@@ -6,7 +6,7 @@ use crate::{
 use alloy::primitives::Address;
 use gm_ratatui_extra::{
     extensions::ThemedWidget,
-    select_owned::{SelectEvent, SelectOwned},
+    select::{Select, SelectEvent},
 };
 use gm_utils::{
     account::{AccountManager, AccountUtils},
@@ -49,13 +49,13 @@ impl AccountSelect {
 
 #[derive(Debug)]
 pub struct AccountPage {
-    select: SelectOwned<AccountSelect>,
+    select: Select<AccountSelect>,
 }
 
 impl AccountPage {
     pub fn new() -> crate::Result<Self> {
         Ok(AccountPage {
-            select: SelectOwned::new(Some(AccountSelect::get_list()?), false),
+            select: Select::new(Some(AccountSelect::get_list()?), false),
         })
     }
 }
@@ -75,14 +75,14 @@ impl Component for AccountPage {
         event: &AppEvent,
         area: Rect,
         _popup_area: Rect,
-        transmitter: &mpsc::Sender<AppEvent>,
+        _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<PostHandleEventActions> {
         let mut result = PostHandleEventActions::default();
 
         if let Some(SelectEvent::Select(account_selected)) =
-            self.select.handle_event(event.input_event(), area)
+            self.select.handle_event(event.input_event(), area)?
         {
             match account_selected {
                 AccountSelect::Create => {
@@ -93,9 +93,8 @@ impl Component for AccountPage {
                 }
                 AccountSelect::Existing(address) => {
                     Config::set_current_account(*address)?;
-                    transmitter.send(AppEvent::AccountChange(*address))?;
-                    transmitter.send(AppEvent::ConfigUpdate)?;
                     result.page_pop();
+                    result.reload();
                 }
             }
         }

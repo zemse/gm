@@ -123,10 +123,11 @@ impl Component for AssetTransferPage {
         let mut actions = PostHandleEventActions::default();
 
         if self.address_book_popup.is_open() {
-            if let Some(selection) =
-                self.address_book_popup
-                    .handle_event(event.input_event(), popup_area, &mut actions)
-            {
+            if let Some(selection) = self.address_book_popup.handle_event(
+                event.input_event(),
+                popup_area,
+                &mut actions,
+            )? {
                 self.form
                     .set_text(FormItem::To, selection.address()?.to_string());
                 self.form.advance_cursor();
@@ -134,7 +135,7 @@ impl Component for AssetTransferPage {
         } else if self.asset_popup.is_open() {
             if let Some(selection) =
                 self.asset_popup
-                    .handle_event(event.input_event(), popup_area, &mut actions)
+                    .handle_event(event.input_event(), popup_area, &mut actions)?
             {
                 self.asset = Some(selection.as_ref().clone());
 

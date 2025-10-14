@@ -80,6 +80,21 @@ impl SendMessagePage {
 }
 
 impl Component for SendMessagePage {
+    fn reload(&mut self, shared_state: &SharedState) -> crate::Result<()> {
+        let network_name = self.form.get_text(FormItem::Network);
+
+        let network = shared_state
+            .networks
+            .get_by_name(&network_name)
+            .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))?;
+
+        if network.is_testnet != shared_state.config.get_testnet_mode() {
+            self.form.set_text(FormItem::Network, "".to_string());
+        }
+
+        Ok(())
+    }
+
     fn set_focus(&mut self, focus: bool) {
         self.form.set_form_focus(focus);
     }
@@ -95,27 +110,12 @@ impl Component for SendMessagePage {
     ) -> Result<PostHandleEventActions> {
         let mut actions = PostHandleEventActions::default();
 
-        #[allow(clippy::single_match)]
-        match event {
-            AppEvent::ConfigUpdate => {
-                let network_name = self.form.get_text(FormItem::Network);
-                let network_store = NetworkStore::load()?;
-                let network = network_store
-                    .get_by_name(&network_name)
-                    .ok_or(crate::Error::NetworkNotFound(network_name.to_string()))?;
-
-                if network.is_testnet != ss.testnet_mode {
-                    self.form.set_text(FormItem::Network, "".to_string());
-                }
-            }
-            _ => {}
-        }
-
         if self.address_book_popup.is_open() {
-            if let Some(selection) =
-                self.address_book_popup
-                    .handle_event(event.input_event(), popup_area, &mut actions)
-            {
+            if let Some(selection) = self.address_book_popup.handle_event(
+                event.input_event(),
+                popup_area,
+                &mut actions,
+            )? {
                 self.form
                     .set_text(FormItem::To, selection.address()?.to_string());
 
@@ -124,7 +124,7 @@ impl Component for SendMessagePage {
         } else if self.networks_popup.is_open() {
             if let Some(selection) =
                 self.networks_popup
-                    .handle_event(event.input_event(), popup_area, &mut actions)
+                    .handle_event(event.input_event(), popup_area, &mut actions)?
             {
                 self.form
                     .set_text(FormItem::Network, selection.name.clone());
@@ -154,8 +154,9 @@ impl Component for SendMessagePage {
                     )?));
             } else if self.form.is_focused(FormItem::Network) && event.is_space_or_enter_pressed() {
                 self.networks_popup.open();
-                self.networks_popup
-                    .set_items(Some(NetworkStore::load()?.filter(ss.testnet_mode)));
+                self.networks_popup.set_items(Some(
+                    NetworkStore::load()?.filter(ss.config.get_testnet_mode()),
+                ));
             } else if let Some(FormEvent::ButtonPressed(label)) = self.form.handle_event(
                 event.widget_event().as_ref(),
                 area,

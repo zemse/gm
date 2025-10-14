@@ -9,18 +9,17 @@ use gm_ratatui_extra::{
     act::Act,
     button::Button,
     confirm_popup::{ConfirmPopup, ConfirmResult},
-    cursor::Cursor,
+    extensions::ThemedWidget,
     form::{Form, FormEvent, FormItemIndex, FormWidget},
     input_box::InputBox,
-    select::Select,
+    select::{Select, SelectEvent},
     thematize::Thematize,
 };
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{Event, KeyCode},
     layout::Rect,
-    text::Text,
-    widgets::{Paragraph, Widget, Wrap},
+    widgets::Widget,
 };
 use serde_json::Value;
 use strum::{Display, EnumIter};
@@ -141,8 +140,7 @@ impl TryFrom<FormItem> for FormWidget {
         let widget = match value {
             FormItem::Heading => FormWidget::Heading("Wallet Connect"),
             FormItem::UriInput => FormWidget::InputBox {
-                widget: InputBox::new("URL")
-                    .with_empty_text("Paste Walletconnect URI from dapp"),
+                widget: InputBox::new("URL").with_empty_text("Paste Walletconnect URI from dapp"),
             },
             FormItem::ConnectButton => FormWidget::Button {
                 widget: Button::new("Connect"),
@@ -155,8 +153,10 @@ impl TryFrom<FormItem> for FormWidget {
 #[derive(Debug)]
 pub struct WalletConnectPage {
     form: Form<FormItem, crate::Error>,
-    session_requests: Vec<WcMessage>,
-    cursor: Cursor,
+    // session_requests: Vec<WcMessage>,
+    // cursor: Cursor,
+    select: Select<WcMessage>,
+
     status: WalletConnectStatus,
     confirm_popup: ConfirmPopup,
     exit_popup: ConfirmPopup,
@@ -172,8 +172,10 @@ impl WalletConnectPage {
     pub fn new() -> crate::Result<Self> {
         Ok(Self {
             form: Form::init(|_| Ok(()))?,
-            session_requests: vec![],
-            cursor: Cursor::new(0),
+            // session_requests: vec![],
+            // cursor: Cursor::new(0),
+            select: Select::default().with_empty_text("Connected! Waiting for session requests"),
+
             status: WalletConnectStatus::Idle,
             confirm_popup: ConfirmPopup::new("WalletConnect", String::new(), "Approve", "Reject", true),
             exit_popup: ConfirmPopup::new(
@@ -197,14 +199,14 @@ impl WalletConnectPage {
         self.form.set_text(FormItem::UriInput, uri.to_string());
     }
 
-    fn open_request_at_cursor(&mut self) -> crate::Result<()> {
-        let req = self.session_requests.get(self.cursor.current).ok_or(
-            crate::Error::SessionRequestNotFound(self.cursor.current, self.session_requests.len()),
-        )?;
+    fn open_request(&mut self) -> crate::Result<()> {
+        let req = self.select.get_focussed_item()?;
+
         let req = req
             .data
             .as_session_request()
             .ok_or(crate::Error::NotSessionRequest)?;
+
         let chain_id = req
             .chain_id
             .strip_prefix("eip155:")
@@ -307,10 +309,11 @@ impl Component for WalletConnectPage {
                         }
                     }
                     WcData::SessionRequest(_) => {
-                        self.session_requests.push(*msg.clone());
+                        self.select.list_push(*msg.clone());
+                        self.select.set_focus_to_last_item();
+
                         if !self.tx_popup.is_open() && !self.sign_popup.is_open() {
-                            self.cursor.current = self.session_requests.len() - 1;
-                            self.open_request_at_cursor()?;
+                            self.open_request()?;
                         }
                     }
                     // TODO handle session delete
@@ -337,12 +340,7 @@ impl Component for WalletConnectPage {
         }
 
         let get_req_tr_2 = || -> crate::Result<_> {
-            let req = self.session_requests.get(self.cursor.current).ok_or(
-                crate::Error::SessionRequestNotFound(
-                    self.cursor.current,
-                    self.session_requests.len(),
-                ),
-            )?;
+            let req = self.select.get_focussed_item()?;
             let tr_2 = self
                 .tr_2
                 .as_ref()
@@ -586,7 +584,7 @@ impl Component for WalletConnectPage {
             )? {
                 if item == FormItem::ConnectButton {
                     let uri_input = self.form.get_text(FormItem::UriInput).to_string();
-                    let current_account = ss.current_account.unwrap(); // TODO ensure we can see this page only if account exists
+                    let current_account = ss.try_current_account()?;
                     let tr = tr.clone();
 
                     let client_seed = [123u8; 32];
@@ -630,24 +628,15 @@ impl Component for WalletConnectPage {
                 }
             }
         } else if self.status == WalletConnectStatus::SessionSettleDone {
-            self.cursor
-                .handle(event.key_event(), self.session_requests.len());
-
-            if let AppEvent::Input(input_event) = event {
-                match input_event {
-                    Event::Key(key_event) => {
-                        if key_event.code == KeyCode::Enter {
-                            self.open_request_at_cursor()?;
-                        }
-                    }
-                    Event::Mouse(_mouse_event) => {}
-                    _ => {}
-                }
+            if let Some(SelectEvent::Select(_)) =
+                self.select.handle_event(event.input_event(), area)?
+            {
+                self.open_request()?;
             }
         }
 
         if remove_current_request || remove_current_request_2 || remove_current_request_3 {
-            self.session_requests.remove(self.cursor.current);
+            self.select.remove_item_at_cursor();
         }
 
         // Special handling for ESC key, Ask user if they really want to exit
@@ -707,29 +696,7 @@ impl Component for WalletConnectPage {
                 "Settling session cancelled".render(area, buf);
             }
             WalletConnectStatus::SessionSettleDone => {
-                if self.session_requests.is_empty() {
-                    "Connected! Waiting for session requests".render(area, buf);
-                } else {
-                    Select {
-                        focus: true,
-                        list: &self
-                            .session_requests
-                            .iter()
-                            .map(|r| format!("{r:?}"))
-                            .collect::<Vec<_>>(),
-                        cursor: &self.cursor,
-                    }
-                    .render(area, buf, None, &shared_state.theme);
-
-                    let mut s = String::new();
-                    for msg in &self.session_requests {
-                        s.push_str(&format!("{msg:?}\n"));
-                    }
-                    Paragraph::new(Text::raw(&s))
-                        .wrap(Wrap { trim: false })
-                        .to_owned()
-                        .render(area, buf);
-                }
+                self.select.render(area, buf, &shared_state.theme);
             }
         }
 

@@ -498,7 +498,7 @@ impl<
                     widget.handle_event(Some(event), area, actions);
 
                     if let Some(selection) =
-                        popup.handle_event(event.input_event(), popup_area, actions)
+                        popup.handle_event(event.input_event(), popup_area, actions)?
                     {
                         widget.set_text(selection.to_string());
                     }

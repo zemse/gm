@@ -98,7 +98,7 @@ impl Component for CompleteSetupPage {
         event: &AppEvent,
         area: Rect,
         popup_area: Rect,
-        transmitter: &mpsc::Sender<AppEvent>,
+        _transmitter: &mpsc::Sender<AppEvent>,
         _shutdown_signal: &CancellationToken,
         _shared_state: &SharedState,
     ) -> crate::Result<PostHandleEventActions> {
@@ -120,7 +120,7 @@ impl Component for CompleteSetupPage {
                 Config::set_alchemy_api_key(
                     self.form.get_text(FormItem::AlchemyApiKey).to_string(),
                 )?;
-                transmitter.send(AppEvent::ConfigUpdate)?;
+                handle_result.reload();
 
                 self.form
                     .set_text(FormItem::Display, "Configuration saved".to_string());
