@@ -230,18 +230,18 @@ impl Component for AccountCreatePage {
                                 }
                             }
                             Event::Mouse(mouse_event) => {
-                                if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
-                                    if let Some(mask_area) = area
-                                        .height_consumed(5)
-                                        .and_then(|area| area.width_consumed(2))
-                                        .map(|area| area.change_width(40))
-                                        .map(|area| area.change_height(1))
-                                    {
-                                        if mask_area.contains(mouse_event.position()) {
-                                            let i = (mouse_event.column as usize)
-                                                .saturating_sub(mask_area.x as usize);
-                                            self.cursor = i;
-                                        }
+                                if area.width > 40
+                                    && mouse_event.kind == MouseEventKind::Down(MouseButton::Left)
+                                {
+                                    let mask_area = area
+                                        .margin_top(5)
+                                        .margin_left(2)
+                                        .change_width(40)
+                                        .change_height(1);
+                                    if mask_area.contains(mouse_event.position()) {
+                                        let i = (mouse_event.column as usize)
+                                            .saturating_sub(mask_area.x as usize);
+                                        self.cursor = i;
                                     }
                                 }
                             }
@@ -336,15 +336,20 @@ impl Component for AccountCreatePage {
     where
         Self: Sized,
     {
+        // TODO make this page work with less space, following is a temporary patch to prevent panic
+        if area.width < 45 || area.height < 20 {
+            "Please increase terminal size".render(area, buf);
+        }
+
         let mut working_area = area;
         Line::from("Create Wallet").bold().render(area, buf);
-        working_area.consume_height(3);
+        working_area = working_area.margin_top(3);
 
         match self.stage {
             Stage::Input => {
                 "You can edit mask if you wish to vanity generate special address"
                     .render(working_area, buf);
-                working_area.consume_height(2);
+                working_area = working_area.margin_top(2);
 
                 "0x".render(working_area, buf);
 
@@ -366,14 +371,10 @@ impl Component for AccountCreatePage {
                         Style::default()
                     };
 
-                    span.style(style).render(
-                        working_area
-                            .width_consumed((2 + i) as u16)
-                            .expect("please increase width"),
-                        buf,
-                    );
+                    span.style(style)
+                        .render(working_area.margin_left((2 + i) as u16), buf);
                 }
-                working_area.consume_height(3);
+                working_area = working_area.margin_top(3);
 
                 let text = if self.is_mask_empty() {
                     "Press enter to generate address instantly".to_string()
@@ -399,7 +400,7 @@ impl Component for AccountCreatePage {
                 };
 
                 text.render(working_area, buf);
-                working_area.consume_height(2);
+                working_area = working_area.margin_top(2);
 
                 format!(
                     "Hash rate: {}",
@@ -411,11 +412,11 @@ impl Component for AccountCreatePage {
                     }
                 )
                 .render(working_area, buf);
-                working_area.consume_height(2);
+                // working_area = working_area.margin_top(2);
             }
             Stage::Mining => {
                 "Mining...".render(working_area, buf);
-                working_area.consume_height(2);
+                working_area = working_area.margin_top(2);
 
                 if let HashRateResult::Some(hash_rate) = self.hash_rate {
                     let count = self.mask_count();
@@ -433,7 +434,7 @@ impl Component for AccountCreatePage {
                                 .unwrap_or(100) as u16,
                         ))
                         .render(working_area, buf);
-                    working_area.consume_height(2);
+                    working_area = working_area.margin_top(2);
 
                     if remaining_time.is_sign_negative() {
                         format!(
@@ -444,14 +445,14 @@ impl Component for AccountCreatePage {
                             ))
                         )
                         .render(working_area, buf);
-                        working_area.consume_height(2);
+                        // working_area = working_area.margin_top(2);
                     } else {
                         format!(
                             "Remaining time: {}",
                             humantime::format_duration(Duration::from_secs(remaining_time as u64))
                         )
                         .render(working_area, buf);
-                        working_area.consume_height(2);
+                        // working_area = working_area.margin_top(2);
                     }
                 }
             }
@@ -464,14 +465,14 @@ impl Component for AccountCreatePage {
                         counter
                     )
                     .render(working_area, buf);
-                    working_area.consume_height(2);
+                    // working_area = working_area.margin_top(2);
                 } else if let Some(addr) = self.mnemonic_result {
                     format!("Created new mnemonic wallet with address: {}", addr)
                         .render(working_area, buf);
-                    working_area.consume_height(2);
+                    // working_area = working_area.margin_top(2);
                 } else {
                     "No result found, this should not happen!".render(working_area, buf);
-                    working_area.consume_height(2);
+                    // working_area = working_area.margin_top(2);
                 }
             }
         }

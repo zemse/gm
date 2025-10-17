@@ -6,6 +6,7 @@ use std::{
     ops::Mul,
     str::FromStr,
     sync::{mpsc, Arc, RwLock, RwLockWriteGuard},
+    time::Duration,
 };
 
 #[cfg(feature = "demo")]
@@ -26,6 +27,7 @@ use crate::{
     AppEvent,
 };
 use alloy::primitives::Address;
+use arboard::Clipboard;
 use gm_ratatui_extra::{
     act::Act,
     extensions::{RectExt, ThemedWidget},
@@ -33,6 +35,7 @@ use gm_ratatui_extra::{
     select::{Select, SelectEvent},
     text_popup::TextPopup,
     thematize::Thematize,
+    toast::Toast,
 };
 use gm_utils::{
     assets::{Asset, AssetManager},
@@ -205,10 +208,11 @@ struct AppAreas {
     popup: Rect,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 enum Focus {
     Menu,
     Body,
+    Popup { on_close: Box<Focus> },
 }
 
 pub struct App {
@@ -217,6 +221,9 @@ pub struct App {
     pub main_menu: Select<MainMenuItem>,
     context: Vec<Page>,
     shared_state: SharedState,
+    clipboard: Clipboard,
+    copied_toast: Toast,
+    opened_toast: Toast,
 
     fatal_error_popup: TextPopup,
     pub invite_popup: InvitePopup,
@@ -258,13 +265,16 @@ impl App {
                 config,
                 networks,
             },
+            clipboard: Clipboard::new().map_err(crate::Error::ArboardInitFailed)?,
+            copied_toast: Toast::new("Copied"),
+            opened_toast: Toast::new("Opened in browser"),
 
-            fatal_error_popup: TextPopup::default()
-                .with_title("Fatal Error")
-                .with_break_words(true),
+            fatal_error_popup: TextPopup::default().with_title("Fatal Error").with_note({
+                "If you think this is a bug, please create issue at https://github.com/zemse/gm/new"
+            }),
             invite_popup: InvitePopup::default(),
             #[cfg(feature = "demo")]
-            demo_popup: TextPopup::new("", false),
+            demo_popup: TextPopup::default(),
 
             tick_thread: None,
             input_thread: None,
@@ -290,7 +300,7 @@ impl App {
         self.init_threads(&event_tr, &shutdown);
 
         #[cfg(feature = "demo")]
-        self.demo_popup.set_text(demo_text().to_string());
+        self.demo_popup.set_text(demo_text().to_string(), true);
 
         if let Some(events) = pre_events {
             let area = self.draw(&mut terminal).map_err(crate::Error::Draw)?;
@@ -298,7 +308,7 @@ impl App {
                 self.handle_event(event, area, &event_tr, &shutdown)
                     .await
                     .unwrap_or_else(|e| {
-                        self.fatal_error_popup.set_text(e.to_string());
+                        self.fatal_error_popup.set_text(e.to_string(), true);
                     })
             }
         }
@@ -308,7 +318,7 @@ impl App {
 
             self.handle_event(event_rc.recv()?, area, &event_tr, &shutdown)
                 .await
-                .unwrap_or_else(|e| self.fatal_error_popup.set_text(e.to_string()));
+                .unwrap_or_else(|e| self.fatal_error_popup.set_text(e.to_string(), true));
         }
 
         // final render before exiting
@@ -474,6 +484,24 @@ impl App {
         &mut self,
         mut result: PostHandleEventActions,
     ) -> crate::Result<(bool, bool, bool)> {
+        if let Some((text, tip_position)) = result.take_clipboard_request() {
+            self.clipboard
+                .set_text(text)
+                .map_err(crate::Error::ArboardSetText)?;
+
+            if let Some(tip_position) = tip_position {
+                self.copied_toast.show(tip_position, Duration::from_secs(1));
+            }
+        }
+
+        if let Some((url, tip_position)) = result.take_url_request() {
+            open::that(url.to_string()).map_err(crate::Error::OpenThat)?;
+
+            if let Some(tip_position) = tip_position {
+                self.opened_toast.show(tip_position, Duration::from_secs(2));
+            }
+        }
+
         if result.get_page_pop() {
             self.context.pop();
         }
@@ -500,6 +528,23 @@ impl App {
         ))
     }
 
+    fn update_popup_focus(&mut self, to_popup: bool) {
+        if to_popup {
+            if !matches!(self.focus, Focus::Popup { .. }) {
+                let old_focus = self.focus.clone();
+
+                let new_focus = Focus::Popup {
+                    on_close: Box::new(old_focus),
+                };
+
+                self.update_focus(new_focus);
+            }
+        } else if let Focus::Popup { on_close } = &self.focus {
+            let old_focus = on_close.as_ref().clone();
+            self.update_focus(old_focus);
+        }
+    }
+
     fn update_focus(&mut self, new_focus: Focus) {
         self.focus = new_focus;
 
@@ -513,6 +558,11 @@ impl App {
         } else if self.focus == Focus::Body {
             if let Some(page) = self.context.last_mut() {
                 page.set_focus(true);
+            }
+            self.main_menu.set_focus(false);
+        } else {
+            if let Some(page) = self.context.last_mut() {
+                page.set_focus(false);
             }
             self.main_menu.set_focus(false);
         }
@@ -533,7 +583,7 @@ impl App {
 
             if demo_timer.elapsed() >= DEMO_2_DELAY {
                 self.demo_timer = None;
-                self.demo_popup.set_text(demo_text_2().to_string());
+                self.demo_popup.set_text(demo_text_2().to_string(), true);
             }
         }
 
@@ -543,6 +593,10 @@ impl App {
         let demo_popup_shown = false;
 
         let fatal_error_popup_open = self.fatal_error_popup.is_open();
+
+        let is_invite_popup_open = self.invite_popup.is_open();
+
+        self.update_popup_focus(demo_popup_shown || fatal_error_popup_open || is_invite_popup_open);
 
         // Update state based on events
         match &event {
@@ -555,7 +609,7 @@ impl App {
                     // ETH Price is the main API for understanding if we are connected to internet
                     self.set_offline().await;
                 } else {
-                    self.fatal_error_popup.set_text(error.to_string());
+                    self.fatal_error_popup.set_text(error.to_string(), true);
                 }
             }
 
@@ -568,7 +622,7 @@ impl App {
             }
             AppEvent::AssetsUpdateError(error, silence_error) => {
                 if !silence_error {
-                    self.fatal_error_popup.set_text(error.to_string());
+                    self.fatal_error_popup.set_text(error.to_string(), true);
                 }
             }
 
@@ -591,30 +645,30 @@ impl App {
                     );
             }
             AppEvent::HeliosError(error) => {
-                self.fatal_error_popup.set_text(error.clone());
+                self.fatal_error_popup.set_text(error.clone(), true);
             }
 
             AppEvent::RecentAddressesUpdate(addresses) => {
                 self.shared_state.recent_addresses = Some(addresses.clone());
             }
             AppEvent::RecentAddressesUpdateError(error) => {
-                self.fatal_error_popup.set_text(error.to_string());
+                self.fatal_error_popup.set_text(error.to_string(), true);
             }
 
             // Candles API
             AppEvent::CandlesUpdateError(error) => {
-                self.fatal_error_popup.set_text(error.to_string());
+                self.fatal_error_popup.set_text(error.to_string(), true);
             }
 
             // Transaction API
-            AppEvent::TxError(error) => self.fatal_error_popup.set_text(error.clone()),
+            AppEvent::TxError(error) => self.fatal_error_popup.set_text(error.clone(), true),
 
             AppEvent::WalletConnectError(_, error) => {
-                self.fatal_error_popup.set_text(error.clone());
+                self.fatal_error_popup.set_text(error.clone(), true);
             }
 
             AppEvent::InviteError(error) => {
-                self.fatal_error_popup.set_text(error.clone());
+                self.fatal_error_popup.set_text(error.clone(), true);
             }
 
             _ => {}
@@ -622,15 +676,18 @@ impl App {
 
         let mut actions = PostHandleEventActions::default();
 
+        self.copied_toast.handle_event(event.widget_event());
+        self.opened_toast.handle_event(event.widget_event());
+
         // Handle the event in the relavent component
         if fatal_error_popup_open {
             self.fatal_error_popup
                 .handle_event::<PostHandleEventActions>(
-                    event.key_event(),
+                    event.input_event(),
                     areas.popup,
                     &mut actions,
                 );
-        } else if self.invite_popup.is_open() {
+        } else if is_invite_popup_open {
             self.invite_popup
                 .handle_event(&event, tr, &self.shared_state, &mut actions)?
         } else if demo_popup_shown {
@@ -638,7 +695,7 @@ impl App {
             unreachable!();
             #[cfg(feature = "demo")]
             self.demo_popup.handle_event::<PostHandleEventActions>(
-                event.key_event(),
+                event.input_event(),
                 areas.popup,
                 &mut actions,
             );
@@ -647,7 +704,7 @@ impl App {
             let mut body_area = areas.body;
 
             if self.context.len() > 1 {
-                body_area.consume_height(2);
+                body_area = body_area.margin_top(2);
             }
 
             // If focus is on body, handle all events. However if focus is not on body
@@ -712,7 +769,8 @@ impl App {
                             self.exit = true;
                         }
                         if char == 'r' && key_event.modifiers == KeyModifiers::CONTROL {
-                            self.fatal_error_popup.set_text("test error".to_string());
+                            self.fatal_error_popup
+                                .set_text("test error".to_string(), true);
                         }
                         if char == 't' && key_event.modifiers == KeyModifiers::CONTROL {
                             self.context.push(Page::Trade(TradePage::default()));
@@ -845,10 +903,10 @@ impl Widget for &App {
             let mut gap_area = areas.gap;
             "┬".render(gap_area, buf);
             for _ in 0..height_inner {
-                gap_area.consume_height(1);
+                gap_area = gap_area.margin_top(1);
                 "│".render(gap_area, buf);
             }
-            gap_area.consume_height(1);
+            gap_area = gap_area.margin_top(1);
             "┴".render(gap_area, buf);
         }
 
@@ -859,7 +917,7 @@ impl Widget for &App {
         let mut body_area = areas.body;
         if self.context.len() > 1 {
             let mut nav_area = areas.body.change_height(1);
-            body_area.consume_height(2);
+            body_area = body_area.margin_top(2);
 
             let names = self
                 .context
@@ -878,13 +936,13 @@ impl Widget for &App {
                         self.shared_state.theme.style_dim()
                     })
                     .render(nav_area, buf);
-                nav_area.consume_width(name_size as u16);
+                nav_area = nav_area.margin_left(name_size as u16);
 
                 if !is_last {
                     Span::raw(" / ")
                         .style(self.shared_state.theme.style_dim())
                         .render(nav_area, buf);
-                    nav_area.consume_width(3);
+                    nav_area = nav_area.margin_left(3);
                 }
             }
         }
@@ -908,5 +966,8 @@ impl Widget for &App {
         #[cfg(feature = "demo")]
         self.demo_popup
             .render(areas.popup, buf, &self.shared_state.theme.popup());
+
+        self.copied_toast.render(buf, &self.shared_state.theme);
+        self.opened_toast.render(buf, &self.shared_state.theme);
     }
 }

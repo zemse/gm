@@ -40,6 +40,7 @@ data3 = "0.2.0"
 helios-ethereum = { package = "zemse-helios-ethereum", version = "0.9" }
 eyre = "0.6"
 open = "5.3.2"
+arboard = "3.6.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 gm-macos = { path = "../macos" }

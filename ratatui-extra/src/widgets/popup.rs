@@ -3,7 +3,7 @@ use crate::{
     extensions::{EventExt, RectExt, RenderTextWrapped, ThemedWidget},
     thematize::Thematize,
 };
-use gm_utils::text::split_string;
+use gm_utils::text_wrap::text_wrap;
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{Event, KeyCode},
@@ -100,7 +100,7 @@ impl Popup {
         let inner_area = popup_area.inner(Margin::new(2, 1));
 
         if let Some(title) = self.title {
-            let title_height = split_string(title, inner_area.width as usize).len() as u16;
+            let title_height = text_wrap(title, inner_area.width).len() as u16;
 
             let title_area = inner_area.change_height(title_height + 1);
             let body_area = inner_area.margin_top(title_height + 1);

@@ -329,8 +329,7 @@ impl Component for WalletConnectPage {
                         .as_session_propose()
                         .ok_or(crate::Error::ProposalNotFound)?;
 
-                    let text = self.confirm_popup.text_mut();
-                    *text = format_proposal(proposal);
+                    self.confirm_popup.set_text(format_proposal(proposal), true);
                     self.confirm_popup.open();
                 }
             }

@@ -21,7 +21,9 @@ use std::{
 };
 
 use alloy::{hex, primitives::Address, rpc::types::TransactionRequest};
-use gm_ratatui_extra::{act::Act, extensions::ThemedWidget, input_box, text_scroll::TextScroll};
+use gm_ratatui_extra::{
+    act::Act, extensions::ThemedWidget, input_box, text_interactive::TextInteractive,
+};
 use gm_rpc_proxy::{
     error::RpcProxyError,
     rpc_types::{ErrorObj, ResponsePayload},
@@ -87,7 +89,7 @@ pub enum ShellUpdate {
 #[derive(Debug)]
 pub struct ShellPage {
     cmd_lines: Vec<ShellLine>,
-    display: TextScroll,
+    display: TextInteractive,
     text_cursor: usize,
     env_vars: Option<HashMap<String, String>>,
     requests: Vec<UserRequest>,
@@ -112,7 +114,7 @@ impl Default for ShellPage {
                 ShellLine::StdOut("Welcome to gm shell".to_string()),
                 ShellLine::UserInput(String::new()),
             ],
-            display: TextScroll::default(),
+            display: TextInteractive::default(),
             text_cursor: 0,
             env_vars: None,
             requests: vec![],
@@ -130,7 +132,7 @@ impl Default for ShellPage {
             server_threads: None,
         };
 
-        page.display.text = page.full_text();
+        page.display.set_text(page.full_text(), false);
 
         page
     }
@@ -312,7 +314,8 @@ impl Component for ShellPage {
             self.create_server_threads(tr, ss)?;
         }
 
-        self.display.handle_event(event.key_event(), area);
+        self.display
+            .handle_event(event.input_event(), area, &mut actions);
 
         if self.prevent_ctrlc_exit {
             actions.ignore_ctrlc();
@@ -483,7 +486,7 @@ impl Component for ShellPage {
                             }
                         }
 
-                        self.display.text = self.full_text();
+                        self.display.set_text(self.full_text(), false);
                         if scroll_to_bottom {
                             self.display
                                 .scroll_to_bottom(area.width as usize, area.height as usize);
@@ -544,7 +547,7 @@ impl Component for ShellPage {
                     }
                 }
 
-                self.display.text = self.full_text();
+                self.display.set_text(self.full_text(), false);
                 self.display
                     .scroll_to_bottom(area.width as usize, area.height as usize);
             }

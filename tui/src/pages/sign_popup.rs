@@ -5,10 +5,10 @@ use alloy::{hex, primitives::Address, signers::Signature};
 use gm_ratatui_extra::{
     act::Act,
     confirm_popup::{ConfirmPopup, ConfirmResult},
-    extensions::{CustomRender, ThemedWidget},
+    extensions::{RenderTextWrapped, ThemedWidget},
     popup::{Popup, PopupWidget},
+    text_interactive::TextInteractive,
     text_popup::TextPopup,
-    text_scroll::TextScroll,
     thematize::Thematize,
 };
 use gm_utils::account::AccountManager;
@@ -73,7 +73,7 @@ impl SignPopup {
 
     fn signing_screen(
         signer_account: Address,
-        message: TextScroll,
+        message: TextInteractive,
         sign_thread: JoinHandle<()>,
         receiver: oneshot::Receiver<gm_utils::Result<Signature>>,
     ) -> Self {
@@ -82,8 +82,7 @@ impl SignPopup {
             // TODO enable initialising TextPopup with TextScroll
             text_popup: TextPopup::default()
                 .with_title("Signing Message")
-                .with_text(message.text)
-                .with_break_words(true),
+                .with_text(message.into_text()),
             sign_thread,
             receiver,
         }
@@ -151,7 +150,7 @@ impl SignPopup {
                         String::from_utf8(bytes).map_err(crate::Error::FromUtf8Error)
                     })?;
 
-                *confirm_popup.text_mut() = utf8_str;
+                confirm_popup.set_text(utf8_str, true);
             }
             SignPopup::Signing { .. } | SignPopup::Result { .. } => {
                 unreachable!("Cannot change message data in this state")
@@ -168,7 +167,7 @@ impl SignPopup {
     fn set_msg_utf8(&mut self, msg: String) {
         match self {
             SignPopup::Confirm { confirm_popup } => {
-                *confirm_popup.text_mut() = msg;
+                confirm_popup.set_text(msg, true);
             }
             SignPopup::Signing { .. } | SignPopup::Result { .. } => {
                 unreachable!("Cannot change message data in this state")
@@ -194,8 +193,8 @@ impl SignPopup {
 
                             let signer_account = ss.try_current_account()?;
                             let data = {
-                                let message = text_scroll.text.clone();
-                                match hex::decode(&message) {
+                                let message = text_scroll.text();
+                                match hex::decode(message) {
                                     Ok(bytes) => bytes,
                                     Err(_) => message.as_bytes().to_vec(),
                                 }
@@ -267,11 +266,8 @@ impl SignPopup {
                 SignPopup::Result { popup, .. } => {
                     popup.render(popup_area, buf, theme);
 
-                    ["Signature is done.", "Press ESC to close"].render(
-                        popup.body_area(popup_area),
-                        buf,
-                        (),
-                    );
+                    ["Signature is done.", "Press ESC to close"]
+                        .render_wrapped(popup.body_area(popup_area), buf);
                 }
             }
         }

@@ -13,9 +13,9 @@ use alloy::{
 use gm_ratatui_extra::{
     act::Act,
     button::Button,
-    extensions::{CustomRender, RectExt, ThemedWidget},
+    extensions::{RectExt, RenderTextWrapped, ThemedWidget},
     popup::{Popup, PopupWidget},
-    text_scroll::TextScroll,
+    text_interactive::TextInteractive,
     thematize::Thematize,
 };
 use ratatui::{
@@ -53,7 +53,7 @@ pub enum TxStatus {
 pub struct SignTxPopup {
     network: Network,
     tx_req: TransactionRequest,
-    text: TextScroll,
+    text: TextInteractive,
     popup: Popup,
 
     cancel_button: Button,
@@ -71,7 +71,7 @@ impl Default for SignTxPopup {
         Self {
             network: Network::default(),
             tx_req: TransactionRequest::default(),
-            text: TextScroll::default().with_break_words(true),
+            text: TextInteractive::default(),
             popup: Popup::default().with_title("Transaction"),
             cancel_button: Button::new("Cancel").with_success_kind(false),
             confirm_button: Button::new("Confirm").with_success_kind(true),
@@ -115,7 +115,8 @@ impl SignTxPopup {
     }
 
     fn update_tx_req(&mut self) {
-        self.text.text = fmt_tx_request(&self.network, &self.tx_req);
+        self.text
+            .set_text(fmt_tx_request(&self.network, &self.tx_req), true);
     }
 
     pub fn is_not_sent(&self) -> bool {
@@ -162,8 +163,11 @@ impl SignTxPopup {
     {
         let mut result = PostHandleEventActions::default();
 
-        self.text
-            .handle_event(event.key_event(), self.popup.body_area(popup_area));
+        self.text.handle_event(
+            event.input_event(),
+            self.popup.body_area(popup_area),
+            &mut result,
+        );
 
         match event {
             AppEvent::Input(input_event) => match input_event {
@@ -306,7 +310,7 @@ impl SignTxPopup {
                         format!("Transaction confirmed! Hash: {tx_hash}"),
                         "Press ESC to close".to_string(),
                     ]
-                    .render(button_area.margin_top(1), buf, false);
+                    .render_wrapped(button_area.margin_top(1), buf);
                 }
                 TxStatus::Failed(tx_hash) => {
                     format!("Transaction failed! Hash: {tx_hash}")

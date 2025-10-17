@@ -4,13 +4,7 @@ use std::{collections::HashMap, marker::PhantomData};
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, MouseEventKind};
 use ratatui::layout::{Constraint, Layout, Position};
 use ratatui::text::Span;
-use ratatui::widgets::WidgetRef;
-use ratatui::{
-    buffer::Buffer,
-    layout::Rect,
-    text::Text,
-    widgets::{Paragraph, Wrap},
-};
+use ratatui::{buffer::Buffer, layout::Rect};
 use strum::IntoEnumIterator;
 
 use super::{button::Button, input_box::InputBox};
@@ -606,9 +600,7 @@ impl<
 
         let item_height = item_height.expect("item_height should be Some");
 
-        let mut item_area = form_area
-            .height_consumed(item_virtual_y - self.scroll_y)
-            .expect("not able to consume height");
+        let mut item_area = form_area.margin_top(item_virtual_y - self.scroll_y);
 
         item_area.height = item_height;
         item_area
@@ -648,13 +640,13 @@ impl<
                     Span::raw(*heading)
                         .style(theme.style())
                         .render_wrapped(virtual_area, &mut virtual_buf);
-                    virtual_area.consume_height(item.height(virtual_area));
+                    virtual_area = virtual_area.margin_top(item.height(virtual_area));
                 }
                 FormWidget::StaticText(text) => {
                     Span::raw(*text)
                         .style(theme.style_dim())
                         .render_wrapped(virtual_area, &mut virtual_buf);
-                    virtual_area.consume_height(item.height(virtual_area));
+                    virtual_area = virtual_area.margin_top(item.height(virtual_area));
                 }
                 FormWidget::InputBox { widget, .. } => {
                     let height_used = item.height(virtual_area);
@@ -665,7 +657,7 @@ impl<
                         self.form_focus && self.cursor == i,
                         theme,
                     );
-                    virtual_area.consume_height(height_used);
+                    virtual_area = virtual_area.margin_top(height_used);
                 }
                 FormWidget::DisplayBox { widget, .. } => {
                     let height_used = item.height(virtual_area);
@@ -676,7 +668,7 @@ impl<
                         self.form_focus && self.cursor == i,
                         theme,
                     );
-                    virtual_area.consume_height(height_used);
+                    virtual_area = virtual_area.margin_top(height_used);
                 }
                 FormWidget::BooleanInput { widget, .. } => {
                     let height_used = item.height(virtual_area);
@@ -687,7 +679,7 @@ impl<
                         self.form_focus && self.cursor == i,
                         theme,
                     );
-                    virtual_area.consume_height(height_used);
+                    virtual_area = virtual_area.margin_top(height_used);
                 }
                 FormWidget::SelectInput { widget, .. } => {
                     let height_used = item.height(virtual_area);
@@ -698,7 +690,7 @@ impl<
                         self.form_focus && self.cursor == i,
                         theme,
                     );
-                    virtual_area.consume_height(height_used);
+                    virtual_area = virtual_area.margin_top(height_used);
                 }
                 FormWidget::Button { widget } => {
                     widget.render(
@@ -708,20 +700,17 @@ impl<
                         theme,
                     );
 
-                    virtual_area.consume_height(item.height(virtual_area));
+                    virtual_area = virtual_area.margin_top(item.height(virtual_area));
                 }
                 FormWidget::DisplayText(text) | FormWidget::ErrorText(text) => {
                     if !text.is_empty() {
-                        Paragraph::new(Text::raw(text))
-                            .wrap(Wrap { trim: false })
-                            .render_ref(virtual_area, &mut virtual_buf);
+                        text.render_wrapped(virtual_area, &mut virtual_buf);
 
-                        virtual_area.consume_height(item.height(virtual_area));
+                        virtual_area = virtual_area.margin_top(item.height(virtual_area));
                     }
                 }
                 FormWidget::LineBreak => {
-                    // Just consume 1 height
-                    virtual_area.consume_height(item.height(virtual_area));
+                    virtual_area = virtual_area.margin_top(item.height(virtual_area));
                 }
             }
         }

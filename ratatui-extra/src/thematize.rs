@@ -8,6 +8,8 @@ pub trait Thematize {
 
     fn cursor_cancelled(&self) -> Style;
 
+    fn toast(&self) -> Style;
+
     /// Calling popup once should update the style. However, is it possible that
     /// popup is called multiple times during rendering of nested popups. The
     /// implementation should not cause toggling but give the same result.
@@ -45,6 +47,10 @@ impl Thematize for DefaultTheme {
     }
 
     fn cursor_cancelled(&self) -> Style {
+        Style::default().add_modifier(Modifier::REVERSED)
+    }
+
+    fn toast(&self) -> Style {
         Style::default().add_modifier(Modifier::REVERSED)
     }
 

@@ -1,10 +1,7 @@
 use std::sync::mpsc::Sender;
 
-use ratatui::{
-    layout::Rect,
-    text::Text,
-    widgets::{Paragraph, Widget, Wrap},
-};
+use gm_ratatui_extra::extensions::RenderTextWrapped;
+use ratatui::layout::Rect;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -46,10 +43,7 @@ impl Component for TextPage {
     where
         Self: Sized,
     {
-        Paragraph::new(Text::raw(&self.text))
-            .wrap(Wrap { trim: false })
-            .to_owned()
-            .render(area, buf);
+        self.text.render_wrapped(area, buf);
 
         area
     }

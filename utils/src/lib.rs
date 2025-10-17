@@ -14,7 +14,8 @@ pub mod network;
 pub mod price_manager;
 pub mod reqwest;
 pub mod serde;
-pub mod text;
+pub mod text_segment;
+pub mod text_wrap;
 
 pub use error::{Result, UtilsError as Error};
 

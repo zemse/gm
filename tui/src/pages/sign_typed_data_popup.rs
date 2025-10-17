@@ -9,9 +9,9 @@ use alloy::{
 use gm_ratatui_extra::{
     act::Act,
     button::Button,
-    extensions::{CustomRender, RectExt, ThemedWidget},
+    extensions::{RectExt, RenderTextWrapped, ThemedWidget},
     popup::{Popup, PopupWidget},
-    text_scroll::TextScroll,
+    text_interactive::TextInteractive,
     thematize::Thematize,
 };
 use ratatui::{
@@ -62,7 +62,7 @@ enum SignStatus {
 #[derive(Debug)]
 pub struct SignTypedDataPopup {
     typed_data_json: Value,
-    display: TextScroll,
+    display: TextInteractive,
     popup: Popup,
     cancel_button: Button,
     confirm_button: Button,
@@ -96,7 +96,7 @@ impl SignTypedDataPopup {
     pub fn new() -> Self {
         Self {
             typed_data_json: Value::Null,
-            display: TextScroll::default(),
+            display: TextInteractive::default(),
             popup: Popup::default().with_title("Sign EIP-712 Typed Data"),
             cancel_button: Button::new("Cancel"),
             confirm_button: Button::new("Confirm"),
@@ -122,10 +122,13 @@ impl SignTypedDataPopup {
             return Err(crate::Error::TypedDataMissingField("message".to_string()));
         }
 
-        self.display.text = match serde_json::to_string_pretty(&v) {
-            Ok(s) => format!("EIP-712 Typed Data:\n\n{s}\n\n"),
-            Err(_) => format!("EIP-712 Typed Data (unprintable):\n\n{v}\n\n"),
-        };
+        self.display.set_text(
+            match serde_json::to_string_pretty(&v) {
+                Ok(s) => format!("EIP-712 Typed Data:\n\n{s}\n\n"),
+                Err(_) => format!("EIP-712 Typed Data (unprintable):\n\n{v}\n\n"),
+            },
+            true,
+        );
         self.typed_data_json = v;
         self.reset();
         Ok(())
@@ -156,7 +159,8 @@ impl SignTypedDataPopup {
         if self.is_open() {
             let body_area = self.body_area(popup_area);
 
-            self.display.handle_event(event.key_event(), body_area);
+            self.display
+                .handle_event(event.input_event(), body_area, &mut result);
 
             match event {
                 AppEvent::Input(input_event) => match input_event {
@@ -253,18 +257,12 @@ impl SignTypedDataPopup {
                     "Signing data...".render(button_area.margin_top(1), buf);
                 }
                 SignStatus::Done => {
-                    ["Signature is done.", "Press ESC to close"].render(
-                        button_area.margin_top(1),
-                        buf,
-                        (),
-                    );
+                    ["Signature is done.", "Press ESC to close"]
+                        .render_wrapped(button_area.margin_top(1), buf);
                 }
                 SignStatus::Failed => {
-                    ["Signing failed.", "Press ESC to close"].render(
-                        button_area.margin_top(1),
-                        buf,
-                        (),
-                    );
+                    ["Signing failed.", "Press ESC to close"]
+                        .render_wrapped(button_area.margin_top(1), buf);
                 }
             }
         }

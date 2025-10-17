@@ -104,9 +104,7 @@ impl<T: Display + PartialEq> FilterSelect<T> {
                 self.update_select_list();
             }
 
-            if let Some(list_area) = area.height_consumed(2) {
-                result = self.select.handle_event(input_event, list_area)?;
-            }
+            result = self.select.handle_event(input_event, area.margin_top(2))?;
         }
 
         Ok(result)

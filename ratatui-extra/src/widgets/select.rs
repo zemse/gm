@@ -5,13 +5,13 @@ use crate::scroll_bar::CustomScrollBar;
 use crate::thematize::{DefaultTheme, Thematize};
 
 use super::cursor::Cursor;
+use gm_utils::text_wrap::text_wrap;
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, MouseEventKind};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{List, ListItem, Widget};
-use textwrap::{Options, WrapAlgorithm};
 
 struct Areas {
     list_area: Rect,
@@ -312,14 +312,13 @@ impl<T: Display + PartialEq> Select<T> {
         let mut total_pages: usize = 1;
         let render_item = |(i, member): (usize, &T)| {
             let text = format!("{member}");
-            let wrapped_text = textwrap::wrap(
+            let wrapped_text = text_wrap(
                 &text,
-                Options::new(if capacity < list_height {
-                    list_area.width as usize
+                if capacity < list_height {
+                    list_area.width
                 } else {
-                    area.width as usize
-                })
-                .wrap_algorithm(WrapAlgorithm::FirstFit),
+                    area.width
+                },
             );
             list_height += wrapped_text.len();
             item_heights.push(wrapped_text.len());

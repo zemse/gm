@@ -166,6 +166,10 @@ impl Thematize for Theme {
         }
     }
 
+    fn toast(&self) -> Style {
+        Style::default().add_modifier(Modifier::REVERSED)
+    }
+
     fn button_focused(&self) -> Style {
         if self.reversed {
             Style::default()

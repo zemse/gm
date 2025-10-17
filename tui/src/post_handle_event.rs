@@ -1,6 +1,8 @@
 use std::mem;
 
 use gm_ratatui_extra::act::Act;
+use ratatui::layout::Position;
+use url::Url;
 
 use crate::pages::Page;
 
@@ -26,6 +28,10 @@ pub struct PostHandleEventActions {
     reload: bool,
     /// Clears data for assets and refetches them.
     refresh_assets: bool,
+    /// Copy to clipboard request
+    copy_to_clipboard: Option<(String, Option<Position>)>,
+    /// Open URL request
+    open_url: Option<(Url, Option<Position>)>,
 }
 
 impl Act for PostHandleEventActions {
@@ -39,6 +45,8 @@ impl Act for PostHandleEventActions {
         self.page_inserts.extend(other.page_inserts);
         self.reload |= other.reload;
         self.refresh_assets |= other.refresh_assets;
+        self.copy_to_clipboard = other.copy_to_clipboard.or(self.copy_to_clipboard.take());
+        self.open_url = other.open_url.or(self.open_url.take());
     }
 
     fn ignore_esc(&mut self) {
@@ -51,6 +59,18 @@ impl Act for PostHandleEventActions {
 
     fn ignore_right(&mut self) {
         // we don't care about right arrow key presses
+    }
+
+    fn is_esc_ignored(&self) -> bool {
+        self.ignore_esc
+    }
+
+    fn copy_to_clipboard(&mut self, text: String, tip_position: Option<Position>) {
+        self.copy_to_clipboard = Some((text, tip_position));
+    }
+
+    fn open_url(&mut self, url: Url, tip_position: Option<Position>) {
+        self.open_url = Some((url, tip_position));
     }
 }
 
@@ -132,5 +152,13 @@ impl PostHandleEventActions {
     /// Getter for refresh_assets, if this is true the App should refetch balances urgently.
     pub fn get_refresh_assets(&self) -> bool {
         self.refresh_assets
+    }
+
+    pub fn take_clipboard_request(&mut self) -> Option<(String, Option<Position>)> {
+        self.copy_to_clipboard.take()
+    }
+
+    pub fn take_url_request(&mut self) -> Option<(Url, Option<Position>)> {
+        self.open_url.take()
     }
 }

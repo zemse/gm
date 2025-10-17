@@ -16,7 +16,7 @@ use crate::{
     thematize::Thematize,
 };
 
-use gm_utils::text::split_string;
+use gm_utils::text_wrap::text_wrap;
 
 fn option_delete(text_input: &mut String, text_cursor: &mut usize) {
     loop {
@@ -155,7 +155,7 @@ pub fn handle_input_event(
         },
         Event::Mouse(mouse_event) => {
             if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
-                let lines = split_string(text_input, (area.width - 4) as usize);
+                let lines = text_wrap(text_input, area.width - 4);
                 let area_text = Rect {
                     x: area.x,
                     y: area.y,
@@ -266,7 +266,7 @@ impl InputBox {
     where
         Self: Sized,
     {
-        let lines = split_string(&self.text_input, (area.width - 4) as usize);
+        let lines = text_wrap(&self.text_input, area.width - 4);
         let area_used = Rect {
             x: area.x,
             y: area.y,
@@ -359,7 +359,7 @@ impl InputBox {
 // TODO this is the right way to get height used, remove the Rect returns from render
 impl WidgetHeight for InputBox {
     fn height_used(&self, area: ratatui::prelude::Rect) -> u16 {
-        let lines = split_string(&self.text_input, (area.width - 2) as usize);
+        let lines = text_wrap(&self.text_input, area.width - 2);
         (2 + lines.len()) as u16
     }
 }

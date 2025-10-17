@@ -1,4 +1,6 @@
-use gm_utils::text::split_string;
+use std::borrow::Cow;
+
+use gm_utils::text_wrap::text_wrap;
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{
@@ -6,8 +8,9 @@ use ratatui::{
         MouseEventKind,
     },
     layout::{Position, Rect},
-    text::{Span, Text, ToLine},
-    widgets::{Block, Paragraph, Widget, WidgetRef, Wrap},
+    style::Style,
+    text::{Line, Span, Text},
+    widgets::{Block, Widget, WidgetRef},
 };
 
 use crate::thematize::Thematize;
@@ -70,53 +73,96 @@ pub trait RenderTextWrapped {
     fn render_wrapped(&self, area: Rect, buf: &mut Buffer);
 }
 
+fn render_wrapped_lines(
+    lines: Vec<Cow<'_, str>>,
+    style: Option<Style>,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    let mut text = Text::default();
+    for line in lines {
+        let mut line = Line::raw(line);
+        if let Some(style) = style {
+            line = line.style(style);
+        }
+        text.push_line(line);
+    }
+    text.render(area, buf);
+}
+
 impl RenderTextWrapped for &str {
     fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new(Text::raw(*self))
-            .wrap(Wrap { trim: false })
-            .to_owned()
-            .render(area, buf);
+        let lines = text_wrap(self, area.width);
+
+        render_wrapped_lines(lines, None, area, buf);
     }
 }
 
 impl RenderTextWrapped for String {
     fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new(Text::raw(self.as_str()))
-            .wrap(Wrap { trim: false })
-            .to_owned()
-            .render(area, buf);
+        let lines = text_wrap(self, area.width);
+
+        render_wrapped_lines(lines, None, area, buf);
     }
 }
 
 impl RenderTextWrapped for Vec<&str> {
     fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new(Text::raw(self.join("\n").as_str()))
-            .wrap(Wrap { trim: false })
-            .to_owned()
-            .render(area, buf);
+        let lines = self
+            .iter()
+            .flat_map(|str| text_wrap(str, area.width))
+            .collect();
+
+        render_wrapped_lines(lines, None, area, buf);
     }
 }
 
 impl RenderTextWrapped for Vec<String> {
     fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new(Text::raw(self.join("\n").as_str()))
-            .wrap(Wrap { trim: false })
-            .to_owned()
-            .render(area, buf);
+        let lines = self
+            .iter()
+            .flat_map(|str| text_wrap(str, area.width))
+            .collect();
+
+        render_wrapped_lines(lines, None, area, buf);
     }
 }
 
 impl<'a> RenderTextWrapped for Span<'a> {
     fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
-        let mut text = Text::default();
-        let style = self.style;
+        let lines = text_wrap(&self.content, area.width);
 
-        text.push_line(self.to_line().style(style));
+        render_wrapped_lines(lines, Some(self.style), area, buf);
+    }
+}
 
-        Paragraph::new(text)
-            .wrap(Wrap { trim: false })
-            .to_owned()
-            .render(area, buf);
+impl<'a> RenderTextWrapped for Cow<'a, str> {
+    fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
+        let lines = text_wrap(self, area.width);
+
+        render_wrapped_lines(lines, None, area, buf);
+    }
+}
+
+impl<const N: usize> RenderTextWrapped for [&str; N] {
+    fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
+        let lines = self
+            .iter()
+            .flat_map(|str| text_wrap(str, area.width))
+            .collect();
+
+        render_wrapped_lines(lines, None, area, buf);
+    }
+}
+
+impl<const N: usize> RenderTextWrapped for [String; N] {
+    fn render_wrapped(&self, area: Rect, buf: &mut Buffer) {
+        let lines = self
+            .iter()
+            .flat_map(|str| text_wrap(str, area.width))
+            .collect();
+
+        render_wrapped_lines(lines, None, area, buf);
     }
 }
 
@@ -124,70 +170,7 @@ pub trait WidgetHeight {
     fn height_used(&self, area: Rect) -> u16;
 }
 
-pub trait CustomRender<Args = ()> {
-    fn render(&self, area: Rect, buf: &mut Buffer, args: Args) -> Rect;
-}
-
-impl<const N: usize> CustomRender for [&str; N] {
-    fn render(&self, area: Rect, buf: &mut Buffer, _: ()) -> Rect
-    where
-        Self: Sized,
-    {
-        // TODO implement wrapping so that insufficient width does not overflow text
-        let mut area = area;
-        for line in self {
-            let line_area = Rect {
-                x: area.x,
-                y: area.y,
-                width: area.width,
-                height: 1,
-            };
-            line.render_ref(line_area, buf);
-            area.y += 1;
-        }
-        area.height = N as u16;
-        area
-    }
-}
-
-impl<const N: usize> CustomRender<bool> for [String; N] {
-    fn render(&self, full_area: Rect, buf: &mut Buffer, leave_space: bool) -> Rect
-    where
-        Self: Sized,
-    {
-        let mut area = full_area;
-        for line in self {
-            let segs = split_string(line, area.width as usize);
-            for seg in segs {
-                if let Some(new_area) = area.height_consumed(1) {
-                    seg.render_ref(area, buf);
-                    area = new_area;
-                } else {
-                    break;
-                }
-            }
-
-            if leave_space {
-                if let Some(new_area) = area.height_consumed(1) {
-                    area = new_area;
-                } else {
-                    break;
-                }
-            }
-        }
-        full_area.change_height(full_area.height - area.height)
-    }
-}
-
 pub trait RectExt {
-    fn width_consumed(self, width: u16) -> Option<Rect>;
-
-    fn height_consumed(self, height: u16) -> Option<Rect>;
-
-    fn consume_width(&mut self, width: u16);
-
-    fn consume_height(&mut self, height: u16);
-
     fn change_height(self, new_height: u16) -> Rect;
 
     fn change_width(self, new_width: u16) -> Rect;
@@ -210,46 +193,7 @@ pub trait RectExt {
 }
 
 impl RectExt for Rect {
-    fn width_consumed(self, width: u16) -> Option<Rect> {
-        if self.width >= width {
-            Some(Rect {
-                x: self.x + width,
-                y: self.y,
-                width: self.width - width,
-                height: self.height,
-            })
-        } else {
-            None
-        }
-    }
-
-    fn height_consumed(self, height: u16) -> Option<Rect> {
-        if self.height >= height {
-            Some(Rect {
-                x: self.x,
-                y: self.y + height,
-                width: self.width,
-                height: self.height - height,
-            })
-        } else {
-            None
-        }
-    }
-
     #[track_caller]
-    fn consume_width(&mut self, width: u16) {
-        *self = self
-            .width_consumed(width)
-            .expect("consume_width failed, if your terminal width is too small, try increasing it otherwise this is a bug");
-    }
-
-    #[track_caller]
-    fn consume_height(&mut self, height: u16) {
-        *self = self
-            .height_consumed(height)
-            .expect("consume_height failed, if your terminal height is too small, try increasing it otherwise this is a bug");
-    }
-
     fn change_height(self, new_height: u16) -> Rect {
         Rect {
             x: self.x,
@@ -258,6 +202,8 @@ impl RectExt for Rect {
             height: new_height,
         }
     }
+
+    #[track_caller]
     fn change_width(self, new_width: u16) -> Rect {
         Rect {
             x: self.x,
@@ -267,6 +213,7 @@ impl RectExt for Rect {
         }
     }
 
+    #[track_caller]
     fn margin_h(self, x: u16) -> Rect {
         Rect {
             x: self.x + x,
@@ -286,6 +233,7 @@ impl RectExt for Rect {
         }
     }
 
+    #[track_caller]
     fn margin_down(self, m: u16) -> Rect {
         Rect {
             x: self.x,
@@ -295,6 +243,7 @@ impl RectExt for Rect {
         }
     }
 
+    #[track_caller]
     fn margin_left(self, m: u16) -> Rect {
         Rect {
             x: self.x + m,
@@ -304,6 +253,7 @@ impl RectExt for Rect {
         }
     }
 
+    #[track_caller]
     fn margin_right(self, m: u16) -> Rect {
         Rect {
             x: self.x,
@@ -313,6 +263,7 @@ impl RectExt for Rect {
         }
     }
 
+    #[track_caller]
     fn expand_vertical(self, m: u16) -> Rect {
         Rect {
             x: self.x,
@@ -322,6 +273,7 @@ impl RectExt for Rect {
         }
     }
 
+    #[track_caller]
     fn block_inner(self) -> Rect {
         Rect {
             x: self.x + 1,
@@ -331,6 +283,7 @@ impl RectExt for Rect {
         }
     }
 
+    #[track_caller]
     fn button_center(self, label_len: usize) -> Rect {
         let button_width = (label_len + 2) as u16;
         let x = self.x + (self.width.saturating_sub(button_width)) / 2;
@@ -461,6 +414,45 @@ impl MouseEventExt for MouseEvent {
         Position {
             x: self.column,
             y: self.row,
+        }
+    }
+}
+
+pub trait PositionExt {
+    fn sort(self, other: Position) -> (Position, Position);
+
+    fn nearest_inner(self, area: Rect) -> Position;
+}
+
+impl PositionExt for Position {
+    /// Returns the two positions in top-to-bottom, left-to-right order.
+    ///
+    /// If `self` appears after `other` in reading order, the positions are swapped
+    /// so that the returned tuple is always `(start, end)`.
+    fn sort(self, other: Position) -> (Position, Position) {
+        if self.y > other.y || (self.y == other.y && self.x > other.x) {
+            (other, self)
+        } else {
+            (self, other)
+        }
+    }
+
+    fn nearest_inner(self, area: Rect) -> Position {
+        if area.contains(self) {
+            self
+        } else if self.x < area.x {
+            if self.y < area.y {
+                Position::new(area.x, area.y)
+            } else {
+                Position::new(area.x, self.y.min(area.y + area.height - 1))
+            }
+        } else if self.y < area.y {
+            Position::new(self.x.min(area.x + area.width), area.y)
+        } else {
+            Position::new(
+                self.x.min(area.x + area.width),
+                self.y.min(area.y + area.height - 1),
+            )
         }
     }
 }

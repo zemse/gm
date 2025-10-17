@@ -9,12 +9,12 @@ use ratatui::{
 use crate::{
     act::Act,
     button::ButtonResult,
-    extensions::{EventExt, RectExt, ThemedWidget},
+    extensions::{RectExt, ThemedWidget},
     popup::PopupWidget,
     thematize::Thematize,
 };
 
-use super::{button::Button, popup::Popup, text_scroll::TextScroll};
+use super::{button::Button, popup::Popup, text_interactive::TextInteractive};
 
 struct Areas {
     text_area: Rect,
@@ -30,7 +30,7 @@ pub enum ConfirmResult {
 #[derive(Debug)]
 pub struct ConfirmPopup {
     popup: Popup,
-    text: TextScroll,
+    text: TextInteractive,
     confirm_button: Button,
     cancel_button: Button,
     is_confirm_focused: bool,
@@ -63,7 +63,7 @@ impl ConfirmPopup {
     ) -> Self {
         Self {
             popup: Popup::default().with_title(title),
-            text: TextScroll::new(text).with_break_words(true),
+            text: TextInteractive::default().with_text(text),
             confirm_button: Button::new(confirm_button_label).with_success_kind(true),
             cancel_button: Button::new(cancel_button_label).with_success_kind(true),
             is_confirm_focused: initial_cursor_on_confirm,
@@ -71,16 +71,16 @@ impl ConfirmPopup {
         }
     }
 
-    pub fn text(&self) -> &String {
-        &self.text.text
+    pub fn text(&self) -> &str {
+        self.text.text()
     }
 
-    pub fn into_text_scroll(&mut self) -> TextScroll {
+    pub fn into_text_scroll(&mut self) -> TextInteractive {
         mem::take(&mut self.text)
     }
 
-    pub fn text_mut(&mut self) -> &mut String {
-        &mut self.text.text
+    pub fn set_text(&mut self, text: String, scroll_to_top: bool) {
+        self.text.set_text(text, scroll_to_top);
     }
 
     pub fn handle_event<A>(
@@ -102,12 +102,12 @@ impl ConfirmPopup {
 
             if let Some(input_event) = input_event {
                 self.text
-                    .handle_event(input_event.key_event(), areas.text_area);
+                    .handle_event(Some(input_event), areas.text_area, actions);
 
                 if let Some(button_event) = self.confirm_button.handle_event(
                     Some(input_event),
                     areas.confirm_button_area,
-                    self.is_confirm_focused,
+                    !self.text.is_focused() && self.is_confirm_focused,
                 ) {
                     match button_event {
                         ButtonResult::Pressed => {
@@ -125,7 +125,7 @@ impl ConfirmPopup {
                 if let Some(button_event) = self.cancel_button.handle_event(
                     Some(input_event),
                     areas.cancel_button_area,
-                    !self.is_confirm_focused,
+                    !self.text.is_focused() && !self.is_confirm_focused,
                 ) {
                     match button_event {
                         ButtonResult::Pressed => {
@@ -150,8 +150,10 @@ impl ConfirmPopup {
                                 self.is_confirm_focused = true;
                             }
                             KeyCode::Esc => {
-                                result = Some(ConfirmResult::Canceled);
-                                self.close();
+                                if !actions.is_esc_ignored() {
+                                    result = Some(ConfirmResult::Canceled);
+                                    self.close();
+                                }
                             }
                             _ => {}
                         }

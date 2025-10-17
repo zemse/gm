@@ -133,6 +133,15 @@ pub enum Error {
     #[error(transparent)]
     IoError(#[from] std::io::Error),
 
+    #[error("Arboard initialization failed. (Error: {0})")]
+    ArboardInitFailed(arboard::Error),
+
+    #[error("Failed to copy text to clipboard. (Error: {0})")]
+    ArboardSetText(arboard::Error),
+
+    #[error("Failed to open the resource. (Error: {0})")]
+    OpenThat(io::Error),
+
     #[error(transparent)]
     ParseFloatError(Box<std::num::ParseFloatError>),
     #[error(transparent)]

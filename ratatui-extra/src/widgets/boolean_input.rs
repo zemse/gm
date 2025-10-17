@@ -102,7 +102,7 @@ impl BooleanInput {
                 Span::raw(part_1)
                     .style(theme.style())
                     .render(draw_area, buf);
-                draw_area.consume_width(8);
+                draw_area = draw_area.margin_left(8);
 
                 Span::raw("On").style(theme.cursor()).render(draw_area, buf);
             } else {
@@ -110,7 +110,7 @@ impl BooleanInput {
                 Span::raw(part_1)
                     .style(theme.cursor_cancelled())
                     .render(inner_area, buf);
-                draw_area.consume_width(4);
+                draw_area = draw_area.margin_left(4);
 
                 Span::raw("◉── On")
                     .style(theme.style())

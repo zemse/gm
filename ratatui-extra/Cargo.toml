@@ -11,8 +11,8 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 console = { workspace = true }
+url = { workspace = true }
 
 gm-utils = { path = "../utils" }
 
 chrono = "0.4.41"
-textwrap = "0.16.2"
