@@ -7,6 +7,7 @@ pub mod filter_select;
 pub mod filter_select_popup;
 pub mod form;
 pub mod input_box;
+pub mod line_chart;
 pub mod popup;
 pub mod scroll_bar;
 pub mod select;

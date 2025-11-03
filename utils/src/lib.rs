@@ -9,6 +9,7 @@ pub mod disk_storage;
 pub mod erc20;
 pub mod error;
 pub mod etherscan;
+pub mod historic_balances;
 pub mod inquire;
 pub mod log;
 pub mod network;
