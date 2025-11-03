@@ -1,5 +1,5 @@
 use crate::app::SharedState;
-use crate::pages::sign_tx_popup::SignTxPopup;
+use crate::pages::sign_tx_popup::{SignTxEvent, SignTxPopup};
 use crate::post_handle_event::PostHandleEventActions;
 use crate::traits::Component;
 use crate::widgets::{address_book_popup, assets_popup, AddressBookPopup, AssetsPopup};
@@ -79,7 +79,7 @@ impl AssetTransferPage {
             asset: None,
             address_book_popup: address_book_popup(),
             asset_popup: assets_popup(),
-            tx_popup: SignTxPopup::default(),
+            tx_popup: SignTxPopup::Closed,
         })
     }
 }
@@ -118,8 +118,8 @@ impl Component for AssetTransferPage {
         event: &AppEvent,
         area: Rect,
         popup_area: Rect,
-        tr: &mpsc::Sender<AppEvent>,
-        sd: &CancellationToken,
+        _tr: &mpsc::Sender<AppEvent>,
+        _sd: &CancellationToken,
         ss: &SharedState,
     ) -> Result<PostHandleEventActions> {
         let mut actions = PostHandleEventActions::default();
@@ -152,20 +152,22 @@ impl Component for AssetTransferPage {
                 self.form.advance_cursor();
             }
         } else if self.tx_popup.is_open() {
-            let is_confirmed = self.tx_popup.is_confirmed();
-            let r = self.tx_popup.handle_event(
-                (event, area, tr, sd, ss),
-                |_| Ok(()),
-                |_| Ok(()),
-                |_, _, _| Ok(()),
-                || Ok(()),
-                || {
-                    if is_confirmed {
-                        actions.page_pop();
+            let r = self.tx_popup.handle_event(event, popup_area, |tx_result| {
+                match tx_result {
+                    SignTxEvent::Confirmed(_) => {
+                        actions.refresh_assets();
                     }
-                    Ok(())
-                },
-            )?;
+                    SignTxEvent::Cancelled => {
+                        actions.ignore_esc();
+                    }
+                    SignTxEvent::Done => {
+                        actions.page_pop();
+                        actions.ignore_esc();
+                    }
+                    _ => {}
+                }
+                Ok(())
+            })?;
             actions.merge(r);
         } else {
             // Handle form events
@@ -216,17 +218,15 @@ impl Component for AssetTransferPage {
                             ),
                         };
 
-                        if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
-                            self.tx_popup.set_tx_req(
-                                Network::from_name(&asset.r#type.network)?,
-                                TransactionRequest::default()
-                                    .to(to)
-                                    .value(value)
-                                    .input(calldata.into()),
-                            );
-                        }
-
-                        self.tx_popup.open();
+                        // if self.tx_popup.is_not_sent() || self.tx_popup.is_confirmed() {
+                        self.tx_popup = SignTxPopup::new(
+                            ss.config.get_current_account()?,
+                            Network::from_name(&asset.r#type.network)?,
+                            TransactionRequest::default()
+                                .to(to)
+                                .value(value)
+                                .input(calldata.into()),
+                        );
                     }
                 }
             }

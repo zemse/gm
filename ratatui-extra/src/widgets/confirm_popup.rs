@@ -1,5 +1,3 @@
-use std::mem;
-
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{Event, KeyCode, KeyEventKind},
@@ -11,6 +9,7 @@ use crate::{
     button::ButtonResult,
     extensions::{RectExt, ThemedWidget},
     popup::PopupWidget,
+    text_popup::TextPopup,
     thematize::Thematize,
 };
 
@@ -27,22 +26,30 @@ pub enum ConfirmResult {
     Canceled,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ConfirmPopup {
     popup: Popup,
     text: TextInteractive,
     confirm_button: Button,
     cancel_button: Button,
-    is_confirm_focused: bool,
+    pub is_confirm_focused: bool,
     initial_cursor_on_confirm: bool,
 }
 
 impl PopupWidget for ConfirmPopup {
-    fn get_popup(&self) -> &Popup {
+    fn get_base_popup(&self) -> &Popup {
         &self.popup
     }
 
-    fn get_popup_mut(&mut self) -> &mut Popup {
+    fn get_base_popup_mut(&mut self) -> &mut Popup {
+        &mut self.popup
+    }
+
+    fn get_popup_inner(&self) -> &dyn PopupWidget {
+        &self.popup
+    }
+
+    fn get_popup_inner_mut(&mut self) -> &mut dyn PopupWidget {
         &mut self.popup
     }
 
@@ -55,15 +62,13 @@ impl PopupWidget for ConfirmPopup {
 
 impl ConfirmPopup {
     pub fn new(
-        title: &'static str,
-        text: String,
         confirm_button_label: &'static str,
         cancel_button_label: &'static str,
         initial_cursor_on_confirm: bool,
     ) -> Self {
         Self {
-            popup: Popup::default().with_title(title),
-            text: TextInteractive::default().with_text(text),
+            popup: Popup::default(),
+            text: TextInteractive::default(),
             confirm_button: Button::new(confirm_button_label).with_success_kind(true),
             cancel_button: Button::new(cancel_button_label).with_success_kind(true),
             is_confirm_focused: initial_cursor_on_confirm,
@@ -71,12 +76,25 @@ impl ConfirmPopup {
         }
     }
 
-    pub fn text(&self) -> &str {
+    pub fn with_text(mut self, text: String) -> Self {
+        self.text.set_text(text, false);
+        self
+    }
+
+    pub fn text_ref(&self) -> &str {
         self.text.text()
     }
 
-    pub fn into_text_scroll(&mut self) -> TextInteractive {
-        mem::take(&mut self.text)
+    pub fn into_text(self) -> TextInteractive {
+        self.text
+    }
+
+    pub fn into_text_popup(self) -> TextPopup {
+        TextPopup {
+            popup: self.popup,
+            text: self.text,
+            note: None,
+        }
     }
 
     pub fn set_text(&mut self, text: String, scroll_to_top: bool) {

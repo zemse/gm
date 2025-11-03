@@ -191,16 +191,12 @@ impl NetworkCreatePage {
             })?,
             network_index,
             tokens: network.tokens,
-            remove_popup: ConfirmPopup::new(
-                "Remove Network",
-                format!(
+            remove_popup: ConfirmPopup::new("Remove", "Cancel", true)
+                .with_title("Remove Network")
+                .with_text(format!(
                     "Are you sure you want to remove the network '{}'?",
                     network.name
-                ),
-                "Remove",
-                "Cancel",
-                true,
-            ),
+                )),
         })
     }
 

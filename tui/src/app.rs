@@ -660,9 +660,6 @@ impl App {
                 self.fatal_error_popup.set_text(error.to_string(), true);
             }
 
-            // Transaction API
-            AppEvent::TxError(error) => self.fatal_error_popup.set_text(error.clone(), true),
-
             AppEvent::WalletConnectError(_, error) => {
                 self.fatal_error_popup.set_text(error.clone(), true);
             }

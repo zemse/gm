@@ -37,7 +37,7 @@ use crate::{
     app::SharedState,
     pages::{
         sign_popup::{SignPopup, SignPopupEvent},
-        sign_tx_popup::SignTxPopup,
+        sign_tx_popup::{SignTxEvent, SignTxPopup},
         sign_typed_data_popup::SignTypedDataPopup,
     },
     post_handle_event::PostHandleEventActions,
@@ -169,6 +169,8 @@ pub struct WalletConnectPage {
     tr_2: Option<Sender<WcEvent>>,
 }
 
+const EXIT_TEXT: &str =  "The WalletConnect session will be ended if you go back. You can also press ESC to go back. If you want to continue session you can choose to wait.";
+
 impl WalletConnectPage {
     pub fn new() -> crate::Result<Self> {
         Ok(Self {
@@ -178,17 +180,12 @@ impl WalletConnectPage {
             select: Select::default().with_empty_text("Connected! Waiting for session requests"),
 
             status: WalletConnectStatus::Idle,
-            confirm_popup: ConfirmPopup::new("WalletConnect", String::new(), "Approve", "Reject", true),
-            exit_popup: ConfirmPopup::new(
-                "Warning",
-                "The WalletConnect session will be ended if you go back. You can also press ESC to go back. If you want to continue session you can choose to wait."
-                    .to_string(),
-                "Wait",
-                "End",
-                false,
-            ),
-            tx_popup: SignTxPopup::default(),
-            sign_popup: SignPopup::default(),
+            confirm_popup: ConfirmPopup::new("Approve", "Reject", true).with_title("WalletConnect"),
+            exit_popup: ConfirmPopup::new("Wait", "End", false)
+                .with_title("Warning")
+                .with_text(EXIT_TEXT.to_string()),
+            tx_popup: SignTxPopup::Closed,
+            sign_popup: SignPopup::Closed,
             sign_typed_data_popup: SignTypedDataPopup::default(),
             watch_thread: None,
             send_thread: None,
@@ -200,7 +197,7 @@ impl WalletConnectPage {
         self.form.set_text(FormItem::UriInput, uri.to_string());
     }
 
-    fn open_request(&mut self) -> crate::Result<()> {
+    fn open_request(&mut self, shared_state: &SharedState) -> crate::Result<()> {
         let req = self.select.get_focussed_item()?;
 
         let req = req
@@ -217,7 +214,9 @@ impl WalletConnectPage {
         match &req.request.params {
             SessionRequestData::EthSendTransaction(tx_req) => {
                 let network = Network::from_chain_id(chain_id)?;
-                self.tx_popup.set_tx_req(
+                let account = shared_state.config.get_current_account()?;
+                self.tx_popup = SignTxPopup::new(
+                    tx_req.from.unwrap_or(account),
                     network,
                     TransactionRequest {
                         from: tx_req.from,
@@ -230,6 +229,7 @@ impl WalletConnectPage {
                         ..Default::default()
                     },
                 );
+
                 self.tx_popup.open();
             }
             SessionRequestData::PersonalSign { message, .. } => {
@@ -288,7 +288,7 @@ impl Component for WalletConnectPage {
         popup_area: Rect,
         tr: &mpsc::Sender<AppEvent>,
         sd: &CancellationToken,
-        ss: &SharedState,
+        shared_state: &SharedState,
     ) -> crate::Result<PostHandleEventActions> {
         let mut actions = PostHandleEventActions::default();
 
@@ -314,7 +314,7 @@ impl Component for WalletConnectPage {
                         self.select.set_focus_to_last_item();
 
                         if !self.tx_popup.is_open() && !self.sign_popup.is_open() {
-                            self.open_request()?;
+                            self.open_request(shared_state)?;
                         }
                     }
                     // TODO handle session delete
@@ -372,7 +372,7 @@ impl Component for WalletConnectPage {
                     ));
 
                     {
-                        let addr = ss.try_current_account()?;
+                        let addr = shared_state.try_current_account()?;
                         let tr = tr.clone();
                         let shutdown_signal = sd.clone();
                         let pairing_clone = pairing.clone();
@@ -421,7 +421,7 @@ impl Component for WalletConnectPage {
                     {
                         let (tr_2, rc_2) = mpsc::channel::<WcEvent>();
                         self.tr_2 = Some(tr_2);
-                        let addr = ss.try_current_account()?;
+                        let addr = shared_state.try_current_account()?;
                         let tr = tr.clone();
                         let shutdown_signal = sd.clone();
                         self.send_thread = Some(tokio::spawn(async move {
@@ -462,54 +462,56 @@ impl Component for WalletConnectPage {
                 None => {}
             }
         } else if self.tx_popup.is_open() {
-            let r = self.tx_popup.handle_event(
-                (event, area, tr, sd, ss),
-                |tx_hash| {
-                    let (req, tr_2) = get_req_tr_2()?;
-                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
-                        WcData::SessionRequestResponse(Value::String(hex::encode_prefixed(
-                            tx_hash,
-                        ))),
-                        None,
-                    ))))?;
-                    remove_current_request = true;
-                    Ok(())
-                },
-                |_| Ok(()),
-                |message, code, data| {
-                    let (req, tr_2) = get_req_tr_2()?;
-                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
-                        WcData::Error {
-                            message,
-                            code,
-                            data,
-                        },
-                        Some(IrnTag::SessionRequestResponse),
-                    ))))?;
-                    remove_current_request_2 = true;
+            let r = self.tx_popup.handle_event(event, area, |tx_result| {
+                match tx_result {
+                    SignTxEvent::Cancelled => {
+                        let (req, tr_2) = get_req_tr_2()?;
+                        tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                            WcData::Error {
+                                message: "User denied tx signing".to_string(),
+                                code: 5000,
+                                data: None,
+                            },
+                            Some(IrnTag::SessionRequestResponse),
+                        ))))?;
+                        remove_current_request_3 = true;
+                    }
+                    SignTxEvent::Broadcasted(tx_hash) => {
+                        let (req, tr_2) = get_req_tr_2()?;
+                        tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                            WcData::SessionRequestResponse(Value::String(hex::encode_prefixed(
+                                tx_hash,
+                            ))),
+                            None,
+                        ))))?;
+                        remove_current_request = true;
+                    }
+                    SignTxEvent::Error { code, message } => {
+                        let (req, tr_2) = get_req_tr_2()?;
+                        tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                            WcData::Error {
+                                message,
+                                code,
+                                data: None,
+                            },
+                            Some(IrnTag::SessionRequestResponse),
+                        ))))?;
+                        remove_current_request_2 = true;
+                    }
+                    SignTxEvent::Built
+                    | SignTxEvent::Signed
+                    | SignTxEvent::Confirmed(_)
+                    | SignTxEvent::Failed(_)
+                    | SignTxEvent::Done => {}
+                }
 
-                    Ok(())
-                },
-                || {
-                    let (req, tr_2) = get_req_tr_2()?;
-                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
-                        WcData::Error {
-                            message: "User denied tx signing".to_string(),
-                            code: 5000,
-                            data: None,
-                        },
-                        Some(IrnTag::SessionRequestResponse),
-                    ))))?;
-                    remove_current_request_3 = true;
-                    Ok(())
-                },
-                || Ok(()),
-            )?;
+                Ok(())
+            })?;
             actions.merge(r);
         } else if self.sign_popup.is_open() {
             if let Some(sign_popup_event) = self
                 .sign_popup
-                .handle_event((event, area, tr, ss), &mut actions)?
+                .handle_event((event, area, tr, shared_state), &mut actions)?
             {
                 match sign_popup_event {
                     SignPopupEvent::Signed(_, signature) => {
@@ -539,7 +541,7 @@ impl Component for WalletConnectPage {
             }
         } else if self.sign_typed_data_popup.is_open() {
             let r = self.sign_typed_data_popup.handle_event(
-                (event, area, tr, ss),
+                (event, area, tr, shared_state),
                 |signature| {
                     let (req, tr_2) = get_req_tr_2()?;
                     tr_2.send(WcEvent::Message(Box::new(req.create_response(
@@ -584,7 +586,7 @@ impl Component for WalletConnectPage {
             )? {
                 if item == FormItem::ConnectButton {
                     let uri_input = self.form.get_text(FormItem::UriInput).to_string();
-                    let current_account = ss.try_current_account()?;
+                    let current_account = shared_state.try_current_account()?;
                     let tr = tr.clone();
 
                     let client_seed = [123u8; 32];
@@ -631,7 +633,7 @@ impl Component for WalletConnectPage {
             if let Some(SelectEvent::Select(_)) =
                 self.select.handle_event(event.input_event(), area)?
             {
-                self.open_request()?;
+                self.open_request(shared_state)?;
             }
         }
 

@@ -6,7 +6,7 @@ use ratatui::{
     buffer::Buffer,
     crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind},
     layout::{Constraint, Layout, Position, Rect},
-    style::{Modifier, Style},
+    style::{Modifier, Style, Styled},
     widgets::Widget,
 };
 use std::borrow::Cow;
@@ -404,7 +404,7 @@ impl ThemedWidget for TextInteractive {
 
         for (i, (line, _)) in lines.iter().enumerate() {
             let line_area = text_area.margin_top(i as u16);
-            line.render(line_area, buf);
+            line.set_style(theme.style_dim()).render(line_area, buf);
         }
 
         Self::segments_iter(segments, text_area, |segment, span_area| {

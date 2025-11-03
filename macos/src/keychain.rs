@@ -1,5 +1,7 @@
 use alloy::{
+    consensus::{SignableTransaction, Signed, TxEip1559},
     hex,
+    network::TxSignerSync,
     primitives::Address,
     signers::{
         k256::{ecdsa::SigningKey, FieldBytes},
@@ -104,6 +106,24 @@ pub async fn sign_message_async(address: Address, data: Vec<u8>) -> crate::Resul
         .sign_message(&data)
         .await
         .map_err(crate::Error::MessageSigningFailed)
+}
+
+pub async fn sign_tx_async(
+    address: Address,
+    mut tx: TxEip1559,
+) -> crate::Result<Signed<TxEip1559>> {
+    let mut guard = Guard::default();
+
+    guard.authenticate(&format!("use {address:#} to sign a transaction"))?;
+
+    let signer = guard.get_secret_internal(address)?.into_alloy_signer()?;
+
+    let signature = signer
+        .sign_transaction_sync(&mut tx)
+        .map_err(crate::Error::TxSigningFailed)?;
+    let tx_signed = SignableTransaction::into_signed(tx, signature);
+
+    Ok(tx_signed)
 }
 
 /// Returns the default keychain.

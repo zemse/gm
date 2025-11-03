@@ -1,6 +1,6 @@
 use std::io;
 
-use alloy::{primitives::Address, rpc::types::TransactionRequest};
+use alloy::primitives::Address;
 use serde_json::Value;
 use walletconnect_sdk::wc_message::WcMessage;
 
@@ -49,12 +49,6 @@ pub enum Error {
 
     #[error("EIP-712 Typed Data is missing field: {0}.")]
     TypedDataMissingField(String),
-
-    #[error("Transaction type is not specified in the request: {0:?}.")]
-    TxTypeNotSpecified(Box<TransactionRequest>),
-
-    #[error("Transaction type is not EIP-1559.")]
-    TxTypeIsNotEip1559,
 
     #[error("WalletConnect Session request not found at index {0}, num requests: {1}.")]
     SessionRequestNotFound(usize, usize),

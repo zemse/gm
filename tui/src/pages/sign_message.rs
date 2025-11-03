@@ -4,10 +4,11 @@ use alloy::{hex, primitives::Address, signers::Signature};
 use gm_ratatui_extra::{
     button::Button,
     confirm_popup::{ConfirmPopup, ConfirmResult},
-    extensions::RenderTextWrapped,
+    extensions::ThemedWidget,
     form::{Form, FormEvent, FormItemIndex, FormWidget},
     input_box::InputBox,
     popup::PopupWidget,
+    text_interactive::TextInteractive,
 };
 use gm_utils::etherscan::publish_signature_to_etherscan;
 use ratatui::{buffer::Buffer, layout::Rect};
@@ -44,16 +45,14 @@ pub enum SignMessagePage {
         address: Address,
         message: String,
         signature: Signature,
+        text: TextInteractive,
         confirm_popup: ConfirmPopup,
         publish_thread: Option<JoinHandle<()>>,
         result_receiver: Option<oneshot::Receiver<gm_utils::Result<String>>>,
     },
 
     /// Step 3 - Show result of publishing
-    Result {
-        signature: Signature,
-        etherscan_url: Option<String>,
-    },
+    Result { text: TextInteractive },
 }
 
 impl FormItemIndex for FormItem {
@@ -80,11 +79,14 @@ impl TryFrom<FormItem> for FormWidget {
     }
 }
 
+const PUBLISH_ETHERSCAN_TEXT: &str =
+    "Your signature will be published to etherscan for free and a sharable link will be generated.";
+
 impl SignMessagePage {
     pub fn new() -> crate::Result<Self> {
         Ok(Self::SignForm {
             form: Form::init(|_| Ok(()))?,
-            sign_popup: SignPopup::default(),
+            sign_popup: SignPopup::Closed,
         })
     }
 
@@ -98,13 +100,14 @@ impl SignMessagePage {
             address,
             message,
             signature,
-            confirm_popup: ConfirmPopup::new(
-                "Publish to Etherscan?",
-                "Your signature will be published to etherscan for free and a sharable link will be generated.".to_string(),
-                "Publish",
-                "Skip",
-                true,
-            ).with_open(true),
+            text: TextInteractive::default().with_text(format!(
+                "Signature: {}",
+                hex::encode_prefixed(signature.as_bytes()),
+            )),
+            confirm_popup: ConfirmPopup::new("Publish", "Skip", true)
+                .with_title("Publish to Etherscan?")
+                .with_text(PUBLISH_ETHERSCAN_TEXT.to_string())
+                .with_open(true),
             publish_thread: None,
             result_receiver: None,
         }
@@ -170,10 +173,13 @@ impl Component for SignMessagePage {
                 address,
                 message,
                 signature,
+                text,
                 confirm_popup,
                 publish_thread,
                 result_receiver,
             } => {
+                text.handle_event(event.input_event(), area, &mut actions);
+
                 if let Some(ConfirmResult::Confirmed) =
                     confirm_popup.handle_event(event.input_event(), popup_area, &mut actions)?
                 {
@@ -190,30 +196,29 @@ impl Component for SignMessagePage {
                 }
 
                 if let Some(rc) = result_receiver {
-                    if let Ok(result) = rc.try_recv() {
-                        match result {
-                            Ok(url) => {
-                                let _ = open::that(&url);
-                                *self = Self::Result {
-                                    signature: *signature,
-                                    etherscan_url: Some(url),
-                                };
-                            }
-                            Err(err) => {
-                                *self = Self::Result {
-                                    signature: *signature,
-                                    etherscan_url: None,
-                                };
-                                return Err(err.into());
-                            }
+                    if let Ok(etherscan_url) = rc.try_recv() {
+                        let mut lines = vec![format!(
+                            "Signature: {}",
+                            hex::encode_prefixed(signature.as_bytes())
+                        )];
+
+                        lines.push(String::new());
+
+                        if let Ok(etherscan_url) = etherscan_url {
+                            lines.push(format!("Etherscan URL: {etherscan_url}"));
+                        } else {
+                            lines.push("Failed to publish to Etherscan.".to_string());
+                        }
+
+                        *self = Self::Result {
+                            text: TextInteractive::default().with_text(lines.join("\n")),
                         }
                     }
                 }
             }
-
-            // No need to handle anything
-            // TODO handle copy events
-            Self::Result { .. } => {}
+            Self::Result { text } => {
+                text.handle_event(event.input_event(), area, &mut actions);
+            }
         }
 
         Ok(actions)
@@ -236,33 +241,16 @@ impl Component for SignMessagePage {
                 sign_popup.render(popup_area, buf, &ss.theme);
             }
             Self::PublishToEtherscan {
-                signature,
+                text,
                 confirm_popup,
                 ..
             } => {
-                format!("Signature: {}", hex::encode_prefixed(signature.as_bytes()))
-                    .render_wrapped(area, buf);
+                text.render(area, buf, &ss.theme);
 
                 confirm_popup.render(popup_area, buf, &ss.theme);
             }
-            Self::Result {
-                signature,
-                etherscan_url,
-            } => {
-                let mut lines = vec![format!(
-                    "Signature: {}",
-                    hex::encode_prefixed(signature.as_bytes())
-                )];
-
-                lines.push(String::new());
-
-                if let Some(url) = etherscan_url {
-                    lines.push(format!("Etherscan URL: {url}"));
-                } else {
-                    lines.push("Failed to publish to Etherscan.".to_string());
-                }
-
-                lines.render_wrapped(area, buf);
+            Self::Result { text } => {
+                text.render(area, buf, &ss.theme);
             }
         }
 

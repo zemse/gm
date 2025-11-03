@@ -1,13 +1,11 @@
 use std::{collections::HashMap, fmt::Display};
 
-use alloy::{
-    primitives::Address,
-    providers::{Provider, ProviderBuilder},
-};
+use alloy::{primitives::Address, providers::ProviderBuilder};
 use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferMany, serde_as, skip_serializing_none, OneOrMany};
 
 use crate::{
+    alloy::AlloyProvider,
     config::Config,
     disk_storage::{DiskStorageInterface, FileFormat},
 };
@@ -102,7 +100,7 @@ impl Network {
             .map(|explorer_url| explorer_url.replace("{}", tx_hash))
     }
 
-    pub fn get_provider(&self) -> crate::Result<impl Provider> {
+    pub fn get_provider(&self) -> crate::Result<AlloyProvider> {
         let rpc_url = self.get_rpc()?;
 
         rpc_url

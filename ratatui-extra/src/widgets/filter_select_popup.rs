@@ -24,11 +24,19 @@ impl<Item: Display + PartialEq> Default for FilterSelectPopup<Item> {
 }
 
 impl<Item: Display + PartialEq> PopupWidget for FilterSelectPopup<Item> {
-    fn get_popup(&self) -> &Popup {
+    fn get_base_popup(&self) -> &Popup {
         &self.popup
     }
 
-    fn get_popup_mut(&mut self) -> &mut Popup {
+    fn get_base_popup_mut(&mut self) -> &mut Popup {
+        &mut self.popup
+    }
+
+    fn get_popup_inner(&self) -> &dyn PopupWidget {
+        &self.popup
+    }
+
+    fn get_popup_inner_mut(&mut self) -> &mut dyn PopupWidget {
         &mut self.popup
     }
 }
@@ -82,10 +90,12 @@ impl<Item: Display + PartialEq> FilterSelectPopup<Item> {
         if self.is_open() {
             self.popup.handle_event(input_event, actions);
 
+            let body_area = self.body_area(popup_area);
             if let Some(SelectEvent::Select(item)) =
-                self.filter_select.handle_event(input_event, popup_area)?
+                self.filter_select.handle_event(input_event, body_area)?
             {
                 result = Some(item);
+                self.popup.close();
             }
 
             actions.ignore_esc();
@@ -103,9 +113,8 @@ impl<Item: Display + PartialEq> ThemedWidget for FilterSelectPopup<Item> {
         if self.is_open() {
             self.popup.render(popup_area, buf, theme);
 
-            // let theme = theme.popup();
-            self.filter_select
-                .render(self.body_area(popup_area), buf, theme);
+            let body_area = self.body_area(popup_area);
+            self.filter_select.render(body_area, buf, theme);
         }
     }
 }

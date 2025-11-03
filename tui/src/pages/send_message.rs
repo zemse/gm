@@ -76,7 +76,7 @@ impl SendMessagePage {
             form: Form::init(|_| Ok(()))?,
             address_book_popup: address_book_popup(),
             networks_popup: networks_popup(),
-            tx_popup: SignTxPopup::default(),
+            tx_popup: SignTxPopup::Closed,
         })
     }
 }
@@ -106,8 +106,8 @@ impl Component for SendMessagePage {
         event: &AppEvent,
         area: Rect,
         popup_area: Rect,
-        tr: &mpsc::Sender<AppEvent>,
-        sd: &CancellationToken,
+        _tr: &mpsc::Sender<AppEvent>,
+        _sd: &CancellationToken,
         ss: &SharedState,
     ) -> Result<PostHandleEventActions> {
         let mut actions = PostHandleEventActions::default();
@@ -133,14 +133,7 @@ impl Component for SendMessagePage {
                 self.form.advance_cursor();
             }
         } else if self.tx_popup.is_open() {
-            let r = self.tx_popup.handle_event(
-                (event, area, tr, sd, ss),
-                |_| Ok(()),
-                |_| Ok(()),
-                |_, _, _| Ok(()),
-                || Ok(()),
-                || Ok(()),
-            )?;
+            let r = self.tx_popup.handle_event(event, popup_area, |_| Ok(()))?;
             actions.merge(r);
         } else {
             // Handle form events
@@ -173,7 +166,8 @@ impl Component for SendMessagePage {
                         return Err(crate::Error::CannotBeEmpty("Message".to_string()));
                     }
 
-                    self.tx_popup.set_tx_req(
+                    self.tx_popup = SignTxPopup::new(
+                        ss.config.get_current_account()?,
                         Network::from_name(&network_name)?,
                         TransactionRequest::default()
                             .to(to.parse_as_address()?)

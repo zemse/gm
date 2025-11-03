@@ -14,7 +14,7 @@ pub enum ButtonResult {
     HoverIn(bool),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Button {
     pub hover_focus: bool,
     pub is_success: bool,

@@ -78,11 +78,11 @@ impl Default for SignTypedDataPopup {
 }
 
 impl PopupWidget for SignTypedDataPopup {
-    fn get_popup(&self) -> &Popup {
+    fn get_popup_inner(&self) -> &dyn PopupWidget {
         &self.popup
     }
 
-    fn get_popup_mut(&mut self) -> &mut Popup {
+    fn get_popup_inner_mut(&mut self) -> &mut dyn PopupWidget {
         &mut self.popup
     }
 

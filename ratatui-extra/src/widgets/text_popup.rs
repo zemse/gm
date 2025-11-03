@@ -12,6 +12,10 @@ use crate::{
     thematize::Thematize,
 };
 
+pub enum TextPopupEvent {
+    Closed,
+}
+
 struct Areas {
     text_area: Rect,
     note_area: Rect,
@@ -22,17 +26,25 @@ struct Areas {
 /// empty it is closed.
 #[derive(Debug, Default)]
 pub struct TextPopup {
-    popup: Popup,
-    text: TextInteractive,
-    note: Option<TextInteractive>,
+    pub(crate) popup: Popup,
+    pub(crate) text: TextInteractive,
+    pub(crate) note: Option<TextInteractive>,
 }
 
 impl PopupWidget for TextPopup {
-    fn get_popup(&self) -> &Popup {
+    fn get_base_popup(&self) -> &Popup {
         &self.popup
     }
 
-    fn get_popup_mut(&mut self) -> &mut Popup {
+    fn get_base_popup_mut(&mut self) -> &mut Popup {
+        &mut self.popup
+    }
+
+    fn get_popup_inner(&self) -> &dyn PopupWidget {
+        &self.popup
+    }
+
+    fn get_popup_inner_mut(&mut self) -> &mut dyn PopupWidget {
         &mut self.popup
     }
 }
@@ -48,6 +60,10 @@ impl TextPopup {
         self
     }
 
+    pub fn text(&self) -> &str {
+        self.text.text()
+    }
+
     pub fn set_text(&mut self, text: String, scroll_to_top: bool) {
         if text.is_empty() {
             self.popup.close();
@@ -58,10 +74,17 @@ impl TextPopup {
         self.text.set_text(text, scroll_to_top);
     }
 
-    pub fn handle_event<A>(&mut self, event: Option<&Event>, popup_area: Rect, actions: &mut A)
+    pub fn handle_event<A>(
+        &mut self,
+        event: Option<&Event>,
+        popup_area: Rect,
+        actions: &mut A,
+    ) -> Option<TextPopupEvent>
     where
         A: Act,
     {
+        let mut text_popup_event = None;
+
         if let Some(event) = event {
             let Areas {
                 text_area,
@@ -78,12 +101,15 @@ impl TextPopup {
                 && (event.is_key_pressed(KeyCode::Esc) || event.is_key_pressed(KeyCode::Enter))
             {
                 self.close();
+                text_popup_event = Some(TextPopupEvent::Closed);
             }
         }
 
         if self.is_open() {
             actions.ignore_esc();
         }
+
+        text_popup_event
     }
 
     fn get_areas(&self, popup_area: Rect) -> Areas {

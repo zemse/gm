@@ -1,7 +1,20 @@
 use alloy::{
-    primitives::Address,
-    providers::{Provider, ProviderBuilder},
+    consensus::{Signed, TxEip1559, TxEnvelope},
+    primitives::{Address, Bytes},
+    providers::{
+        fillers::{BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller},
+        Identity, Provider, ProviderBuilder,
+    },
+    rlp::{self, BytesMut, Encodable},
 };
+
+pub type AlloyProvider = FillProvider<
+    JoinFill<
+        Identity,
+        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+    >,
+    alloy::providers::RootProvider,
+>;
 
 pub trait StringExt {
     fn parse_as_address(&self) -> crate::Result<Address>;
@@ -31,5 +44,19 @@ impl StringExt for String {
         self.parse()
             .map_err(|e| crate::Error::UrlParsingFailed(self.to_string(), e))
             .map(|rpc_url| ProviderBuilder::new().connect_http(rpc_url))
+    }
+}
+
+pub trait TxExt {
+    fn to_raw(self) -> crate::Result<Bytes>;
+}
+
+impl TxExt for Signed<TxEip1559> {
+    // TODO upstream this to alloy
+    fn to_raw(self) -> crate::Result<Bytes> {
+        let mut out = BytesMut::new();
+        let tx_typed = TxEnvelope::Eip1559(self);
+        tx_typed.encode(&mut out);
+        Ok(rlp::decode_exact::<Bytes>(out)?)
     }
 }

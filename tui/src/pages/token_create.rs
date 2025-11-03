@@ -101,13 +101,9 @@ impl TokenCreatePage {
                 Ok(())
             })?,
             token_index,
-            remove_popup: ConfirmPopup::new(
-                "Remove Token",
-                "Are you sure you want to remove this token?".to_string(),
-                "Remove",
-                "Cancel",
-                true,
-            ),
+            remove_popup: ConfirmPopup::new("Remove", "Cancel", true)
+                .with_title("Remove Token")
+                .with_text("Are you sure you want to remove this token?".to_string()),
             token,
             network,
             network_index,

@@ -32,6 +32,8 @@ pub struct PostHandleEventActions {
     copy_to_clipboard: Option<(String, Option<Position>)>,
     /// Open URL request
     open_url: Option<(Url, Option<Position>)>,
+    /// Error
+    error: Option<crate::Error>,
 }
 
 impl Act for PostHandleEventActions {
@@ -47,6 +49,7 @@ impl Act for PostHandleEventActions {
         self.refresh_assets |= other.refresh_assets;
         self.copy_to_clipboard = other.copy_to_clipboard.or(self.copy_to_clipboard.take());
         self.open_url = other.open_url.or(self.open_url.take());
+        self.error = other.error.or(self.error.take());
     }
 
     fn ignore_esc(&mut self) {
@@ -110,6 +113,11 @@ impl PostHandleEventActions {
         self.refresh_assets = true;
     }
 
+    /// Sets an error to be displayed by the App.
+    pub fn set_error(&mut self, error: crate::Error) {
+        self.error = Some(error);
+    }
+
     /// Getter for ignore_esc, if this is true the App should not
     /// handle the [ESC] key.
     pub fn get_ignore_esc(&self) -> bool {
@@ -160,5 +168,9 @@ impl PostHandleEventActions {
 
     pub fn take_url_request(&mut self) -> Option<(Url, Option<Position>)> {
         self.open_url.take()
+    }
+
+    pub fn take_error(&mut self) -> Option<crate::Error> {
+        self.error.take()
     }
 }

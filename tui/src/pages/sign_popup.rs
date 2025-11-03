@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::{mem, sync::mpsc};
 
 use alloy::{hex, primitives::Address, signers::Signature};
 
@@ -6,7 +6,7 @@ use gm_ratatui_extra::{
     act::Act,
     confirm_popup::{ConfirmPopup, ConfirmResult},
     extensions::{RenderTextWrapped, ThemedWidget},
-    popup::{Popup, PopupWidget},
+    popup::PopupWidget,
     text_interactive::TextInteractive,
     text_popup::TextPopup,
     thematize::Thematize,
@@ -26,8 +26,12 @@ pub enum SignPopupEvent {
 
 #[derive(Debug)]
 pub enum SignPopup {
+    Closed,
+
     /// Step 1 - User confirms or rejects signing
-    Confirm { confirm_popup: ConfirmPopup },
+    Prompt {
+        confirm_popup: ConfirmPopup,
+    },
 
     /// Step 2 - Signing in progress
     Signing {
@@ -38,36 +42,71 @@ pub enum SignPopup {
     },
 
     /// Step 3 - Signing is done or failed
-    Result {
-        popup: Popup,
+    Done {
+        text_popup: TextPopup,
         signature: Option<Signature>,
     },
 }
 
-impl Default for SignPopup {
-    fn default() -> Self {
-        Self::confirm_screen()
+impl PopupWidget for SignPopup {
+    #[track_caller]
+    fn get_popup_inner(&self) -> &dyn PopupWidget {
+        match self {
+            SignPopup::Closed => unreachable!("SignPopup::get_popup_inner Closed"),
+            SignPopup::Prompt { confirm_popup, .. } => confirm_popup as &dyn PopupWidget,
+            SignPopup::Signing { text_popup, .. } => text_popup as &dyn PopupWidget,
+            SignPopup::Done { text_popup, .. } => text_popup as &dyn PopupWidget,
+        }
+    }
+
+    #[track_caller]
+    fn get_popup_inner_mut(&mut self) -> &mut dyn PopupWidget {
+        match self {
+            SignPopup::Closed => unreachable!("SignPopup::get_popup_inner_mut Closed"),
+            SignPopup::Prompt { confirm_popup, .. } => confirm_popup as &mut dyn PopupWidget,
+            SignPopup::Signing { text_popup, .. } => text_popup as &mut dyn PopupWidget,
+            SignPopup::Done { text_popup, .. } => text_popup as &mut dyn PopupWidget,
+        }
+    }
+
+    fn is_open(&self) -> bool {
+        if matches!(self, SignPopup::Closed) {
+            false
+        } else {
+            self.get_popup_inner().is_open()
+        }
+    }
+
+    #[track_caller]
+    fn open(&mut self) {
+        if matches!(self, SignPopup::Closed) {
+            unreachable!(
+                "SignPopup::open called when Closed, use SignPopup::new_with_message_* instead"
+            );
+        } else {
+            self.get_popup_inner_mut().open();
+        }
     }
 }
 
 impl SignPopup {
     /// Create a new SignPopup with the given hex message to sign
     pub fn new_with_message_hex(msg_hex: &str) -> crate::Result<Self> {
-        let mut popup = Self::confirm_screen();
+        let mut popup = Self::prompt_screen();
         popup.set_msg_hex(msg_hex)?;
         Ok(popup)
     }
 
     /// Create a new SignPopup with the given utf8 message to sign
     pub fn new_with_message_utf8(msg: String) -> Self {
-        let mut popup = Self::confirm_screen();
+        let mut popup = Self::prompt_screen();
         popup.set_msg_utf8(msg);
         popup
     }
 
-    fn confirm_screen() -> Self {
-        Self::Confirm {
-            confirm_popup: ConfirmPopup::new("Sign Message", String::new(), "Sign", "Cancel", true),
+    fn prompt_screen() -> Self {
+        Self::Prompt {
+            confirm_popup: ConfirmPopup::new("Sign", "Cancel", true).with_title("Sign Message"),
         }
     }
 
@@ -88,32 +127,40 @@ impl SignPopup {
         }
     }
 
-    fn result_screen(signature: Option<Signature>) -> Self {
-        Self::Result {
-            popup: Popup::default().with_title(if signature.is_some() {
-                "Sign Message Result"
-            } else {
-                "Sign Message Failed"
-            }),
+    fn done_screen(signature: Option<Signature>) -> Self {
+        Self::Done {
+            text_popup: TextPopup::default()
+                .with_title(if signature.is_some() {
+                    "Sign Message Result"
+                } else {
+                    "Sign Message Failed"
+                })
+                .with_text(
+                    signature
+                        .map(|signature| signature.to_string())
+                        .unwrap_or_else(|| "Failed to sign the message.".to_string()),
+                ),
             signature,
         }
     }
 
     pub fn is_open(&self) -> bool {
         match self {
-            SignPopup::Confirm { confirm_popup } => confirm_popup.is_open(),
+            SignPopup::Closed => false,
+            SignPopup::Prompt { confirm_popup } => confirm_popup.is_open(),
             SignPopup::Signing { text_popup, .. } => text_popup.is_open(),
-            SignPopup::Result { popup, .. } => popup.is_open(),
+            SignPopup::Done { text_popup, .. } => text_popup.is_open(),
         }
     }
 
     #[track_caller]
     pub fn open(&mut self) {
         match self {
-            SignPopup::Confirm { confirm_popup } => {
+            SignPopup::Closed => unreachable!("Null"),
+            SignPopup::Prompt { confirm_popup } => {
                 confirm_popup.open();
             }
-            SignPopup::Signing { .. } | SignPopup::Result { .. } => {
+            SignPopup::Signing { .. } | SignPopup::Done { .. } => {
                 // The code that calls open() should prepare a fresh "Confirm" and then open.
                 unreachable!("Cannot open sign_popup in this state")
             }
@@ -122,14 +169,15 @@ impl SignPopup {
 
     pub fn close(&mut self) {
         match self {
-            SignPopup::Confirm { confirm_popup } => {
+            SignPopup::Closed => unreachable!("Null"),
+            SignPopup::Prompt { confirm_popup } => {
                 confirm_popup.close();
             }
             SignPopup::Signing { text_popup, .. } => {
                 text_popup.close();
             }
-            SignPopup::Result { popup, .. } => {
-                popup.close();
+            SignPopup::Done { text_popup, .. } => {
+                text_popup.close();
             }
         }
     }
@@ -143,7 +191,11 @@ impl SignPopup {
     #[track_caller]
     fn set_msg_hex(&mut self, msg_hex: &str) -> crate::Result<()> {
         match self {
-            SignPopup::Confirm { confirm_popup } => {
+            SignPopup::Closed => {
+                *self = SignPopup::prompt_screen();
+                self.set_msg_hex(msg_hex)?;
+            }
+            SignPopup::Prompt { confirm_popup } => {
                 let utf8_str = hex::decode(msg_hex)
                     .map_err(crate::Error::FromHexError)
                     .and_then(|bytes| {
@@ -152,7 +204,7 @@ impl SignPopup {
 
                 confirm_popup.set_text(utf8_str, true);
             }
-            SignPopup::Signing { .. } | SignPopup::Result { .. } => {
+            SignPopup::Signing { .. } | SignPopup::Done { .. } => {
                 unreachable!("Cannot change message data in this state")
             }
         }
@@ -166,10 +218,14 @@ impl SignPopup {
     #[track_caller]
     fn set_msg_utf8(&mut self, msg: String) {
         match self {
-            SignPopup::Confirm { confirm_popup } => {
+            SignPopup::Closed => {
+                *self = SignPopup::prompt_screen();
+                self.set_msg_utf8(msg);
+            }
+            SignPopup::Prompt { confirm_popup } => {
                 confirm_popup.set_text(msg, true);
             }
-            SignPopup::Signing { .. } | SignPopup::Result { .. } => {
+            SignPopup::Signing { .. } | SignPopup::Done { .. } => {
                 unreachable!("Cannot change message data in this state")
             }
         }
@@ -185,11 +241,14 @@ impl SignPopup {
         if self.is_open() {
             actions.ignore_esc();
 
-            match self {
-                SignPopup::Confirm { confirm_popup } => {
+            let self_owned = mem::replace(self, Self::Closed);
+
+            *self = match self_owned {
+                SignPopup::Closed => self_owned, // Do nothing
+                SignPopup::Prompt { mut confirm_popup } => {
                     match confirm_popup.handle_event(event.input_event(), popup_area, actions)? {
                         Some(ConfirmResult::Confirmed) => {
-                            let text_scroll = confirm_popup.into_text_scroll();
+                            let text_scroll = confirm_popup.into_text();
 
                             let signer_account = ss.try_current_account()?;
                             let data = {
@@ -206,28 +265,33 @@ impl SignPopup {
                                     AccountManager::sign_message_async(signer_account, data).await,
                                 );
                             });
-                            *self = Self::signing_screen(signer_account, text_scroll, thread, rc);
+
+                            // Move to signing screen
+                            SignPopup::signing_screen(signer_account, text_scroll, thread, rc)
                         }
                         Some(ConfirmResult::Canceled) => {
-                            self.close();
+                            confirm_popup.close();
                             result = Some(SignPopupEvent::Rejected);
+                            SignPopup::Prompt { confirm_popup }
                         }
-                        None => {}
+                        None => SignPopup::Prompt { confirm_popup }, // Do nothing
                     }
                 }
                 SignPopup::Signing {
                     sign_thread,
-                    receiver,
+                    mut receiver,
                     signer_account,
-                    ..
+                    mut text_popup,
                 } => {
+                    text_popup.handle_event(event.input_event(), popup_area, actions);
+
                     if let Ok(sign_result) = receiver.try_recv() {
                         match sign_result {
                             Ok(signature) => {
-                                result = Some(SignPopupEvent::Signed(*signer_account, signature));
+                                result = Some(SignPopupEvent::Signed(signer_account, signature));
                                 sign_thread.abort();
 
-                                *self = Self::result_screen(Some(signature));
+                                Self::done_screen(Some(signature))
                             }
                             Err(err) => {
                                 sign_thread.abort();
@@ -235,10 +299,25 @@ impl SignPopup {
                                 return Err(err.into());
                             }
                         }
+                    } else {
+                        SignPopup::Signing {
+                            sign_thread,
+                            receiver,
+                            signer_account,
+                            text_popup,
+                        } // do nothing, still signing
                     }
                 }
-                SignPopup::Result { popup, .. } => {
-                    popup.handle_event(event.input_event(), actions);
+                SignPopup::Done {
+                    mut text_popup,
+                    signature,
+                } => {
+                    text_popup.handle_event(event.input_event(), popup_area, actions);
+
+                    SignPopup::Done {
+                        text_popup,
+                        signature,
+                    }
                 }
             }
         }
@@ -252,7 +331,8 @@ impl SignPopup {
     {
         if self.is_open() {
             match self {
-                SignPopup::Confirm { confirm_popup } => {
+                SignPopup::Closed => {}
+                SignPopup::Prompt { confirm_popup } => {
                     confirm_popup.render(popup_area, buf, theme);
                 }
                 SignPopup::Signing { text_popup, .. } => {
@@ -263,11 +343,11 @@ impl SignPopup {
                         .style(theme.style_dim())
                         .render(text_popup.body_area(popup_area), buf);
                 }
-                SignPopup::Result { popup, .. } => {
-                    popup.render(popup_area, buf, theme);
+                SignPopup::Done { text_popup, .. } => {
+                    text_popup.render(popup_area, buf, theme);
 
                     ["Signature is done.", "Press ESC to close"]
-                        .render_wrapped(popup.body_area(popup_area), buf);
+                        .render_wrapped(text_popup.body_area(popup_area), buf);
                 }
             }
         }

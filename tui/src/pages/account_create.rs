@@ -64,6 +64,8 @@ pub struct AccountCreatePage {
     exit_popup: ConfirmPopup,
 }
 
+const EXIT_TEXT: &str = "Mining will be ended if you go back. You can press ESC to go back or select End. If you want to continue mining you can choose to wait.";
+
 impl Default for AccountCreatePage {
     fn default() -> Self {
         Self {
@@ -79,14 +81,9 @@ impl Default for AccountCreatePage {
             hash_rate_thread: None,
             vanity_thread: None,
 
-            exit_popup: ConfirmPopup::new(
-                "Warning",
-                "Mining will be ended if you go back. You can press ESC to go back or select End. If you want to continue mining you can choose to wait."
-                    .to_string(),
-                "Wait",
-                "Exit",
-                false
-            ),
+            exit_popup: ConfirmPopup::new("Wait", "Exit", false)
+                .with_title("Warning")
+                .with_text(EXIT_TEXT.to_string()),
         }
     }
 }

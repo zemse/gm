@@ -15,52 +15,74 @@ use ratatui::{
 /// A trait for widgets that contain a Popup, it implements the basic methods so that
 /// the inner popup can be controlled.
 pub trait PopupWidget {
-    fn get_popup(&self) -> &Popup;
-    fn get_popup_mut(&mut self) -> &mut Popup;
+    /// Every popup widget apart from the Popup widget itself must be building on top of
+    /// another popup widget. This method allows accessing the inner popup widget.
+    ///
+    /// Returns a reference to the inner popup widget.
+    fn get_popup_inner(&self) -> &dyn PopupWidget;
+
+    /// Mutable version of `get_popup_inner`
+    fn get_popup_inner_mut(&mut self) -> &mut dyn PopupWidget;
+
+    /*
+     * Internal methods used to access the base popup
+     */
+    /// This is automatically implemented in the Popups that implement this trait. It
+    /// creates a chain of calls to reach the base popup getting it's reference.
+    fn get_base_popup(&self) -> &Popup {
+        self.get_popup_inner().get_base_popup()
+    }
+
+    /// Mutable version of `get_base_popup`
+    fn get_base_popup_mut(&mut self) -> &mut Popup {
+        self.get_popup_inner_mut().get_base_popup_mut()
+    }
 
     /*
      * Builder methods
      */
-
+    /// Sets the title of the popup
     fn with_title(mut self, title: &'static str) -> Self
     where
         Self: Sized,
     {
-        self.get_popup_mut().title = Some(title);
+        self.get_base_popup_mut().title = Some(title);
         self
     }
 
+    /// Sets whether the popup is open or closed at init
     fn with_open(mut self, open: bool) -> Self
     where
         Self: Sized,
     {
-        self.get_popup_mut().open = open;
+        self.get_base_popup_mut().open = open;
         self
     }
 
     /*
      * Utility Methods
+     *
+     * These methods chains the calls to reach the base popup, making sure any
+     * overrides are triggered.
      */
-
+    /// Checks whether the popup is open
     fn is_open(&self) -> bool {
-        let popup = self.get_popup();
-        popup.open
+        self.get_popup_inner().is_open()
     }
 
+    /// Opens the popup
     fn open(&mut self) {
-        let popup = self.get_popup_mut();
-        popup.open = true;
+        self.get_popup_inner_mut().open();
     }
 
+    /// Closes the popup
     fn close(&mut self) {
-        let popup = self.get_popup_mut();
-        popup.open = false;
+        self.get_popup_inner_mut().close();
     }
 
+    /// Gets the body area of the popup
     fn body_area(&self, popup_area: Rect) -> Rect {
-        let popup = self.get_popup();
-        let areas = popup.get_areas(popup_area);
-        areas.body_area
+        self.get_popup_inner().body_area(popup_area)
     }
 }
 
@@ -76,12 +98,38 @@ pub struct Popup {
 }
 
 impl PopupWidget for Popup {
-    fn get_popup(&self) -> &Popup {
+    fn get_popup_inner(&self) -> &dyn PopupWidget {
         self
     }
 
-    fn get_popup_mut(&mut self) -> &mut Popup {
+    fn get_popup_inner_mut(&mut self) -> &mut dyn PopupWidget {
         self
+    }
+
+    fn get_base_popup(&self) -> &Popup {
+        self
+    }
+
+    fn get_base_popup_mut(&mut self) -> &mut Popup {
+        self
+    }
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn open(&mut self) {
+        self.open = true;
+    }
+
+    fn close(&mut self) {
+        self.open = false;
+    }
+
+    fn body_area(&self, popup_area: Rect) -> Rect {
+        let popup = self.get_base_popup();
+        let areas = popup.get_areas(popup_area);
+        areas.body_area
     }
 }
 

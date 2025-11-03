@@ -3,6 +3,7 @@ pub mod address_book;
 pub mod alchemy;
 pub mod alloy;
 pub mod assets;
+pub mod r#async;
 pub mod config;
 pub mod disk_storage;
 pub mod erc20;
@@ -14,8 +15,10 @@ pub mod network;
 pub mod price_manager;
 pub mod reqwest;
 pub mod serde;
+pub mod shutdown;
 pub mod text_segment;
 pub mod text_wrap;
+pub mod tx;
 
 pub use error::{Result, UtilsError as Error};
 

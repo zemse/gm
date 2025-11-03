@@ -1,4 +1,5 @@
 use alloy::{
+    consensus::{Signed, TxEip1559},
     hex,
     primitives::{keccak256, Address},
     signers::{
@@ -69,6 +70,17 @@ impl AccountManager {
 
         #[cfg(not(target_os = "macos"))]
         return linux_insecure::LinuxInsecure::sign_message_async(address, data).await;
+    }
+
+    pub async fn sign_transaction_async(
+        address: Address,
+        tx: TxEip1559,
+    ) -> crate::Result<Signed<TxEip1559>> {
+        #[cfg(target_os = "macos")]
+        return Ok(gm_macos::sign_tx_async(address, tx).await?);
+
+        #[cfg(not(target_os = "macos"))]
+        return linux_insecure::LinuxInsecure::sign_tx_async(address, tx).await;
     }
 }
 
@@ -209,6 +221,8 @@ fn eth_addr_from_affine(aff: &AffinePoint) -> [u8; 20] {
 
 pub mod linux_insecure {
 
+    use alloy::{consensus::SignableTransaction, network::TxSignerSync};
+
     use crate::disk_storage::{DiskStorageInterface, FileFormat};
 
     use super::*;
@@ -246,6 +260,21 @@ pub mod linux_insecure {
                 .sign_message(&data)
                 .await
                 .map_err(crate::Error::MessageSigningFailed)
+        }
+
+        pub async fn sign_tx_async(
+            address: Address,
+            mut tx: TxEip1559,
+        ) -> crate::Result<Signed<TxEip1559>> {
+            let wallet = Self::get_secret(address)?.into_alloy_signer()?;
+
+            // TODO this code also exactly appears in macos crate, it could be moved to common crate
+            let signature = wallet
+                .sign_transaction_sync(&mut tx)
+                .map_err(crate::Error::TxSigningFailed)?;
+            let tx_signed = SignableTransaction::into_signed(tx, signature);
+
+            Ok(tx_signed)
         }
     }
 

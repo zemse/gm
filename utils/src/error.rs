@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use alloy::primitives::Address;
+use alloy::{
+    primitives::Address,
+    transports::{RpcError, TransportErrorKind},
+};
 use serde_json::Value;
 use url::Url;
 
@@ -152,6 +155,27 @@ pub enum UtilsError {
 
     #[error("Message signing failed. (Error: {0})")]
     MessageSigningFailed(alloy::signers::Error),
+
+    #[error("Transaction signing failed. (Error: {0})")]
+    TxSigningFailed(alloy::signers::Error),
+
+    #[error("Rpc Error: {0}")]
+    RpcError(#[from] RpcError<TransportErrorKind>),
+
+    #[error("Alloy Signer Error: {0}")]
+    AlloySignerError(#[from] alloy::signers::Error),
+
+    #[error("RLP Error: {0}")]
+    AlloyRlpError(#[from] alloy::rlp::Error),
+
+    #[error("Transaction type is not specified in the request.")]
+    TxTypeNotSpecified,
+
+    #[error("Transaction type is not EIP-1559.")]
+    TxTypeIsNotEip1559,
+
+    #[error("Operation aborted due to shutdown.")]
+    AbortDueToShutdown,
 }
 
 impl UtilsError {

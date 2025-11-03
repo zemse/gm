@@ -21,7 +21,6 @@ use gm_utils::{
 use crate::pages::{
     invite_popup::{InviteCodeClaimStatus, InviteCodeValidity},
     shell::ShellUpdate,
-    sign_tx_popup::TxStatus,
     walletconnect::WalletConnectStatus,
 };
 
@@ -47,12 +46,8 @@ pub enum AppEvent {
     CandlesUpdate(Vec<Candle>, Interval),
     CandlesUpdateError(UtilsError),
 
-    TxUpdate(TxStatus),
-    TxError(String),
-
     SignResult(Address, Signature),
     SignError(String),
-
     WalletConnectStatus(WalletConnectStatus),
     WalletConnectMessage(Address, Box<WcMessage>),
     WalletConnectError(Address, String),

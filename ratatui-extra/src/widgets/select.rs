@@ -231,6 +231,12 @@ impl<T: Display + PartialEq> Select<T> {
                 Event::Mouse(mouse_event) => {
                     if area.contains(mouse_event.position()) {
                         if let Some(list) = self.list.as_ref() {
+                            if mouse_event.is_left_click() && !list.is_empty() {
+                                result = Some(SelectEvent::Select(&list[self.cursor.current]));
+                            }
+                        }
+
+                        if let Some(list) = self.list.as_ref() {
                             if !list.is_empty() {
                                 let display = Self::display_item(
                                     list,

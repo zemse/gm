@@ -308,6 +308,8 @@ pub trait EventExt {
     fn key_event(&self) -> Option<&KeyEvent>;
 
     fn is_key_pressed(&self, key: KeyCode) -> bool;
+
+    fn key_code(&self) -> Option<KeyCode>;
 }
 
 impl EventExt for Event {
@@ -362,6 +364,42 @@ impl EventExt for Event {
     fn is_key_pressed(&self, key: KeyCode) -> bool {
         self.key_event()
             .is_some_and(|ke| ke.kind == KeyEventKind::Press && ke.code == key)
+    }
+
+    fn key_code(&self) -> Option<KeyCode> {
+        self.key_event().map(|ke| ke.code)
+    }
+}
+
+impl EventExt for Option<&Event> {
+    fn is_key_press(&self) -> bool {
+        self.map(|event| event.is_key_press()).unwrap_or(false)
+    }
+
+    fn is_mouse_left_click_or_hover(&self) -> bool {
+        self.map(|event| event.is_mouse_left_click_or_hover())
+            .unwrap_or(false)
+    }
+
+    fn is_mouse_left_click(&self) -> bool {
+        self.map(|event| event.is_mouse_left_click())
+            .unwrap_or(false)
+    }
+
+    fn is_mouse_hover(&self) -> bool {
+        self.map(|event| event.is_mouse_hover()).unwrap_or(false)
+    }
+
+    fn key_event(&self) -> Option<&KeyEvent> {
+        self.and_then(|event| event.key_event())
+    }
+
+    fn is_key_pressed(&self, key: KeyCode) -> bool {
+        self.map(|event| event.is_key_pressed(key)).unwrap_or(false)
+    }
+
+    fn key_code(&self) -> Option<KeyCode> {
+        self.and_then(|event| event.key_code())
     }
 }
 

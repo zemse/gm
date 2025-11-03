@@ -30,4 +30,7 @@ pub enum MacosError {
 
     #[error("Message signing failed. (Error: {0})")]
     MessageSigningFailed(alloy::signers::Error),
+
+    #[error("Transaction signing failed. (Error: {0})")]
+    TxSigningFailed(alloy::signers::Error),
 }

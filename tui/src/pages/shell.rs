@@ -118,8 +118,8 @@ impl Default for ShellPage {
             text_cursor: 0,
             env_vars: None,
             requests: vec![],
-            tx_popup: SignTxPopup::default(),
-            sign_popup: SignPopup::default(),
+            tx_popup: SignTxPopup::Closed,
+            sign_popup: SignPopup::Closed,
             prevent_ctrlc_exit: true,
 
             kill_signal: CancellationToken::new(),
