@@ -3,9 +3,14 @@ use alloy::{
     primitives::{Address, FixedBytes},
     providers::Provider,
     rpc::{json_rpc::ErrorPayload, types::TransactionRequest},
+    sol_types::SolCall,
 };
+use gm_common::{erc20::IERC20, tx_meta::TransactionMeta};
 
-use crate::network::Network;
+use crate::{
+    network::{Network, Token},
+    sourcify::Sourcify,
+};
 
 /// Build EIP-1559 transaction by estimating gas, nonce, chain ID, and gas fees.
 /// Returns the built `TxEip1559` on success, or the original `TransactionRequest` and an error on failure.
@@ -65,6 +70,69 @@ pub async fn build(
         .clone();
 
     Ok(tx)
+}
+
+pub async fn meta(
+    network: Network,
+    tx: TransactionRequest,
+    mut meta: TransactionMeta,
+    token: Option<Token>,
+) -> crate::Result<TransactionMeta> {
+    let provider = network.get_provider()?;
+
+    if let Some(to) = tx.to.and_then(|to| to.into_to()) {
+        if meta.tx_dest_is_contract.is_none() {
+            meta.tx_dest_is_contract = Some(!provider.get_code_at(to).await?.is_empty());
+        }
+
+        if meta.tx_dest_name.is_none() {
+            meta.tx_dest_name = Sourcify::fetch_contract_name(network.chain_id as u64, to)
+                .await
+                .ok()
+                .flatten();
+        }
+
+        if meta.native_symbol.is_none() || meta.native_decimals.is_none() {
+            meta.native_symbol = network.symbol.clone();
+            meta.native_decimals = network.native_decimals;
+        }
+
+        if let Some(input) = tx.input.input() {
+            if let Some(erc20_receiver) =
+                if let Ok(decoded) = IERC20::approveCall::abi_decode_validate(input) {
+                    Some(decoded.spender)
+                } else if let Ok(decoded) = IERC20::transferCall::abi_decode_validate(input) {
+                    Some(decoded.to)
+                } else {
+                    None
+                }
+            {
+                if meta.erc20_receiver_is_contract.is_none() {
+                    meta.erc20_receiver_is_contract =
+                        Some(!provider.get_code_at(erc20_receiver).await?.is_empty());
+                }
+
+                if meta.erc20_receiver_name.is_none() {
+                    meta.erc20_receiver_name =
+                        Sourcify::fetch_contract_name(network.chain_id as u64, erc20_receiver)
+                            .await
+                            .ok()
+                            .flatten();
+                }
+
+                if let Some(token) = token {
+                    meta.erc20_symbol = Some(token.symbol.clone());
+                    meta.erc20_decimals = Some(token.decimals);
+                } else {
+                    let contract = IERC20::new(to, provider);
+                    meta.erc20_symbol = contract.symbol().call().await.ok();
+                    meta.erc20_decimals = contract.decimals().call().await.ok();
+                }
+            }
+        }
+    }
+
+    Ok(meta)
 }
 
 pub enum SendTxResult {

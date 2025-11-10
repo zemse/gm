@@ -270,7 +270,7 @@ impl App {
             opened_toast: Toast::new("Opened in browser"),
 
             fatal_error_popup: TextPopup::default().with_title("Fatal Error").with_note({
-                "If you think this is a bug, please create issue at https://github.com/zemse/gm/new"
+                "If you think this is a bug, please create issue at https://github.com/zemse/gm/issues/new"
             }),
             invite_popup: InvitePopup::default(),
             #[cfg(feature = "demo")]
@@ -521,6 +521,11 @@ impl App {
             }
         }
         self.context.extend(result.get_page_inserts_owned());
+
+        if let Some(error) = result.take_error() {
+            self.fatal_error_popup.set_text(error.to_string(), true);
+        }
+
         Ok((
             result.get_ignore_esc(),
             result.get_ignore_ctrlc(),

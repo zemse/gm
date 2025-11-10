@@ -19,24 +19,20 @@ pub struct AsyncOnce<T> {
 /// - A `JoinHandle<()>` for the spawned Tokio task.
 /// - A `oneshot::Receiver<R>` to receive the result of the job once it's satisfactory.
 /// - A `CancellationToken` that can be used to signal the task to stop urgently.
-pub fn async_once_thread<S, FS, R, F, Fut>(state: FS, job: F) -> AsyncOnce<R>
+pub fn async_once_thread<R, F, Fut>(job: F) -> AsyncOnce<R>
 where
-    S: Send + Sync + 'static,
-    FS: FnOnce() -> S + Send + 'static,
     R: Send + 'static,
-    F: FnOnce(S) -> Fut + Send + Sync + 'static,
+    F: FnOnce() -> Fut + Send + Sync + 'static,
     Fut: Future<Output = R> + Send + 'static,
 {
     let cancel_token = CancellationToken::new();
     let (tr, rc) = oneshot::channel();
     let cancel_token_clone = cancel_token.clone();
 
-    let s = state();
-
     let thread = tokio::spawn(async move {
         tokio::select! {
              _ = cancel_token_clone.cancelled() => (),
-            result = job(s) => {
+            result = job() => {
                 let _ = tr.send(result);
             }
         };

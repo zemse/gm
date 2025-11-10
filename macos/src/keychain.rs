@@ -15,7 +15,7 @@ use core_foundation::{
     dictionary::CFDictionary,
     string::CFString,
 };
-use gm_common::{secret::Secret, text_truncate::truncate_with_count};
+use gm_common::{secret::Secret, text_truncate::truncate_with_count, tx_meta::TransactionMeta};
 use security_framework::{
     item::{ItemClass, ItemSearchOptions, SearchResult},
     os::macos::keychain::SecKeychain,
@@ -111,10 +111,15 @@ pub async fn sign_message_async(address: Address, data: Vec<u8>) -> crate::Resul
 pub async fn sign_tx_async(
     address: Address,
     mut tx: TxEip1559,
+    meta: TransactionMeta,
 ) -> crate::Result<Signed<TxEip1559>> {
     let mut guard = Guard::default();
 
-    guard.authenticate(&format!("use {address:#} to sign a transaction"))?;
+    let auth_msg = meta.get_display_message(&tx);
+    guard.authenticate(&format!(
+        "{auth_msg} from {address:#} on network {}",
+        tx.chain_id
+    ))?;
 
     let signer = guard.get_secret_internal(address)?.into_alloy_signer()?;
 

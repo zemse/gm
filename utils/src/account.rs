@@ -12,7 +12,7 @@ use alloy::{
     },
 };
 use coins_bip39::{English, Mnemonic};
-use gm_common::secret::Secret;
+use gm_common::{secret::Secret, tx_meta::TransactionMeta};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -75,12 +75,13 @@ impl AccountManager {
     pub async fn sign_transaction_async(
         address: Address,
         tx: TxEip1559,
+        meta: TransactionMeta,
     ) -> crate::Result<Signed<TxEip1559>> {
         #[cfg(target_os = "macos")]
-        return Ok(gm_macos::sign_tx_async(address, tx).await?);
+        return Ok(gm_macos::sign_tx_async(address, tx, meta).await?);
 
         #[cfg(not(target_os = "macos"))]
-        return linux_insecure::LinuxInsecure::sign_tx_async(address, tx).await;
+        return linux_insecure::LinuxInsecure::sign_tx_async(address, tx, meta).await;
     }
 }
 
@@ -265,6 +266,7 @@ pub mod linux_insecure {
         pub async fn sign_tx_async(
             address: Address,
             mut tx: TxEip1559,
+            _meta: TransactionMeta,
         ) -> crate::Result<Signed<TxEip1559>> {
             let wallet = Self::get_secret(address)?.into_alloy_signer()?;
 

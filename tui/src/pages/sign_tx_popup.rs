@@ -7,6 +7,7 @@ use alloy::{
     providers::Provider,
     rpc::types::TransactionRequest,
 };
+use gm_common::tx_meta::TransactionMeta;
 use gm_ratatui_extra::{
     confirm_popup::{ConfirmPopup, ConfirmResult},
     extensions::ThemedWidget,
@@ -48,10 +49,7 @@ pub enum SignTxEvent {
     Failed(FixedBytes<32>),
 
     /// When transaction fails with another issue
-    Error {
-        code: i64,
-        message: String,
-    },
+    Error { code: i64, message: String },
 
     /// User presses ESC or Enter on the done popup
     Done,
@@ -65,13 +63,24 @@ pub enum SignTxPopup {
         account: Address,
         network: Network,
         tx_req: TransactionRequest,
+        build_job: Option<AsyncOnce<gm_utils::Result<TxEip1559>>>,
+        meta_job: Option<AsyncOnce<gm_utils::Result<TransactionMeta>>>,
+    },
+    PromptBuilt {
+        confirm_popup: ConfirmPopup,
+        account: Address,
+        network: Network,
+        tx_req: TransactionRequest,
+        tx_built: TxEip1559,
+        tx_meta: TransactionMeta,
     },
     Building {
         text_popup: TextPopup,
         account: Address,
         network: Network,
         tx_req: TransactionRequest,
-        build_job: Option<AsyncOnce<gm_utils::Result<TxEip1559>>>,
+        build_job: AsyncOnce<gm_utils::Result<TxEip1559>>,
+        meta_job: AsyncOnce<gm_utils::Result<TransactionMeta>>,
     },
     Signing {
         text_popup: TextPopup,
@@ -79,6 +88,7 @@ pub enum SignTxPopup {
         network: Network,
         tx_req: TransactionRequest,
         tx_built: TxEip1559,
+        tx_meta: TransactionMeta,
         sign_job: Option<AsyncOnce<gm_utils::Result<Signed<TxEip1559>>>>,
     },
     Sending {
@@ -111,6 +121,7 @@ impl PopupWidget for SignTxPopup {
         match self {
             SignTxPopup::Closed => unreachable!("SignTxPopup::get_popup_inner Closed"),
             SignTxPopup::Prompt { confirm_popup, .. } => confirm_popup as &dyn PopupWidget,
+            SignTxPopup::PromptBuilt { confirm_popup, .. } => confirm_popup as &dyn PopupWidget,
             SignTxPopup::Building { text_popup, .. } => text_popup as &dyn PopupWidget,
             SignTxPopup::Signing { text_popup, .. } => text_popup as &dyn PopupWidget,
             SignTxPopup::Sending { text_popup, .. } => text_popup as &dyn PopupWidget,
@@ -124,6 +135,7 @@ impl PopupWidget for SignTxPopup {
         match self {
             SignTxPopup::Closed => unreachable!("SignTxPopup::get_popup_inner Closed"),
             SignTxPopup::Prompt { confirm_popup, .. } => confirm_popup as &mut dyn PopupWidget,
+            SignTxPopup::PromptBuilt { confirm_popup, .. } => confirm_popup as &mut dyn PopupWidget,
             SignTxPopup::Building { text_popup, .. } => text_popup as &mut dyn PopupWidget,
             SignTxPopup::Signing { text_popup, .. } => text_popup as &mut dyn PopupWidget,
             SignTxPopup::Sending { text_popup, .. } => text_popup as &mut dyn PopupWidget,
@@ -151,7 +163,9 @@ impl PopupWidget for SignTxPopup {
 }
 
 impl SignTxPopup {
-    pub fn new(account: Address, network: Network, tx_req: TransactionRequest) -> Self {
+    pub fn new(account: Address, network: Network, mut tx_req: TransactionRequest) -> Self {
+        tx_req.normalize_data();
+
         let text = fmt_tx_request(&network, &tx_req);
 
         Self::Prompt {
@@ -162,6 +176,8 @@ impl SignTxPopup {
             account,
             network,
             tx_req,
+            build_job: None,
+            meta_job: None,
         }
     }
 
@@ -175,10 +191,7 @@ impl SignTxPopup {
 
     fn reset(&mut self) {
         match self {
-            SignTxPopup::Building {
-                build_job: Some(build_job),
-                ..
-            } => {
+            SignTxPopup::Building { build_job, .. } => {
                 build_job.thread.abort();
             }
             SignTxPopup::Signing {
@@ -224,13 +237,121 @@ impl SignTxPopup {
                 account,
                 network,
                 tx_req,
+                build_job,
+                meta_job,
+            } => {
+                // Start build and meta jobs in the background during the prompt
+                if build_job.is_none() {
+                    let account_clone = *account;
+                    let network_clone = network.clone();
+                    let tx_req_clone = tx_req.clone();
+                    let job = async_once_thread(async move || {
+                        tx::build(account_clone, network_clone, tx_req_clone).await
+                    });
+
+                    *build_job = Some(job);
+                }
+
+                if meta_job.is_none() {
+                    let network_clone = network.clone();
+                    let tx_req_clone = tx_req.clone();
+                    let job = async_once_thread(async || {
+                        tx::meta(
+                            network_clone,
+                            tx_req_clone,
+                            TransactionMeta::default(),
+                            None,
+                        )
+                        .await
+                    });
+
+                    *meta_job = Some(job);
+                }
+
+                if build_job.as_ref().is_some_and(|j| !j.receiver.is_empty())
+                    && meta_job.as_ref().is_some_and(|j| !j.receiver.is_empty())
+                {
+                    let build_result = mem::take(build_job).unwrap().receiver.try_recv().unwrap();
+                    let meta_result = mem::take(meta_job).unwrap().receiver.try_recv().unwrap();
+
+                    match build_result {
+                        Ok(tx_built) => {
+                            callback(SignTxEvent::Built)?;
+
+                            // Transition to Signing state
+                            *self = SignTxPopup::PromptBuilt {
+                                confirm_popup: mem::take(confirm_popup).with_text(String::new()),
+                                account: *account,
+                                network: mem::take(network),
+                                tx_req: mem::take(tx_req),
+                                tx_built,
+                                tx_meta: meta_result.unwrap_or_default(),
+                            };
+
+                            return Ok(actions);
+                        }
+                        Err(err) => {
+                            callback(SignTxEvent::Error {
+                                code: -32603, // Internal error
+                                message: format!("Failed to build transaction: {}", err),
+                            })?;
+
+                            // Show error message in the global
+                            actions.set_error(err.into());
+
+                            // Return to prompt state
+                            *self = SignTxPopup::Closed;
+
+                            return Ok(actions);
+                        }
+                    }
+                }
+
+                match confirm_popup.handle_event(event.input_event(), popup_area, &mut actions)? {
+                    Some(ConfirmResult::Confirmed) => {
+                        // If user confirms before building, wait for build and meta jobs to be finished
+                        if build_job.is_some() && meta_job.is_some() {
+                            let build_job = mem::take(build_job).unwrap();
+                            let meta_job = mem::take(meta_job).unwrap();
+
+                            let confirm_popup = mem::take(confirm_popup);
+
+                            // Transition to Building state
+                            *self = SignTxPopup::Building {
+                                text_popup: confirm_popup
+                                    .into_text_popup()
+                                    // confirm_popup is closed after selecting the confirm button
+                                    .with_text("Building transaction...".to_string())
+                                    .with_open(true),
+                                account: *account,
+                                network: mem::take(network),
+                                tx_req: mem::take(tx_req),
+                                build_job,
+                                meta_job,
+                            }
+                        }
+                    }
+                    Some(ConfirmResult::Canceled) => {
+                        confirm_popup.close();
+                        callback(SignTxEvent::Cancelled)?;
+                    }
+                    None => {}
+                }
+            }
+            Self::PromptBuilt {
+                confirm_popup,
+                account,
+                network,
+                tx_req,
+                tx_built,
+                tx_meta,
             } => {
                 match confirm_popup.handle_event(event.input_event(), popup_area, &mut actions)? {
                     Some(ConfirmResult::Confirmed) => {
                         let confirm_popup = mem::take(confirm_popup);
 
-                        // Transition to Building state
-                        *self = SignTxPopup::Building {
+                        // Transition to Signing state
+                        *self = SignTxPopup::Signing {
                             text_popup: confirm_popup
                                 .into_text_popup()
                                 // confirm_popup is closed after selecting the confirm button
@@ -238,7 +359,9 @@ impl SignTxPopup {
                             account: *account,
                             network: mem::take(network),
                             tx_req: mem::take(tx_req),
-                            build_job: None,
+                            tx_built: mem::take(tx_built),
+                            tx_meta: mem::take(tx_meta),
+                            sign_job: None,
                         }
                     }
                     Some(ConfirmResult::Canceled) => {
@@ -254,6 +377,7 @@ impl SignTxPopup {
                 network,
                 tx_req,
                 build_job,
+                meta_job,
             } => {
                 if let Some(TextPopupEvent::Closed) =
                     text_popup.handle_event(event.input_event(), popup_area, &mut actions)
@@ -264,51 +388,36 @@ impl SignTxPopup {
                     reset = true;
                 }
 
-                match build_job {
-                    None => {
-                        let account_clone = *account;
-                        let network_clone = network.clone();
-                        let tx_req_clone = tx_req.clone();
-                        let job = async_once_thread(
-                            move || (account_clone, network_clone, tx_req_clone),
-                            async |(account, network, tx_req)| {
-                                tx::build(account, network, tx_req).await
-                            },
-                        );
+                if !build_job.receiver.is_empty() && !meta_job.receiver.is_empty() {
+                    let build_result = build_job.receiver.try_recv().unwrap();
+                    let meta_result = meta_job.receiver.try_recv().unwrap();
 
-                        text_popup.set_text("Building transaction...".to_string(), true);
+                    match build_result {
+                        Ok(tx_built) => {
+                            callback(SignTxEvent::Built)?;
 
-                        *build_job = Some(job);
-                    }
-                    Some(build_job) => {
-                        if let Ok(result) = build_job.receiver.try_recv() {
-                            match result {
-                                Ok(tx_built) => {
-                                    callback(SignTxEvent::Built)?;
-
-                                    // Transition to Signing state
-                                    *self = SignTxPopup::Signing {
-                                        text_popup: mem::take(text_popup),
-                                        account: *account,
-                                        network: mem::take(network),
-                                        tx_req: mem::take(tx_req),
-                                        tx_built,
-                                        sign_job: None,
-                                    }
-                                }
-                                Err(err) => {
-                                    callback(SignTxEvent::Error {
-                                        code: -32603, // Internal error
-                                        message: format!("Failed to build transaction: {}", err),
-                                    })?;
-
-                                    // Show error message in the global
-                                    actions.set_error(err.into());
-
-                                    // Return to prompt state
-                                    *self = SignTxPopup::Closed;
-                                }
+                            // Transition to Signing state
+                            *self = SignTxPopup::Signing {
+                                text_popup: mem::take(text_popup),
+                                account: *account,
+                                network: mem::take(network),
+                                tx_req: mem::take(tx_req),
+                                tx_built,
+                                tx_meta: meta_result.unwrap_or_default(),
+                                sign_job: None,
                             }
+                        }
+                        Err(err) => {
+                            callback(SignTxEvent::Error {
+                                code: -32603, // Internal error
+                                message: format!("Failed to build transaction: {}", err),
+                            })?;
+
+                            // Show error message in the global
+                            actions.set_error(err.into());
+
+                            // Return to prompt state
+                            *self = SignTxPopup::Closed;
                         }
                     }
                 }
@@ -319,6 +428,7 @@ impl SignTxPopup {
                 network,
                 tx_req,
                 tx_built,
+                tx_meta,
                 sign_job,
             } => {
                 if let Some(TextPopupEvent::Closed) =
@@ -334,13 +444,17 @@ impl SignTxPopup {
                     None => {
                         let account_copied = *account;
                         let tx_built_clone = tx_built.clone();
-                        let job = async_once_thread(
-                            move || (account_copied, tx_built_clone),
-                            async |(account, tx_built)| {
-                                // TODO will need to handle multiple wallet types in the future
-                                AccountManager::sign_transaction_async(account, tx_built).await
-                            },
-                        );
+                        let tx_meta = mem::take(tx_meta);
+
+                        let job = async_once_thread(async move || {
+                            // TODO will need to handle multiple wallet types in the future
+                            AccountManager::sign_transaction_async(
+                                account_copied,
+                                tx_built_clone,
+                                tx_meta,
+                            )
+                            .await
+                        });
 
                         text_popup.set_text("Signing transaction...".to_string(), true);
 
@@ -401,16 +515,13 @@ impl SignTxPopup {
                     None => {
                         let tx_raw = tx_signed.clone().to_raw()?;
                         let provider = network.get_provider()?;
-                        let job = async_once_thread(
-                            || (provider, tx_raw),
-                            async |(provider, tx_raw)| {
-                                provider
-                                    .send_raw_transaction(tx_raw.as_ref())
-                                    .await
-                                    .map(|r| *r.tx_hash())
-                                    .map_err(gm_utils::Error::from)
-                            },
-                        );
+                        let job = async_once_thread(async move || {
+                            provider
+                                .send_raw_transaction(tx_raw.as_ref())
+                                .await
+                                .map(|r| *r.tx_hash())
+                                .map_err(gm_utils::Error::from)
+                        });
 
                         text_popup.set_text(
                             format!(
@@ -594,6 +705,9 @@ impl SignTxPopup {
             match self {
                 SignTxPopup::Closed => {}
                 SignTxPopup::Prompt { confirm_popup, .. } => {
+                    confirm_popup.render(area, buf, &theme);
+                }
+                SignTxPopup::PromptBuilt { confirm_popup, .. } => {
                     confirm_popup.render(area, buf, &theme);
                 }
                 SignTxPopup::Building { text_popup, .. } => {
