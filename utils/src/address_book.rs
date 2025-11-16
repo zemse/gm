@@ -89,8 +89,8 @@ impl AddressBookStore {
         }
     }
 
-    pub fn update(&mut self, id: usize, new_entry: AddressBookEntry) -> crate::Result<()> {
-        self.entries[id - 1] = new_entry;
+    pub fn update(&mut self, idx: usize, new_entry: AddressBookEntry) -> crate::Result<()> {
+        self.entries[idx] = new_entry;
         self.save()
     }
 

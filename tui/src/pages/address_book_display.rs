@@ -51,14 +51,14 @@ impl TryFrom<FormItem> for FormWidget {
 
 #[derive(Debug)]
 pub struct AddressBookDisplayPage {
-    pub id: usize,
+    pub idx: usize,
     pub form: Form<FormItem, crate::Error>,
 }
 
 impl AddressBookDisplayPage {
-    pub fn new(id: usize, name: String, address: String) -> crate::Result<Self> {
+    pub fn new(idx: usize, name: String, address: String) -> crate::Result<Self> {
         Ok(Self {
-            id,
+            idx,
             form: Form::init(|form| {
                 form.set_text(FormItem::Name, name);
                 form.set_text(FormItem::Address, address);
@@ -103,7 +103,7 @@ impl Component for AddressBookDisplayPage {
                     let address = self.form.get_text(FormItem::Address);
                     let result = address.parse_as_address().and_then(|address| {
                         address_book.update(
-                            self.id,
+                            self.idx,
                             AddressBookEntry {
                                 name: name.to_string(),
                                 address,
