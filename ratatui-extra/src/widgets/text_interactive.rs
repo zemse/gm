@@ -192,6 +192,7 @@ impl TextInteractive {
                         if text_area.contains(mouse_event.position()) {
                             let (_, _, segments) = self.get_visible_text(area);
 
+                            let mut action_registered = false;
                             Self::segments_iter(
                                 segments,
                                 text_area,
@@ -200,16 +201,22 @@ impl TextInteractive {
                                     if span_area.contains(mouse_event.position()) {
                                         match &segment.kind {
                                             TokenKind::Url(url) => {
-                                                actions.open_url(
-                                                    url.clone(),
-                                                    Some(mouse_event.position()),
-                                                );
+                                                if !action_registered {
+                                                    actions.open_url(
+                                                        url.clone(),
+                                                        Some(mouse_event.position()),
+                                                    );
+                                                    action_registered = true;
+                                                }
                                             }
                                             TokenKind::Hex(str) => {
-                                                actions.copy_to_clipboard(
-                                                    str.clone(),
-                                                    Some(mouse_event.position()),
-                                                );
+                                                if !action_registered {
+                                                    actions.copy_to_clipboard(
+                                                        str.clone(),
+                                                        Some(mouse_event.position()),
+                                                    );
+                                                    action_registered = true;
+                                                }
                                             }
                                         }
                                     }
@@ -243,14 +250,16 @@ impl TextInteractive {
                         let (_, _, segments) = self.get_visible_text(area);
 
                         let mut hovered_on_some_segment = false;
+                        let mut hover_registered = false;
                         Self::segments_iter(
                             segments,
                             text_area,
                             self.scroll_offset,
                             |segment, span_area| {
-                                if span_area.contains(mouse_event.position()) {
+                                if span_area.contains(mouse_event.position()) && !hover_registered {
                                     hovered_on_some_segment = true;
                                     self.segment_idx = Some(segment.idx);
+                                    hover_registered = true;
                                 }
                             },
                         );

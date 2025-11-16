@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, cmp::Ordering};
 
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -60,6 +60,16 @@ pub fn segmented_wrap(str: &str, max_width: u16) -> (Vec<Cow<'_, str>>, Vec<Wrap
             end_char_idx,
         });
     }
+
+    wrapped_segments.sort_by(|a, b| {
+        if matches!(a.kind, TokenKind::Hex(_)) == matches!(b.kind, TokenKind::Hex(_)) {
+            Ordering::Equal
+        } else if matches!(a.kind, TokenKind::Hex(_)) {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        }
+    });
 
     (lines, wrapped_segments)
 }

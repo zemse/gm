@@ -5,7 +5,6 @@ use gm_ratatui_extra::{
     extensions::{MouseEventExt, RectExt},
     thematize::Thematize,
 };
-use gm_utils::gm_log;
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{MouseButton, MouseEventKind},
@@ -107,9 +106,7 @@ impl Component for Title {
         if let Some(mouse_event) = event.mouse_event() {
             match mouse_event.kind {
                 MouseEventKind::Down(MouseButton::Left) => {
-                    gm_log!("mouse down in title");
                     if areas.address.contains(mouse_event.position()) {
-                        gm_log!("mouse down in address");
                         actions.copy_to_clipboard(account, Some(mouse_event.position()));
                     }
                 }

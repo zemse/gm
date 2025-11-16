@@ -780,7 +780,7 @@ impl App {
                         }
                         if char == 'r' && key_event.modifiers == KeyModifiers::CONTROL {
                             self.fatal_error_popup
-                                .set_text("test error".to_string(), true);
+                                .set_text("test error https://arbiscan.io/tx/0x5b3258ef730fdfa466f8012f903fe4839eab25aaf8d501307aef7f38b37e5e28".to_string(), true);
                         }
                         if char == 't' && key_event.modifiers == KeyModifiers::CONTROL {
                             self.context.push(Page::Trade(TradePage::default()));
