@@ -706,6 +706,10 @@ impl App {
                 &mut actions,
             );
         } else {
+            let r =
+                Title.handle_event(&event, areas.title, areas.popup, tr, sd, &self.shared_state)?;
+            actions.merge(r);
+
             let is_key_event = event.key_event().is_some();
             let mut body_area = areas.body;
 
