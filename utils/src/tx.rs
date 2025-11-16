@@ -1,6 +1,6 @@
 use alloy::{
     consensus::{TxEip1559, TxType},
-    primitives::{Address, FixedBytes},
+    primitives::{Address, FixedBytes, TxKind},
     providers::Provider,
     rpc::{json_rpc::ErrorPayload, types::TransactionRequest},
     sol_types::SolCall,
@@ -20,6 +20,10 @@ pub async fn build(
     mut tx: TransactionRequest,
 ) -> crate::Result<TxEip1559> {
     let provider = network.get_provider()?;
+
+    if tx.to.is_none() {
+        tx.to = Some(TxKind::Create);
+    }
 
     let nonce = provider.get_transaction_count(sender_account).await?;
     tx.nonce = Some(nonce);
@@ -41,7 +45,7 @@ pub async fn build(
     let estimate = if estimate_result.is_err()
         && format!("{:?}", &estimate_result).contains("insufficient funds")
     {
-        // re-estimate wihout gas price fields
+        // re-estimate without gas price fields
         let mut tx_temp = tx.clone();
         tx_temp.gas_price = None;
         tx_temp.max_fee_per_gas = None;
@@ -61,13 +65,7 @@ pub async fn build(
 
     tx.transaction_type = Some(2); // EIP-1559 transaction type
 
-    let tx = tx
-        .transaction_type(TxType::Eip1559.into())
-        .build_typed_tx()
-        .map_err(|_| crate::Error::TxTypeNotSpecified)?
-        .eip1559()
-        .ok_or(crate::Error::TxTypeIsNotEip1559)?
-        .clone();
+    let tx = tx.transaction_type(TxType::Eip1559.into()).build_1559()?;
 
     Ok(tx)
 }

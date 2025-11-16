@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
 use alloy::{
+    consensus::error::ValueError,
     primitives::Address,
+    rpc::types::TransactionRequest,
     transports::{RpcError, TransportErrorKind},
 };
 use serde_json::Value;
@@ -176,6 +178,9 @@ pub enum UtilsError {
 
     #[error("Operation aborted due to shutdown.")]
     AbortDueToShutdown,
+
+    #[error(transparent)]
+    AlloyFromValueTxReq(#[from] ValueError<TransactionRequest>),
 }
 
 impl UtilsError {

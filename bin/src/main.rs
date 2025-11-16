@@ -2,7 +2,7 @@ use clap::Parser;
 use gm_ratatui_extra::widgets::popup::PopupWidget;
 use gm_tui::{
     pages::{shell::ShellPage, walletconnect::WalletConnectPage, Page},
-    MainMenuItem,
+    Focus, MainMenuItem,
 };
 
 mod cli;
@@ -30,22 +30,25 @@ async fn main() -> gm_tui::Result<()> {
                 }
 
                 main_menu.set_focussed_item(MainMenuItem::WalletConnect);
-                tui_app.insert_page(Page::WalletConnect(wc));
+                tui_app.set_page(Page::WalletConnect(wc));
             }
 
             Commands::Shell {
                 expose_private_key: _,
                 cmd,
             } => {
-                let mut run_page = ShellPage::default();
-                if !cmd.is_empty() {
-                    let (input, cursor) = run_page.get_user_input_mut().expect("not in input mode");
-                    *input = cmd.join(" ");
-                    *cursor = input.len();
-                    pre_events = Some(vec![gm_tui::AppEvent::INPUT_KEY_ENTER]);
+                if cmd.is_empty() {
+                    println!("Please provide a command to run");
+
+                    return Ok(());
                 }
+                let run_page = ShellPage::from_command(cmd);
+
                 main_menu.set_focussed_item(MainMenuItem::Shell);
-                tui_app.insert_page(Page::Shell(run_page));
+                tui_app.set_page(Page::Shell(run_page));
+                tui_app.update_focus(Focus::Body);
+                tui_app.hide_main_menu = true;
+                pre_events = Some(vec![gm_tui::AppEvent::INPUT_KEY_ENTER]);
             }
 
             Commands::InviteCode { code } => {

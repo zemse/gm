@@ -9,6 +9,7 @@ use alloy::{
 };
 use gm_common::tx_meta::TransactionMeta;
 use gm_ratatui_extra::{
+    act::Act,
     confirm_popup::{ConfirmPopup, ConfirmResult},
     extensions::ThemedWidget,
     popup::PopupWidget,
@@ -26,6 +27,7 @@ use gm_utils::{
     tx,
 };
 
+#[derive(Debug)]
 pub enum SignTxEvent {
     /// When user selects cancel on the initial prompt or presses ESC
     /// during the process.
@@ -68,6 +70,7 @@ pub enum SignTxPopup {
     },
     PromptBuilt {
         confirm_popup: ConfirmPopup,
+        confirm_text_updated: bool,
         account: Address,
         network: Network,
         tx_req: TransactionRequest,
@@ -217,18 +220,19 @@ impl SignTxPopup {
         };
     }
 
-    pub fn handle_event<F1>(
+    pub fn handle_event(
         &mut self,
         event: &AppEvent,
         popup_area: Rect,
-        mut callback: F1,
-    ) -> crate::Result<PostHandleEventActions>
-    where
-        F1: FnMut(SignTxEvent) -> crate::Result<()>,
-    {
-        let mut actions = PostHandleEventActions::default();
-
+        actions: &mut PostHandleEventActions,
+    ) -> crate::Result<Option<SignTxEvent>> {
         let mut reset = false;
+        let mut result_event = None;
+
+        if !matches!(self, SignTxPopup::Closed) {
+            actions.ignore_left();
+            actions.ignore_right();
+        }
 
         match self {
             SignTxPopup::Closed => {}
@@ -276,11 +280,10 @@ impl SignTxPopup {
 
                     match build_result {
                         Ok(tx_built) => {
-                            callback(SignTxEvent::Built)?;
-
                             // Transition to Signing state
                             *self = SignTxPopup::PromptBuilt {
-                                confirm_popup: mem::take(confirm_popup).with_text(String::new()),
+                                confirm_popup: mem::take(confirm_popup),
+                                confirm_text_updated: false,
                                 account: *account,
                                 network: mem::take(network),
                                 tx_req: mem::take(tx_req),
@@ -288,13 +291,10 @@ impl SignTxPopup {
                                 tx_meta: meta_result.unwrap_or_default(),
                             };
 
-                            return Ok(actions);
+                            return Ok(Some(SignTxEvent::Built));
                         }
                         Err(err) => {
-                            callback(SignTxEvent::Error {
-                                code: -32603, // Internal error
-                                message: format!("Failed to build transaction: {}", err),
-                            })?;
+                            let message = format!("Failed to build transaction: {}", err);
 
                             // Show error message in the global
                             actions.set_error(err.into());
@@ -302,12 +302,15 @@ impl SignTxPopup {
                             // Return to prompt state
                             *self = SignTxPopup::Closed;
 
-                            return Ok(actions);
+                            return Ok(Some(SignTxEvent::Error {
+                                code: -32603, // Internal error
+                                message,
+                            }));
                         }
                     }
                 }
 
-                match confirm_popup.handle_event(event.input_event(), popup_area, &mut actions)? {
+                match confirm_popup.handle_event(event.input_event(), popup_area, actions)? {
                     Some(ConfirmResult::Confirmed) => {
                         // If user confirms before building, wait for build and meta jobs to be finished
                         if build_job.is_some() && meta_job.is_some() {
@@ -333,20 +336,26 @@ impl SignTxPopup {
                     }
                     Some(ConfirmResult::Canceled) => {
                         confirm_popup.close();
-                        callback(SignTxEvent::Cancelled)?;
+                        result_event = Some(SignTxEvent::Cancelled);
                     }
                     None => {}
                 }
             }
             Self::PromptBuilt {
                 confirm_popup,
+                confirm_text_updated,
                 account,
                 network,
                 tx_req,
                 tx_built,
                 tx_meta,
             } => {
-                match confirm_popup.handle_event(event.input_event(), popup_area, &mut actions)? {
+                if !*confirm_text_updated {
+                    confirm_popup.set_text(fmt_tx_request(&network, &tx_req), true);
+                    *confirm_text_updated = true;
+                }
+
+                match confirm_popup.handle_event(event.input_event(), popup_area, actions)? {
                     Some(ConfirmResult::Confirmed) => {
                         let confirm_popup = mem::take(confirm_popup);
 
@@ -366,7 +375,7 @@ impl SignTxPopup {
                     }
                     Some(ConfirmResult::Canceled) => {
                         confirm_popup.close();
-                        callback(SignTxEvent::Cancelled)?;
+                        result_event = Some(SignTxEvent::Cancelled);
                     }
                     None => {}
                 }
@@ -380,10 +389,10 @@ impl SignTxPopup {
                 meta_job,
             } => {
                 if let Some(TextPopupEvent::Closed) =
-                    text_popup.handle_event(event.input_event(), popup_area, &mut actions)
+                    text_popup.handle_event(event.input_event(), popup_area, actions)
                 {
                     // User closed the popup while building
-                    callback(SignTxEvent::Cancelled)?;
+                    result_event = Some(SignTxEvent::Cancelled);
 
                     reset = true;
                 }
@@ -394,7 +403,7 @@ impl SignTxPopup {
 
                     match build_result {
                         Ok(tx_built) => {
-                            callback(SignTxEvent::Built)?;
+                            result_event = Some(SignTxEvent::Built);
 
                             // Transition to Signing state
                             *self = SignTxPopup::Signing {
@@ -408,10 +417,10 @@ impl SignTxPopup {
                             }
                         }
                         Err(err) => {
-                            callback(SignTxEvent::Error {
+                            result_event = Some(SignTxEvent::Error {
                                 code: -32603, // Internal error
                                 message: format!("Failed to build transaction: {}", err),
-                            })?;
+                            });
 
                             // Show error message in the global
                             actions.set_error(err.into());
@@ -432,10 +441,10 @@ impl SignTxPopup {
                 sign_job,
             } => {
                 if let Some(TextPopupEvent::Closed) =
-                    text_popup.handle_event(event.input_event(), popup_area, &mut actions)
+                    text_popup.handle_event(event.input_event(), popup_area, actions)
                 {
                     // User closed the popup while signing
-                    callback(SignTxEvent::Cancelled)?;
+                    result_event = Some(SignTxEvent::Cancelled);
 
                     reset = true;
                 }
@@ -465,7 +474,7 @@ impl SignTxPopup {
                         if let Ok(result) = sign_job.receiver.try_recv() {
                             match result {
                                 Ok(tx_signed) => {
-                                    callback(SignTxEvent::Signed)?;
+                                    result_event = Some(SignTxEvent::Signed);
 
                                     // Transition to Sending state
                                     *self = SignTxPopup::Sending {
@@ -478,10 +487,10 @@ impl SignTxPopup {
                                     }
                                 }
                                 Err(err) => {
-                                    callback(SignTxEvent::Error {
+                                    result_event = Some(SignTxEvent::Error {
                                         code: -32603, // Internal error
                                         message: format!("Failed to sign transaction: {}", err),
-                                    })?;
+                                    });
 
                                     // Show error message in the global
                                     actions.set_error(err.into());
@@ -503,10 +512,10 @@ impl SignTxPopup {
                 send_job,
             } => {
                 if let Some(TextPopupEvent::Closed) =
-                    text_popup.handle_event(event.input_event(), popup_area, &mut actions)
+                    text_popup.handle_event(event.input_event(), popup_area, actions)
                 {
                     // User closed the popup while sending
-                    callback(SignTxEvent::Cancelled)?;
+                    result_event = Some(SignTxEvent::Cancelled);
 
                     reset = true;
                 }
@@ -545,16 +554,18 @@ impl SignTxPopup {
                                         tx_req: mem::take(tx_req),
                                         tx_hash,
                                         wait_job: None,
-                                    }
+                                    };
+
+                                    result_event = Some(SignTxEvent::Broadcasted(tx_hash))
                                 }
                                 Err(err) => {
-                                    callback(SignTxEvent::Error {
+                                    result_event = Some(SignTxEvent::Error {
                                         code: -32603, // Internal error
                                         message: format!(
                                             "Failed to broadcast transaction: {}",
                                             err
                                         ),
-                                    })?;
+                                    });
 
                                     // Show error message in the global
                                     actions.set_error(err.into());
@@ -576,10 +587,10 @@ impl SignTxPopup {
                 wait_job,
             } => {
                 if let Some(TextPopupEvent::Closed) =
-                    text_popup.handle_event(event.input_event(), popup_area, &mut actions)
+                    text_popup.handle_event(event.input_event(), popup_area, actions)
                 {
                     // User closed the popup while waiting
-                    callback(SignTxEvent::Cancelled)?;
+                    result_event = Some(SignTxEvent::Cancelled);
 
                     reset = true;
                 }
@@ -620,9 +631,9 @@ impl SignTxPopup {
                             match result {
                                 Ok(is_confirmed) => {
                                     if is_confirmed {
-                                        callback(SignTxEvent::Confirmed(*tx_hash))?;
+                                        result_event = Some(SignTxEvent::Confirmed(*tx_hash));
                                     } else {
-                                        callback(SignTxEvent::Failed(*tx_hash))?;
+                                        result_event = Some(SignTxEvent::Failed(*tx_hash));
                                     }
 
                                     *self = SignTxPopup::Done {
@@ -636,10 +647,10 @@ impl SignTxPopup {
                                     };
                                 }
                                 Err(err) => {
-                                    callback(SignTxEvent::Error {
+                                    result_event = Some(SignTxEvent::Error {
                                         code: -32603, // Internal error
                                         message: format!("Transaction failed: {}", err),
-                                    })?;
+                                    });
 
                                     // Show error message in the global
                                     actions.set_error(err.into());
@@ -659,10 +670,10 @@ impl SignTxPopup {
                 is_confirmed,
             } => {
                 if let Some(TextPopupEvent::Closed) =
-                    text_popup.handle_event(event.input_event(), popup_area, &mut actions)
+                    text_popup.handle_event(event.input_event(), popup_area, actions)
                 {
                     // User closed the popup while building
-                    callback(SignTxEvent::Done)?;
+                    result_event = Some(SignTxEvent::Done);
 
                     reset = true;
                 }
@@ -692,7 +703,7 @@ impl SignTxPopup {
             self.reset();
         }
 
-        Ok(actions)
+        Ok(result_event)
     }
 
     pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme)

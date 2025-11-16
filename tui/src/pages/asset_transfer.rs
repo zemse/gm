@@ -152,23 +152,22 @@ impl Component for AssetTransferPage {
                 self.form.advance_cursor();
             }
         } else if self.tx_popup.is_open() {
-            let r = self.tx_popup.handle_event(event, popup_area, |tx_result| {
-                match tx_result {
-                    SignTxEvent::Confirmed(_) => {
-                        actions.refresh_assets();
-                    }
-                    SignTxEvent::Cancelled => {
-                        actions.ignore_esc();
-                    }
-                    SignTxEvent::Done => {
-                        actions.page_pop();
-                        actions.ignore_esc();
-                    }
-                    _ => {}
+            match self
+                .tx_popup
+                .handle_event(event, popup_area, &mut actions)?
+            {
+                Some(SignTxEvent::Confirmed(_)) => {
+                    actions.refresh_assets();
                 }
-                Ok(())
-            })?;
-            actions.merge(r);
+                Some(SignTxEvent::Cancelled) => {
+                    actions.ignore_esc();
+                }
+                Some(SignTxEvent::Done) => {
+                    actions.page_pop();
+                    actions.ignore_esc();
+                }
+                _ => {}
+            }
         } else {
             // Handle form events
             if self.form.is_focused(FormItem::To)

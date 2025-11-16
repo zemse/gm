@@ -76,7 +76,7 @@ impl Button {
 
     pub fn area(&self, area: Rect) -> Rect {
         Rect {
-            width: (self.label.len() + 2) as u16,
+            width: (self.label.len() + 4) as u16,
             height: 3,
             x: area.x,
             y: area.y,
@@ -123,7 +123,7 @@ impl Button {
                 })
                 .render_ref(button_area, buf);
 
-            Line::from(self.label).render_ref(button_area.block_inner(), buf);
+            Line::from(self.label).render_ref(button_area.block_inner().margin_h(1), buf);
         }
     }
 }

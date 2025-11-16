@@ -3,7 +3,6 @@ use crate::pages::sign_tx_popup::SignTxPopup;
 use crate::post_handle_event::PostHandleEventActions;
 use crate::traits::Component;
 use crate::widgets::{address_book_popup, networks_popup, AddressBookPopup, NetworksPopup};
-use gm_ratatui_extra::act::Act;
 use gm_ratatui_extra::button::Button;
 use gm_ratatui_extra::extensions::ThemedWidget;
 use gm_ratatui_extra::form::{Form, FormEvent, FormWidget};
@@ -133,8 +132,8 @@ impl Component for SendMessagePage {
                 self.form.advance_cursor();
             }
         } else if self.tx_popup.is_open() {
-            let r = self.tx_popup.handle_event(event, popup_area, |_| Ok(()))?;
-            actions.merge(r);
+            self.tx_popup
+                .handle_event(event, popup_area, &mut actions)?;
         } else {
             // Handle form events
             if self.form.is_focused(FormItem::To)

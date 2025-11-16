@@ -18,17 +18,22 @@ use std::{
     process::{self, Command, Stdio},
     sync::mpsc::Sender,
     thread,
+    time::Duration,
 };
 
 use alloy::{hex, primitives::Address, rpc::types::TransactionRequest};
 use gm_ratatui_extra::{
-    act::Act, extensions::ThemedWidget, input_box, text_interactive::TextInteractive,
+    act::Act, extensions::ThemedWidget, input_box, popup::PopupWidget,
+    text_interactive::TextInteractive,
 };
 use gm_rpc_proxy::{
     error::RpcProxyError,
     rpc_types::{ErrorObj, ResponsePayload},
 };
-use gm_utils::{disk_storage::DiskStorageInterface, network::NetworkStore};
+use gm_utils::{
+    disk_storage::DiskStorageInterface,
+    network::{Network, NetworkStore},
+};
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{Event, KeyCode, KeyModifiers},
@@ -49,6 +54,8 @@ use crate::{
     traits::Component,
     AppEvent,
 };
+
+use super::sign_tx_popup::SignTxEvent;
 
 #[derive(Debug)]
 enum ShellLine {
@@ -78,7 +85,8 @@ pub enum ShellUpdate {
     StdErr(String),
     StdErr_Error(io::Error),
 
-    Wait(process::ExitStatus),
+    WaitResp(process::ExitStatus),
+    Wait_Error(io::Error),
 
     Kill_Error(io::Error),
 
@@ -139,7 +147,15 @@ impl Default for ShellPage {
 }
 
 impl ShellPage {
-    pub fn get_user_input_mut(&mut self) -> Option<(&mut String, &mut usize)> {
+    pub fn from_command(cmd: Vec<String>) -> Self {
+        let mut run_page = ShellPage::default();
+        let (input, cursor) = run_page.get_user_input_mut().expect("not in input mode");
+        *input = cmd.join(" ");
+        *cursor = input.len();
+        run_page
+    }
+
+    fn get_user_input_mut(&mut self) -> Option<(&mut String, &mut usize)> {
         self.cmd_lines.last_mut().and_then(|cmd_line| {
             if let ShellLine::UserInput(input) = cmd_line {
                 Some((input, &mut self.text_cursor))
@@ -172,6 +188,11 @@ impl ShellPage {
         let mut server_threads = vec![];
         let mut env_vars = HashMap::new();
 
+        env_vars.insert(
+            "SENDER".to_string(),
+            ss.config.get_current_account()?.to_string(),
+        );
+
         let mut port = 9393;
         for network in networks {
             let rpc_url = network.get_rpc()?.parse()?;
@@ -181,6 +202,7 @@ impl ShellPage {
             let network_name = network.name.clone();
             let current_account = ss.try_current_account()?;
             let exit_signal = self.exit_signal.clone();
+            let chain_id = network.chain_id;
             server_threads.push(tokio::spawn(async move {
                 let tr_clone = tr.clone();
                 let result = gm_rpc_proxy::serve(
@@ -189,12 +211,22 @@ impl ShellPage {
                     rpc_url,
                     exit_signal,
                     move |request| {
-                        if request.method == "eth_accounts" {
+                        if request.method == "web3_clientVersion" {
+                            // Synchronous immediate response
+                            Ok(gm_rpc_proxy::OverrideResult::Sync(
+                                ResponsePayload::Success(json!("gm")),
+                            ))
+                        } else if request.method == "eth_chainId" {
+                            // Synchronous immediate response
+                            Ok(gm_rpc_proxy::OverrideResult::Sync(
+                                ResponsePayload::Success(json!(format!("0x{:x}", chain_id))),
+                            ))
+                        } else if request.method == "eth_accounts" {
                             // Synchronous immediate response
                             Ok(gm_rpc_proxy::OverrideResult::Sync(
                                 ResponsePayload::Success(json!([current_account])),
                             ))
-                        } else if request.method == "eth_sendTransction" {
+                        } else if request.method == "eth_sendTransaction" {
                             let (oneshot_tr, oneshot_rv) =
                                 oneshot::channel::<ResponsePayload<Value>>();
 
@@ -303,7 +335,7 @@ impl Component for ShellPage {
         &mut self,
         event: &AppEvent,
         area: Rect,
-        _popup_area: Rect,
+        popup_area: Rect,
         tr: &Sender<AppEvent>,
         _: &CancellationToken,
         ss: &SharedState,
@@ -314,8 +346,10 @@ impl Component for ShellPage {
             self.create_server_threads(tr, ss)?;
         }
 
-        self.display
-            .handle_event(event.input_event(), area, &mut actions);
+        if !self.tx_popup.is_open() && !self.sign_popup.is_open() {
+            self.display
+                .handle_event(event.input_event(), area, &mut actions);
+        }
 
         if self.prevent_ctrlc_exit {
             actions.ignore_ctrlc();
@@ -360,7 +394,8 @@ impl Component for ShellPage {
                                         self.cmd_lines.push(ShellLine::UserInput(String::new()));
                                         self.text_cursor = 0;
                                     } else {
-                                        self.kill_signal.cancel();
+                                        self.kill_signal = CancellationToken::new();
+
                                         let mut child = Command::new("sh")
                                             .arg("-c")
                                             .arg(text_input)
@@ -429,34 +464,59 @@ impl Component for ShellPage {
                                             }
                                         }));
 
-                                        let tr_stderr = tr.clone();
+                                        let tr_wait = tr.clone();
                                         let kill_signal = self.kill_signal.clone();
-                                        self.wait_thread = Some(thread::spawn(move || {
-                                            while !kill_signal.is_cancelled() {
-                                                if let Ok(status) = child.try_wait() {
-                                                    match status {
-                                                        Some(s) => {
-                                                            let _ = tr_stderr.send(
-                                                                AppEvent::ShellUpdate(
-                                                                    ShellUpdate::Wait(s),
-                                                                ),
-                                                            );
-                                                        }
-                                                        None => {}
+                                        self.wait_thread = Some(thread::spawn(move || loop {
+                                            if kill_signal.is_cancelled() {
+                                                match child.kill() {
+                                                    Ok(_) => {}
+                                                    Err(e) => {
+                                                        let _ =
+                                                            tr_wait.send(AppEvent::ShellUpdate(
+                                                                ShellUpdate::Kill_Error(e),
+                                                            ));
                                                     }
-                                                    thread::sleep(
-                                                        std::time::Duration::from_millis(100),
-                                                    );
                                                 }
+
+                                                match child.wait() {
+                                                    Ok(status) => {
+                                                        let _ =
+                                                            tr_wait.send(AppEvent::ShellUpdate(
+                                                                ShellUpdate::WaitResp(status),
+                                                            ));
+                                                    }
+                                                    Err(e) => {
+                                                        // Something went wrong querying status → report and stop.
+                                                        let _ =
+                                                            tr_wait.send(AppEvent::ShellUpdate(
+                                                                ShellUpdate::Wait_Error(e),
+                                                            ));
+                                                        break;
+                                                    }
+                                                }
+
+                                                break;
                                             }
-                                            match child.kill() {
-                                                Ok(_) => {}
-                                                Err(e) => {
-                                                    let _ = tr_stderr.send(AppEvent::ShellUpdate(
-                                                        ShellUpdate::Kill_Error(e),
+
+                                            match child.try_wait() {
+                                                Ok(Some(s)) => {
+                                                    let _ = tr_wait.send(AppEvent::ShellUpdate(
+                                                        ShellUpdate::WaitResp(s),
                                                     ));
+
+                                                    break;
                                                 }
+                                                Err(e) => {
+                                                    // Something went wrong querying status → report and stop.
+                                                    let _ = tr_wait.send(AppEvent::ShellUpdate(
+                                                        ShellUpdate::Wait_Error(e),
+                                                    ));
+                                                    break;
+                                                }
+                                                _ => {}
                                             }
+
+                                            thread::sleep(Duration::from_millis(100));
                                         }));
                                     }
                                 }
@@ -521,7 +581,7 @@ impl Component for ShellPage {
                     ShellUpdate::StdErr_Error(error) => {
                         return Err(crate::Error::StderrReadFailed(format!("{error:?}")));
                     }
-                    ShellUpdate::Wait(exit_status) => {
+                    ShellUpdate::WaitResp(exit_status) => {
                         self.exit_shell_threads_sync();
                         self.cmd_lines.push(ShellLine::StdOut(format!(
                             "Process exited with {}",
@@ -529,6 +589,9 @@ impl Component for ShellPage {
                         )));
                         self.cmd_lines.push(ShellLine::UserInput(String::new()));
                         self.text_cursor = 0;
+                    }
+                    ShellUpdate::Wait_Error(error) => {
+                        return Err(crate::Error::StderrReadFailed(format!("{error:?}")));
                     }
                     ShellUpdate::Kill_Error(error) => {
                         return Err(crate::Error::ProcessKillFailed(format!("{error:?}")));
@@ -561,7 +624,53 @@ impl Component for ShellPage {
         if let Some(request) = self.requests.first_mut() {
             match &request.params {
                 UserRequestParams::SendTransaction(transaction_request) => {
-                    todo!("{transaction_request:?}")
+                    // TODO include address and chain id in the request params
+                    // so that legacy tx without chain_id can be possible to be sent
+
+                    let current = ss.try_current_account()?;
+
+                    if !self.tx_popup.is_open() {
+                        let tx_req = transaction_request[0].clone();
+                        let network =
+                            // TODO take chain id from the server
+                            Network::from_chain_id(tx_req.chain_id.unwrap_or(11155111) as u32)?;
+
+                        self.tx_popup = SignTxPopup::new(current, network, *tx_req)
+                    }
+
+                    match self
+                        .tx_popup
+                        .handle_event(event, popup_area, &mut actions)?
+                    {
+                        Some(SignTxEvent::Broadcasted(tx_hash)) => {
+                            let reply_to = request
+                                .reply_to
+                                .take()
+                                .ok_or(crate::Error::ValueAlreadyTaken("UserRequest.reply_to"))?;
+                            reply_to
+                                .send(ResponsePayload::Success(json!(tx_hash.to_string())))
+                                .map_err(|_| crate::Error::OneshotSendFailed)?;
+                        }
+                        Some(SignTxEvent::Error { code, message }) => {
+                            let reply_to = request
+                                .reply_to
+                                .take()
+                                .ok_or(crate::Error::ValueAlreadyTaken("UserRequest.reply_to"))?;
+                            reply_to
+                                .send(ResponsePayload::Error(ErrorObj {
+                                    code: code as i32,
+                                    message,
+                                    data: None,
+                                }))
+                                .map_err(|_| crate::Error::OneshotSendFailed)?;
+                        }
+                        _ => {}
+                    }
+
+                    // If tx popup is closed during this moment, remove the request from the queue
+                    if !self.tx_popup.is_open() {
+                        self.requests.remove(0);
+                    }
                 }
                 UserRequestParams::SignMessage((msg, address)) => {
                     let current = ss.try_current_account()?;

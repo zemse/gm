@@ -12,5 +12,5 @@ mod threads;
 mod traits;
 mod widgets;
 
-pub use app::{App, MainMenuItem};
+pub use app::{App, Focus, MainMenuItem};
 pub use events::AppEvent;

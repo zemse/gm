@@ -101,6 +101,9 @@ pub enum Error {
     #[error("Failed to read from child stderr. (Error: {0})")]
     StderrReadFailed(String),
 
+    #[error("Error while child wait. (Error: {0})")]
+    WaitFailed(String),
+
     #[error("Failed to kill the process. (Error: {0})")]
     ProcessKillFailed(String),
 

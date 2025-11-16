@@ -101,15 +101,11 @@ impl TextInteractive {
                 if seg.start_line < self.scroll_offset {
                     seg.start_line = self.scroll_offset;
                     seg.start_char_idx = 0;
-                } else {
-                    seg.start_line -= self.scroll_offset;
                 }
 
                 if seg.end_line >= self.scroll_offset + area.height as usize {
                     seg.end_line = self.scroll_offset + area.height as usize - 1;
                     seg.end_char_idx = lines[seg.end_line].len();
-                } else {
-                    seg.end_line -= self.scroll_offset;
                 }
 
                 seg
@@ -193,27 +189,37 @@ impl TextInteractive {
                 }
                 Event::Mouse(mouse_event) => match mouse_event.kind {
                     MouseEventKind::Down(MouseButton::Left) => {
-                        let (_, _, segments) = self.get_visible_text(area);
+                        if text_area.contains(mouse_event.position()) {
+                            let (_, _, segments) = self.get_visible_text(area);
 
-                        Self::segments_iter(segments, text_area, |segment, span_area| {
-                            if span_area.contains(mouse_event.position()) {
-                                match &segment.kind {
-                                    TokenKind::Url(url) => {
-                                        actions.open_url(url.clone(), Some(mouse_event.position()));
+                            Self::segments_iter(
+                                segments,
+                                text_area,
+                                self.scroll_offset,
+                                |segment, span_area| {
+                                    if span_area.contains(mouse_event.position()) {
+                                        match &segment.kind {
+                                            TokenKind::Url(url) => {
+                                                actions.open_url(
+                                                    url.clone(),
+                                                    Some(mouse_event.position()),
+                                                );
+                                            }
+                                            TokenKind::Hex(str) => {
+                                                actions.copy_to_clipboard(
+                                                    str.clone(),
+                                                    Some(mouse_event.position()),
+                                                );
+                                            }
+                                        }
                                     }
-                                    TokenKind::Hex(str) => {
-                                        actions.copy_to_clipboard(
-                                            str.clone(),
-                                            Some(mouse_event.position()),
-                                        );
-                                    }
-                                }
+                                },
+                            );
+
+                            if self.mouse_drag_start.is_none() {
+                                self.mouse_drag_start =
+                                    Some(mouse_event.position().nearest_inner(text_area));
                             }
-                        });
-
-                        if self.mouse_drag_start.is_none() {
-                            self.mouse_drag_start =
-                                Some(mouse_event.position().nearest_inner(text_area));
                         }
                     }
                     MouseEventKind::Drag(MouseButton::Left) => {
@@ -237,12 +243,17 @@ impl TextInteractive {
                         let (_, _, segments) = self.get_visible_text(area);
 
                         let mut hovered_on_some_segment = false;
-                        Self::segments_iter(segments, text_area, |segment, span_area| {
-                            if span_area.contains(mouse_event.position()) {
-                                hovered_on_some_segment = true;
-                                self.segment_idx = Some(segment.idx);
-                            }
-                        });
+                        Self::segments_iter(
+                            segments,
+                            text_area,
+                            self.scroll_offset,
+                            |segment, span_area| {
+                                if span_area.contains(mouse_event.position()) {
+                                    hovered_on_some_segment = true;
+                                    self.segment_idx = Some(segment.idx);
+                                }
+                            },
+                        );
 
                         if !hovered_on_some_segment {
                             self.segment_idx = None;
@@ -269,13 +280,22 @@ impl TextInteractive {
         }
     }
 
-    fn segments_iter<F>(segments: Vec<WrappedSegment>, text_area: Rect, mut callback: F)
-    where
+    fn segments_iter<F>(
+        segments: Vec<WrappedSegment>,
+        text_area: Rect,
+        scroll_offset: usize,
+        mut callback: F,
+    ) where
         F: FnMut(&WrappedSegment, Rect),
     {
         for segment in segments {
             for line_idx in segment.start_line..=segment.end_line {
-                let line_area = text_area.margin_top(line_idx as u16).change_height(1);
+                let line_area = Rect {
+                    x: text_area.x,
+                    y: text_area.y + (line_idx.saturating_sub(scroll_offset)) as u16,
+                    width: text_area.width,
+                    height: 1,
+                };
 
                 let Some((start, end)) =
                     (if line_idx == segment.start_line && line_idx == segment.end_line {
@@ -284,6 +304,8 @@ impl TextInteractive {
                         Some((segment.start_char_idx, line_area.width as usize))
                     } else if line_idx == segment.end_line {
                         Some((0, segment.end_char_idx))
+                    } else if line_idx > segment.start_line && line_idx < segment.end_line {
+                        Some((0, line_area.width as usize))
                     } else {
                         None
                     })
@@ -293,7 +315,9 @@ impl TextInteractive {
 
                 let span_area = line_area
                     .margin_left(start as u16)
-                    .margin_right(text_area.width - end as u16);
+                    // TODO the text wrap has a bug, sometimes it seems that lines are
+                    // longer than the constrained width.
+                    .margin_right(text_area.width.saturating_sub(end as u16));
 
                 callback(&segment, span_area);
             }
@@ -393,7 +417,7 @@ impl ThemedWidget for TextInteractive {
         let text_area = if total > area.height as usize {
             CustomScrollBar {
                 cursor: self.scroll_offset,
-                total_items: total,
+                total_items: total - area.height as usize + 1,
                 paginate: false,
             }
             .render(scroll_area, buf, theme);
@@ -407,17 +431,22 @@ impl ThemedWidget for TextInteractive {
             line.set_style(theme.style_dim()).render(line_area, buf);
         }
 
-        Self::segments_iter(segments, text_area, |segment, span_area| {
-            let mut style = Style::default().add_modifier(Modifier::UNDERLINED);
+        Self::segments_iter(
+            segments,
+            text_area,
+            self.scroll_offset,
+            |segment, span_area| {
+                let mut style = Style::default().add_modifier(Modifier::UNDERLINED);
 
-            let is_segment_focused = self.segment_idx.is_some_and(|idx| idx == segment.idx);
+                let is_segment_focused = self.segment_idx.is_some_and(|idx| idx == segment.idx);
 
-            if is_segment_focused {
-                style = theme.select_focused();
-            }
+                if is_segment_focused {
+                    style = theme.select_focused();
+                }
 
-            buf.set_style(span_area, style);
-        });
+                buf.set_style(span_area, style);
+            },
+        );
 
         if let Some((start, current)) = self.mouse_drag_start.zip(self.mouse_drag_current) {
             let (start, end) = start.sort(current);

@@ -462,52 +462,50 @@ impl Component for WalletConnectPage {
                 None => {}
             }
         } else if self.tx_popup.is_open() {
-            let r = self.tx_popup.handle_event(event, area, |tx_result| {
-                match tx_result {
-                    SignTxEvent::Cancelled => {
-                        let (req, tr_2) = get_req_tr_2()?;
-                        tr_2.send(WcEvent::Message(Box::new(req.create_response(
-                            WcData::Error {
-                                message: "User denied tx signing".to_string(),
-                                code: 5000,
-                                data: None,
-                            },
-                            Some(IrnTag::SessionRequestResponse),
-                        ))))?;
-                        remove_current_request_3 = true;
-                    }
-                    SignTxEvent::Broadcasted(tx_hash) => {
-                        let (req, tr_2) = get_req_tr_2()?;
-                        tr_2.send(WcEvent::Message(Box::new(req.create_response(
-                            WcData::SessionRequestResponse(Value::String(hex::encode_prefixed(
-                                tx_hash,
-                            ))),
-                            None,
-                        ))))?;
-                        remove_current_request = true;
-                    }
-                    SignTxEvent::Error { code, message } => {
-                        let (req, tr_2) = get_req_tr_2()?;
-                        tr_2.send(WcEvent::Message(Box::new(req.create_response(
-                            WcData::Error {
-                                message,
-                                code,
-                                data: None,
-                            },
-                            Some(IrnTag::SessionRequestResponse),
-                        ))))?;
-                        remove_current_request_2 = true;
-                    }
+            match self.tx_popup.handle_event(event, area, &mut actions)? {
+                Some(SignTxEvent::Cancelled) => {
+                    let (req, tr_2) = get_req_tr_2()?;
+                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                        WcData::Error {
+                            message: "User denied tx signing".to_string(),
+                            code: 5000,
+                            data: None,
+                        },
+                        Some(IrnTag::SessionRequestResponse),
+                    ))))?;
+                    remove_current_request_3 = true;
+                }
+                Some(SignTxEvent::Broadcasted(tx_hash)) => {
+                    let (req, tr_2) = get_req_tr_2()?;
+                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                        WcData::SessionRequestResponse(Value::String(hex::encode_prefixed(
+                            tx_hash,
+                        ))),
+                        None,
+                    ))))?;
+                    remove_current_request = true;
+                }
+                Some(SignTxEvent::Error { code, message }) => {
+                    let (req, tr_2) = get_req_tr_2()?;
+                    tr_2.send(WcEvent::Message(Box::new(req.create_response(
+                        WcData::Error {
+                            message,
+                            code,
+                            data: None,
+                        },
+                        Some(IrnTag::SessionRequestResponse),
+                    ))))?;
+                    remove_current_request_2 = true;
+                }
+                Some(
                     SignTxEvent::Built
                     | SignTxEvent::Signed
                     | SignTxEvent::Confirmed(_)
                     | SignTxEvent::Failed(_)
-                    | SignTxEvent::Done => {}
-                }
-
-                Ok(())
-            })?;
-            actions.merge(r);
+                    | SignTxEvent::Done,
+                )
+                | None => {}
+            }
         } else if self.sign_popup.is_open() {
             if let Some(sign_popup_event) = self
                 .sign_popup

@@ -209,7 +209,7 @@ struct AppAreas {
 }
 
 #[derive(Clone, PartialEq)]
-enum Focus {
+pub enum Focus {
     Menu,
     Body,
     Popup { on_close: Box<Focus> },
@@ -218,6 +218,7 @@ enum Focus {
 pub struct App {
     exit: bool,
     focus: Focus,
+    pub hide_main_menu: bool,
     pub main_menu: Select<MainMenuItem>,
     context: Vec<Page>,
     shared_state: SharedState,
@@ -251,6 +252,7 @@ impl App {
         let mut app = Self {
             exit: false,
             focus: Focus::Menu,
+            hide_main_menu: false,
             main_menu: Select::new(
                 Some(MainMenuItem::get_menu(config.get_developer_mode())?),
                 true,
@@ -550,10 +552,12 @@ impl App {
         }
     }
 
-    fn update_focus(&mut self, new_focus: Focus) {
+    pub fn update_focus(&mut self, new_focus: Focus) {
         self.focus = new_focus;
 
-        if self.context.is_empty() {
+        if self.hide_main_menu && self.focus == Focus::Menu {
+            self.focus = Focus::Body;
+        } else if self.context.is_empty() {
             self.focus = Focus::Menu;
         } else if self.focus == Focus::Menu {
             if let Some(page) = self.context.last_mut() {
@@ -720,7 +724,7 @@ impl App {
 
             // If focus is on menu, handle all events. However if focus is not on menu
             // then handle all but key events. This allows to handle mouse clicks.
-            if self.focus == Focus::Menu || !is_key_event {
+            if (self.focus == Focus::Menu || !is_key_event) && !self.hide_main_menu {
                 match self
                     .main_menu
                     .handle_event(event.input_event(), areas.menu)?
@@ -803,7 +807,10 @@ impl App {
                     }
                     KeyCode::Esc => {
                         if !ignore_esc {
-                            if self.context.len() == 1 && self.focus != Focus::Menu {
+                            if self.context.len() == 1
+                                && self.focus != Focus::Menu
+                                && !self.hide_main_menu
+                            {
                                 self.update_focus(Focus::Menu);
                             } else {
                                 let page = self.context.pop();
@@ -837,19 +844,25 @@ impl App {
             Constraint::Length(1),
         ])
         .areas(area);
-        let [menu_area, gap_area, body_area] = Layout::horizontal([
-            Constraint::Length(14),
-            Constraint::Length(1),
-            Constraint::Min(2),
-        ])
-        .areas(middle_area.block_inner());
+
+        let [menu_area, gap_area, body_area] = if self.hide_main_menu {
+            [Rect::default(), Rect::default(), middle_area.block_inner()]
+        } else {
+            let [menu_area, gap_area, body_area] = Layout::horizontal([
+                Constraint::Length(14),
+                Constraint::Length(1),
+                Constraint::Min(2),
+            ])
+            .areas(middle_area.block_inner());
+            [menu_area, gap_area.expand_vertical(1), body_area]
+        };
 
         AppAreas {
             title: title_area,
             middle: middle_area,
             footer: footer_area,
             menu: menu_area,
-            gap: gap_area.expand_vertical(1),
+            gap: gap_area,
             body: body_area,
             popup: {
                 let diff = |num: u16| num.mul(1).saturating_div(8).max(2);
@@ -874,8 +887,8 @@ impl App {
         self.context.last_mut()
     }
 
-    pub fn insert_page(&mut self, page: Page) {
-        self.context.push(page);
+    pub fn set_page(&mut self, page: Page) {
+        self.context = vec![page];
     }
 }
 
@@ -913,8 +926,10 @@ impl Widget for &App {
         }
 
         // Render Main Menu on the Left side
-        self.main_menu
-            .render(areas.menu, buf, &self.shared_state.theme);
+        if !self.hide_main_menu {
+            self.main_menu
+                .render(areas.menu, buf, &self.shared_state.theme);
+        }
 
         let mut body_area = areas.body;
         if self.context.len() > 1 {
