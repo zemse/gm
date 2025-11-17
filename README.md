@@ -1,8 +1,12 @@
-![>gm](./gm-banner-white.png)
+<!-- ![>gm](./gm-banner-white.png) -->
 
-Terminal-based Ethereum accounts manager for devs and security focused users.
+Terminal-based Ethereum accounts manager for devs.
+
+![gm demo](./gm-demo.gif)
 
 <!-- ![gm screenshot](./gm-screenshot.png) -->
+
+Join [telegram group](https://t.me/+m2Lq_q_XqfcyN2Jl) for following this project.
 
 ## Features
 
@@ -24,14 +28,6 @@ Most wallets treat updates casually, some hardware wallet apps would force firmw
 - Long term support: all minor versions receive security patches and bug fixes.
 
 This is an unusually strong commitment that should be in the wallet space, we hardly see it because it's challenging and most people being onboarded to crypto don't care initially.
-
-## Live Demo
-
-```
-ssh demo@gm-tui.com
-```
-
-Run the above command in your terminal, it connects to a EC2 instance which has gm wallet already installed so you can preview it without installing anything.
 
 ## Installation
 
