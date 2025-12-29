@@ -1,4 +1,6 @@
-use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+use ratatui::crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
+};
 
 use crate::extensions::ThemedWidget;
 use crate::testutils::*;
@@ -51,7 +53,14 @@ fn popup_with_open_builder() {
 fn popup_with_title_builder() {
     let popup = Popup::default().with_title("My Title");
     // Title is set (we can verify via rendering)
-    assert!(popup.get_base_popup().get_areas(ratatui::layout::Rect::new(0, 0, 30, 20)).title_area.height > 0);
+    assert!(
+        popup
+            .get_base_popup()
+            .get_areas(ratatui::layout::Rect::new(0, 0, 30, 20))
+            .title_area
+            .height
+            > 0
+    );
 }
 
 #[test]

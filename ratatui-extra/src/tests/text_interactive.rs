@@ -1,6 +1,6 @@
 use ratatui::crossterm::event::{
-    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers, MouseButton,
-    MouseEvent, MouseEventKind,
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers, MouseButton, MouseEvent,
+    MouseEventKind,
 };
 
 use crate::extensions::ThemedWidget;
@@ -165,8 +165,8 @@ fn text_interactive_scroll_up_at_top_does_nothing() {
 
 #[test]
 fn text_interactive_scroll_down() {
-    let mut ti = TextInteractive::default()
-        .with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
+    let mut ti =
+        TextInteractive::default().with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
 
     // Scroll down with area that can only show 2 lines
     ti.scroll_down(20, 2);
@@ -178,8 +178,8 @@ fn text_interactive_scroll_down() {
 
 #[test]
 fn text_interactive_scroll_to_bottom() {
-    let mut ti = TextInteractive::default()
-        .with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
+    let mut ti =
+        TextInteractive::default().with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
 
     ti.scroll_to_bottom(20, 2);
 
@@ -203,8 +203,8 @@ fn text_interactive_scroll_to_bottom_short_content() {
 
 #[test]
 fn text_interactive_up_key_scrolls_up() {
-    let mut ti = TextInteractive::default()
-        .with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
+    let mut ti =
+        TextInteractive::default().with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
     let area = ratatui::layout::Rect::new(0, 0, 20, 3);
     let mut actions = TestAct::default();
 
@@ -221,8 +221,8 @@ fn text_interactive_up_key_scrolls_up() {
 
 #[test]
 fn text_interactive_down_key_scrolls_down() {
-    let mut ti = TextInteractive::default()
-        .with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
+    let mut ti =
+        TextInteractive::default().with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
     let area = ratatui::layout::Rect::new(0, 0, 20, 3);
     let mut actions = TestAct::default();
 
@@ -233,7 +233,8 @@ fn text_interactive_down_key_scrolls_down() {
 
 #[test]
 fn text_interactive_esc_clears_focus() {
-    let mut ti = TextInteractive::default().with_text("Hello https://example.com world".to_string());
+    let mut ti =
+        TextInteractive::default().with_text("Hello https://example.com world".to_string());
     let area = ratatui::layout::Rect::new(0, 0, 40, 10);
     let mut actions = TestAct::default();
 
@@ -252,8 +253,8 @@ fn text_interactive_esc_clears_focus() {
 
 #[test]
 fn text_interactive_mouse_scroll_up() {
-    let mut ti = TextInteractive::default()
-        .with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
+    let mut ti =
+        TextInteractive::default().with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
     let area = ratatui::layout::Rect::new(0, 0, 20, 3);
     let mut actions = TestAct::default();
 
@@ -268,8 +269,8 @@ fn text_interactive_mouse_scroll_up() {
 
 #[test]
 fn text_interactive_mouse_scroll_down() {
-    let mut ti = TextInteractive::default()
-        .with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
+    let mut ti =
+        TextInteractive::default().with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
     let area = ratatui::layout::Rect::new(0, 0, 20, 3);
     let mut actions = TestAct::default();
 
@@ -284,7 +285,8 @@ fn text_interactive_mouse_scroll_down() {
 
 #[test]
 fn text_interactive_focused_ignores_esc() {
-    let mut ti = TextInteractive::default().with_text("Hello https://example.com world".to_string());
+    let mut ti =
+        TextInteractive::default().with_text("Hello https://example.com world".to_string());
     let area = ratatui::layout::Rect::new(0, 0, 50, 10);
     let mut actions = TestAct::default();
 
@@ -357,8 +359,7 @@ fn text_interactive_renders_empty() {
 #[test]
 fn text_interactive_renders_with_scrollbar_when_overflow() {
     let mut term = TestTerminal::new(30, 3);
-    let ti = TextInteractive::default()
-        .with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
+    let ti = TextInteractive::default().with_text("Line1\nLine2\nLine3\nLine4\nLine5".to_string());
     let theme = TestTheme::boxed();
 
     ti.render(term.area, &mut term.buffer, &theme);

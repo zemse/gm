@@ -94,7 +94,10 @@ fn select_cursor_moves_down() {
     let mut select = Select::default().with_list(vec!["A", "B", "C"]);
     let area = ratatui::layout::Rect::new(0, 0, 20, 10);
 
-    let _ = select.handle_event(Some(&ratatui::crossterm::event::Event::Key(key_down())), area);
+    let _ = select.handle_event(
+        Some(&ratatui::crossterm::event::Event::Key(key_down())),
+        area,
+    );
 
     assert_eq!(select.cursor(), 1);
 }
@@ -116,7 +119,10 @@ fn select_cursor_wraps_down() {
     select.set_cursor(2);
     let area = ratatui::layout::Rect::new(0, 0, 20, 10);
 
-    let _ = select.handle_event(Some(&ratatui::crossterm::event::Event::Key(key_down())), area);
+    let _ = select.handle_event(
+        Some(&ratatui::crossterm::event::Event::Key(key_down())),
+        area,
+    );
 
     assert_eq!(select.cursor(), 0);
 }
@@ -141,8 +147,10 @@ fn select_enter_selects_item() {
     select.set_cursor(1);
     let area = ratatui::layout::Rect::new(0, 0, 20, 10);
 
-    let result =
-        select.handle_event(Some(&ratatui::crossterm::event::Event::Key(key_enter())), area);
+    let result = select.handle_event(
+        Some(&ratatui::crossterm::event::Event::Key(key_enter())),
+        area,
+    );
 
     assert!(matches!(result, Ok(Some(SelectEvent::Select(item))) if *item == "B"));
 }

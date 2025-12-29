@@ -117,7 +117,7 @@ fn candle_calc_y() {
 
     assert_eq!(y_open, (100.0 - 80.0) / 10.0); // 2.0
     assert_eq!(y_high, (110.0 - 80.0) / 10.0); // 3.0
-    assert_eq!(y_low, (90.0 - 80.0) / 10.0);   // 1.0
+    assert_eq!(y_low, (90.0 - 80.0) / 10.0); // 1.0
     assert_eq!(y_close, (105.0 - 80.0) / 10.0); // 2.5
 }
 
@@ -433,9 +433,7 @@ fn candle_chart_renders_x_axis() {
 fn candle_chart_renders_y_axis() {
     let mut term = TestTerminal::new(80, 25);
     let mut chart = CandleChart::default();
-    let candles = vec![
-        Candle::new(100.0, 110.0, 105.0, 95.0, 1000000, 2000000),
-    ];
+    let candles = vec![Candle::new(100.0, 110.0, 105.0, 95.0, 1000000, 2000000)];
     chart.update(candles, Interval::OneSecond);
 
     (&chart).render(term.area, &mut term.buffer);

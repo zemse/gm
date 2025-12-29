@@ -1,4 +1,6 @@
-use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+use ratatui::crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
+};
 
 use crate::testutils::*;
 use crate::widgets::confirm_popup::{ConfirmPopup, ConfirmResult};

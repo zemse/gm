@@ -1,4 +1,6 @@
-use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+use ratatui::crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
+};
 
 use crate::extensions::ThemedWidget;
 use crate::testutils::*;
@@ -102,7 +104,11 @@ fn filter_select_popup_open_resets_filter() {
 #[test]
 fn filter_select_popup_set_items() {
     let mut popup: FilterSelectPopup<String> = FilterSelectPopup::default();
-    popup.set_items(Some(vec!["A".to_string(), "B".to_string(), "C".to_string()]));
+    popup.set_items(Some(vec![
+        "A".to_string(),
+        "B".to_string(),
+        "C".to_string(),
+    ]));
     popup.open();
     assert_eq!(popup.display_selection(), "A");
 }

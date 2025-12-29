@@ -1,4 +1,6 @@
-use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+use ratatui::crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
+};
 
 use crate::testutils::*;
 use crate::widgets::filter_select::FilterSelect;
@@ -270,7 +272,8 @@ fn filter_select_set_items_none() {
 
 #[test]
 fn filter_select_set_items_preserves_filter() {
-    let mut fs = FilterSelect::default().with_items(vec!["Apple".to_string(), "Banana".to_string()]);
+    let mut fs =
+        FilterSelect::default().with_items(vec!["Apple".to_string(), "Banana".to_string()]);
     let area = ratatui::layout::Rect::new(0, 0, 30, 15);
 
     // Set filter
@@ -331,7 +334,8 @@ Apple";
 #[test]
 fn filter_select_renders_current_filter() {
     let mut term = TestTerminal::new(30, 5);
-    let mut fs = FilterSelect::default().with_items(vec!["Apple".to_string(), "Banana".to_string()]);
+    let mut fs =
+        FilterSelect::default().with_items(vec!["Apple".to_string(), "Banana".to_string()]);
     let area = ratatui::layout::Rect::new(0, 0, 30, 5);
     let theme = TestTheme::boxed();
 

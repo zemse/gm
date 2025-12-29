@@ -214,10 +214,14 @@ fn mouse_click_toggles_value() {
 
     // Click inside the switch area (inner area after block_inner)
     let click = mouse_click(2, 1);
-    input.handle_event(Some(&Event::Mouse(match click {
-        Event::Mouse(m) => m,
-        _ => panic!(),
-    })), area, &mut actions);
+    input.handle_event(
+        Some(&Event::Mouse(match click {
+            Event::Mouse(m) => m,
+            _ => panic!(),
+        })),
+        area,
+        &mut actions,
+    );
 
     assert!(input.value);
 }
@@ -230,10 +234,14 @@ fn mouse_click_outside_does_nothing() {
 
     // Click outside the switch area
     let click = mouse_click(20, 1);
-    input.handle_event(Some(&Event::Mouse(match click {
-        Event::Mouse(m) => m,
-        _ => panic!(),
-    })), area, &mut actions);
+    input.handle_event(
+        Some(&Event::Mouse(match click {
+            Event::Mouse(m) => m,
+            _ => panic!(),
+        })),
+        area,
+        &mut actions,
+    );
 
     assert!(!input.value);
 }

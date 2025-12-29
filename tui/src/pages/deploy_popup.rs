@@ -52,7 +52,9 @@ pub enum DeployPopup {
         networks_popup: Box<NetworksPopup>,
     },
     /// Network selected, now showing transaction popup
-    Transaction { tx_popup: Box<SignTxPopup> },
+    Transaction {
+        tx_popup: Box<SignTxPopup>,
+    },
 }
 
 impl Default for DeployPopup {
@@ -82,7 +84,13 @@ impl DeployPopup {
             .unwrap_or("Contract")
             .to_string();
 
-        Ok(Self::start(bytecode, contract_name, network, account, networks))
+        Ok(Self::start(
+            bytecode,
+            contract_name,
+            network,
+            account,
+            networks,
+        ))
     }
 
     /// Start deploy flow with bytecode directly
