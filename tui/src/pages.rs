@@ -41,6 +41,7 @@ pub mod asset_transfer;
 pub mod assets;
 pub mod complete_setup;
 pub mod config;
+pub mod deploy_popup;
 pub mod dev_key_capture;
 pub mod footer;
 pub mod invite_popup;

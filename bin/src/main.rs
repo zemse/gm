@@ -1,9 +1,10 @@
 use clap::Parser;
 use gm_ratatui_extra::widgets::popup::PopupWidget;
 use gm_tui::{
-    pages::{shell::ShellPage, walletconnect::WalletConnectPage, Page},
+    pages::{deploy_popup::DeployPopup, shell::ShellPage, walletconnect::WalletConnectPage, Page},
     Focus, MainMenuItem,
 };
+use gm_utils::{disk_storage::DiskStorageInterface, network::Network};
 
 mod cli;
 use crate::cli::{Cli, Commands};
@@ -54,6 +55,19 @@ async fn main() -> gm_tui::Result<()> {
             Commands::InviteCode { code } => {
                 tui_app.invite_popup.set_invite_code(code);
                 tui_app.invite_popup.open();
+            }
+
+            Commands::Deploy { path, network } => {
+                let network = network.map(|n| Network::from_name(&n)).transpose()?;
+                let account = gm_utils::config::Config::load()?.get_current_account()?;
+
+                tui_app.deploy_popup = DeployPopup::from_artifact_path(
+                    &path,
+                    network,
+                    account,
+                    &tui_app.shared_state().networks,
+                )?;
+                tui_app.hide_main_menu = true;
             }
 
             Commands::Wildcard(_) => unreachable!(),

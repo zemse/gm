@@ -3430,6 +3430,7 @@ dependencies = [
  "console",
  "gm-ratatui-extra",
  "gm-tui",
+ "gm-utils",
  "ratatui",
  "tokio",
  "walletconnect-sdk",

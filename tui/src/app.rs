@@ -14,10 +14,11 @@ use crate::demo::{demo_exit_text, demo_text, demo_text_2};
 use crate::{
     pages::{
         account::AccountPage, address_book::AddressBookPage, assets::AssetsPage,
-        complete_setup::CompleteSetupPage, config::ConfigPage, dev_key_capture::DevKeyCapturePage,
-        footer::Footer, invite_popup::InvitePopup, network::NetworkPage,
-        send_message::SendMessagePage, shell::ShellPage, sign_message::SignMessagePage,
-        title::Title, trade::TradePage, walletconnect::WalletConnectPage, Page,
+        complete_setup::CompleteSetupPage, config::ConfigPage, deploy_popup::DeployPopup,
+        dev_key_capture::DevKeyCapturePage, footer::Footer, invite_popup::InvitePopup,
+        network::NetworkPage, send_message::SendMessagePage, shell::ShellPage,
+        sign_message::SignMessagePage, title::Title, trade::TradePage,
+        walletconnect::WalletConnectPage, Page,
     },
     post_handle_event::PostHandleEventActions,
     threads::{
@@ -228,6 +229,7 @@ pub struct App {
 
     fatal_error_popup: TextPopup,
     pub invite_popup: InvitePopup,
+    pub deploy_popup: DeployPopup,
     #[cfg(feature = "demo")]
     demo_popup: TextPopup,
 
@@ -275,6 +277,7 @@ impl App {
                 "If you think this is a bug, please create issue at https://github.com/zemse/gm/issues/new"
             }),
             invite_popup: InvitePopup::default(),
+            deploy_popup: DeployPopup::default(),
             #[cfg(feature = "demo")]
             demo_popup: TextPopup::default(),
 
@@ -291,6 +294,10 @@ impl App {
         app.update_focus(Focus::Menu);
 
         Ok(app)
+    }
+
+    pub fn shared_state(&self) -> &SharedState {
+        &self.shared_state
     }
 
     pub async fn run(&mut self, pre_events: Option<Vec<AppEvent>>) -> crate::Result<()> {
@@ -604,8 +611,14 @@ impl App {
         let fatal_error_popup_open = self.fatal_error_popup.is_open();
 
         let is_invite_popup_open = self.invite_popup.is_open();
+        let is_deploy_popup_open = self.deploy_popup.is_open();
 
-        self.update_popup_focus(demo_popup_shown || fatal_error_popup_open || is_invite_popup_open);
+        self.update_popup_focus(
+            demo_popup_shown
+                || fatal_error_popup_open
+                || is_invite_popup_open
+                || is_deploy_popup_open,
+        );
 
         // Update state based on events
         match &event {
@@ -696,6 +709,9 @@ impl App {
         } else if is_invite_popup_open {
             self.invite_popup
                 .handle_event(&event, tr, &self.shared_state, &mut actions)?
+        } else if is_deploy_popup_open {
+            self.deploy_popup
+                .handle_event(&event, areas.popup, &mut actions)?;
         } else if demo_popup_shown {
             #[cfg(not(feature = "demo"))]
             unreachable!();
@@ -979,6 +995,9 @@ impl Widget for &App {
         .render(areas.footer, buf, &self.shared_state.theme);
 
         self.invite_popup
+            .render(areas.popup, buf, &self.shared_state);
+
+        self.deploy_popup
             .render(areas.popup, buf, &self.shared_state);
 
         self.fatal_error_popup

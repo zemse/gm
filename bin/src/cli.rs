@@ -1,5 +1,6 @@
 use clap::{CommandFactory, Parser, Subcommand};
 use console::style;
+use std::path::PathBuf;
 use walletconnect_sdk::utils::UriParameters;
 
 #[derive(Parser, Debug)]
@@ -27,6 +28,15 @@ pub enum Commands {
 
     #[command(alias = "its", hide = true)]
     InviteCode { code: String },
+
+    /// Deploy a contract from a Foundry artifact JSON file
+    Deploy {
+        /// Path to the contract artifact JSON file
+        path: PathBuf,
+        /// Network name (optional, shows network picker if not provided)
+        #[arg(long, short)]
+        network: Option<String>,
+    },
 
     #[command(external_subcommand)]
     Wildcard(#[allow(dead_code)] Vec<String>),
