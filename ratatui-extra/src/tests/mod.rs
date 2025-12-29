@@ -1,11 +1,16 @@
 mod boolean_input;
 mod button;
+mod candle_chart;
 mod confirm_popup;
 mod cursor;
 mod filter_select;
+mod filter_select_popup;
+mod form;
 mod input_box;
+mod line_chart;
 mod popup;
 mod scroll_bar;
 mod select;
+mod text_interactive;
 mod text_popup;
 mod toast;

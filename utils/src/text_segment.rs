@@ -65,9 +65,9 @@ pub fn segmented_wrap(str: &str, max_width: u16) -> (Vec<Cow<'_, str>>, Vec<Wrap
         if matches!(a.kind, TokenKind::Hex(_)) == matches!(b.kind, TokenKind::Hex(_)) {
             Ordering::Equal
         } else if matches!(a.kind, TokenKind::Hex(_)) {
-            Ordering::Less
-        } else {
             Ordering::Greater
+        } else {
+            Ordering::Less
         }
     });
 

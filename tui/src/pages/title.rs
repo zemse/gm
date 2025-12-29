@@ -104,13 +104,10 @@ impl Component for Title {
         let (areas, account, _) = Title::get_areas(area, shared_state);
 
         if let Some(mouse_event) = event.mouse_event() {
-            match mouse_event.kind {
-                MouseEventKind::Down(MouseButton::Left) => {
-                    if areas.address.contains(mouse_event.position()) {
-                        actions.copy_to_clipboard(account, Some(mouse_event.position()));
-                    }
+            if let MouseEventKind::Down(MouseButton::Left) = mouse_event.kind {
+                if areas.address.contains(mouse_event.position()) {
+                    actions.copy_to_clipboard(account, Some(mouse_event.position()));
                 }
-                _ => {}
             }
         }
 

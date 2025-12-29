@@ -351,7 +351,7 @@ impl SignTxPopup {
                 tx_meta,
             } => {
                 if !*confirm_text_updated {
-                    confirm_popup.set_text(fmt_tx_request(&network, &tx_req), true);
+                    confirm_popup.set_text(fmt_tx_request(network, tx_req), true);
                     *confirm_text_updated = true;
                 }
 
