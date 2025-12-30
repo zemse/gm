@@ -215,12 +215,14 @@ impl NetworkStore {
         self.networks
             .iter()
             .find(|n| {
-                n.name == network_name
+                n.name.eq_ignore_ascii_case(network_name)
                     || n.name_alchemy
                         .as_ref()
-                        .map(|name| name == network_name)
+                        .map(|name| name.eq_ignore_ascii_case(network_name))
                         .unwrap_or(false)
-                    || n.name_aliases.contains(&network_name.to_string())
+                    || n.name_aliases
+                        .iter()
+                        .any(|alias| alias.eq_ignore_ascii_case(network_name))
             })
             .cloned()
     }
@@ -261,10 +263,10 @@ impl NetworkStore {
             .networks
             .iter_mut()
             .find(|n| {
-                n.name == network_name
+                n.name.eq_ignore_ascii_case(network_name)
                     || n.name_alchemy
                         .as_ref()
-                        .map(|name| name == network_name)
+                        .map(|name| name.eq_ignore_ascii_case(network_name))
                         .unwrap_or(false)
             })
             .expect("network not found");

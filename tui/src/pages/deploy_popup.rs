@@ -41,19 +41,30 @@ pub enum DeployEvent {
 
 /// Popup for deploying a contract
 /// Manages network selection and transaction signing internally
+/// Supports deploying to multiple networks sequentially
 #[derive(Debug)]
 pub enum DeployPopup {
     Closed,
-    /// User needs to select a network
+    /// User needs to select a network (when no networks provided via CLI)
     SelectNetwork {
         bytecode: Bytes,
         contract_name: String,
         account: Address,
         networks_popup: Box<NetworksPopup>,
     },
-    /// Network selected, now showing transaction popup
+    /// Deploying to one or more networks
     Transaction {
         tx_popup: Box<SignTxPopup>,
+        /// Bytecode for creating subsequent transactions
+        bytecode: Bytes,
+        /// Account for signing
+        account: Address,
+        /// Remaining networks to deploy to after current one completes
+        pending_networks: Vec<Network>,
+        /// Number of completed deployments
+        completed_count: usize,
+        /// Total number of networks to deploy to
+        total_count: usize,
     },
 }
 
@@ -67,9 +78,9 @@ impl DeployPopup {
     /// Start deploy flow from a Foundry artifact JSON file
     pub fn from_artifact_path(
         path: &Path,
-        network: Option<Network>,
+        networks_to_deploy: Vec<Network>,
         account: Address,
-        networks: &NetworkStore,
+        network_store: &NetworkStore,
     ) -> crate::Result<Self> {
         let content = std::fs::read_to_string(path)?;
         let artifact: ContractArtifact = serde_json::from_str(&content)?;
@@ -87,37 +98,77 @@ impl DeployPopup {
         Ok(Self::start(
             bytecode,
             contract_name,
-            network,
+            networks_to_deploy,
             account,
-            networks,
+            network_store,
         ))
     }
 
     /// Start deploy flow with bytecode directly
+    /// If networks is empty, shows network picker
+    /// If networks has one or more, deploys to each sequentially
     pub fn start(
         bytecode: Bytes,
         contract_name: String,
-        network: Option<Network>,
+        mut networks: Vec<Network>,
         account: Address,
-        networks: &NetworkStore,
+        network_store: &NetworkStore,
     ) -> Self {
-        if let Some(network) = network {
-            let tx_request = TransactionRequest {
-                input: TransactionInput::new(bytecode),
-                ..Default::default()
-            };
-            Self::Transaction {
-                tx_popup: Box::new(SignTxPopup::new(account, network, tx_request)),
-            }
-        } else {
+        if networks.is_empty() {
+            // No networks specified, show picker
             let mut popup = networks_popup();
-            popup.set_items(Some(networks.networks.clone()));
+            popup.set_items(Some(network_store.networks.clone()));
             popup.open();
             Self::SelectNetwork {
                 bytecode,
                 contract_name,
                 account,
                 networks_popup: Box::new(popup),
+            }
+        } else {
+            // Deploy to the first network, queue the rest
+            let total_count = networks.len();
+            let network = networks.remove(0);
+            let tx_request = TransactionRequest {
+                input: TransactionInput::new(bytecode.clone()),
+                ..Default::default()
+            };
+            Self::Transaction {
+                tx_popup: Box::new(SignTxPopup::new(account, network, tx_request)),
+                bytecode,
+                account,
+                pending_networks: networks,
+                completed_count: 0,
+                total_count,
+            }
+        }
+    }
+
+    /// Create a transaction popup for the next network
+    fn start_next_network(&mut self) {
+        if let DeployPopup::Transaction {
+            bytecode,
+            account,
+            pending_networks,
+            completed_count,
+            total_count,
+            ..
+        } = self
+        {
+            if !pending_networks.is_empty() {
+                let network = pending_networks.remove(0);
+                let tx_request = TransactionRequest {
+                    input: TransactionInput::new(bytecode.clone()),
+                    ..Default::default()
+                };
+                *self = DeployPopup::Transaction {
+                    tx_popup: Box::new(SignTxPopup::new(*account, network, tx_request)),
+                    bytecode: bytecode.clone(),
+                    account: *account,
+                    pending_networks: std::mem::take(pending_networks),
+                    completed_count: *completed_count + 1,
+                    total_count: *total_count,
+                };
             }
         }
     }
@@ -126,7 +177,7 @@ impl DeployPopup {
         match self {
             DeployPopup::Closed => false,
             DeployPopup::SelectNetwork { networks_popup, .. } => networks_popup.is_open(),
-            DeployPopup::Transaction { tx_popup } => tx_popup.is_open(),
+            DeployPopup::Transaction { tx_popup, .. } => tx_popup.is_open(),
         }
     }
 
@@ -158,6 +209,11 @@ impl DeployPopup {
                     };
                     *self = DeployPopup::Transaction {
                         tx_popup: Box::new(SignTxPopup::new(*account, network, tx_request)),
+                        bytecode: bytecode.clone(),
+                        account: *account,
+                        pending_networks: vec![],
+                        completed_count: 0,
+                        total_count: 1,
                     };
                     Ok(None)
                 } else if !networks_popup.is_open() {
@@ -168,11 +224,26 @@ impl DeployPopup {
                     Ok(None)
                 }
             }
-            DeployPopup::Transaction { tx_popup } => {
+            DeployPopup::Transaction {
+                tx_popup,
+                pending_networks,
+                ..
+            } => {
                 match tx_popup.handle_event(event, popup_area, actions)? {
-                    Some(SignTxEvent::Cancelled) | Some(SignTxEvent::Done) => {
+                    Some(SignTxEvent::Cancelled) => {
                         *self = DeployPopup::Closed;
-                        Ok(Some(DeployEvent::Done))
+                        Ok(Some(DeployEvent::Cancelled))
+                    }
+                    Some(SignTxEvent::Done) => {
+                        if pending_networks.is_empty() {
+                            // All deployments complete
+                            *self = DeployPopup::Closed;
+                            Ok(Some(DeployEvent::Done))
+                        } else {
+                            // Start next network deployment
+                            self.start_next_network();
+                            Ok(None)
+                        }
                     }
                     _ => Ok(None),
                 }
@@ -186,7 +257,7 @@ impl DeployPopup {
             DeployPopup::SelectNetwork { networks_popup, .. } => {
                 networks_popup.render(popup_area, buf, &shared_state.theme.popup());
             }
-            DeployPopup::Transaction { tx_popup } => {
+            DeployPopup::Transaction { tx_popup, .. } => {
                 tx_popup.render(popup_area, buf, &shared_state.theme);
             }
         }

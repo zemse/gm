@@ -169,7 +169,8 @@ impl SignTxPopup {
     pub fn new(account: Address, network: Network, mut tx_req: TransactionRequest) -> Self {
         tx_req.normalize_data();
 
-        let text = fmt_tx_request(&network, &tx_req);
+        // No nonce yet - will be updated after build
+        let text = fmt_tx_request(&network, &tx_req, None);
 
         Self::Prompt {
             confirm_popup: ConfirmPopup::new("Sign", "Reject", true)
@@ -351,7 +352,9 @@ impl SignTxPopup {
                 tx_meta,
             } => {
                 if !*confirm_text_updated {
-                    confirm_popup.set_text(fmt_tx_request(network, tx_req), true);
+                    let deployer_and_nonce = Some((*account, tx_built.nonce));
+                    confirm_popup
+                        .set_text(fmt_tx_request(network, tx_req, deployer_and_nonce), true);
                     *confirm_text_updated = true;
                 }
 
@@ -741,11 +744,26 @@ impl SignTxPopup {
     }
 }
 
-fn fmt_tx_request(network: &Network, tx_req: &TransactionRequest) -> String {
+fn fmt_tx_request(
+    network: &Network,
+    tx_req: &TransactionRequest,
+    deployer_and_nonce: Option<(Address, u64)>,
+) -> String {
+    let to_str = if tx_req.to.is_none() || tx_req.to == Some(alloy::primitives::TxKind::Create) {
+        if let Some((deployer, nonce)) = deployer_and_nonce {
+            let predicted_addr = deployer.create(nonce);
+            format!("Contract Deploy → {predicted_addr}")
+        } else {
+            "Contract Deploy".to_string()
+        }
+    } else {
+        format!("{:?}", tx_req.to.unwrap_or_default())
+    };
+
     format!(
-        "Network: {}\nTo: {:?}\nValue: {}\nData: {:?}\n",
+        "Network: {}\nTo: {}\nValue: {}\nData: {:?}\n",
         network,
-        tx_req.to.unwrap_or_default(),
+        to_str,
         tx_req.value.unwrap_or_default(),
         tx_req.input.input().unwrap_or_default()
     )

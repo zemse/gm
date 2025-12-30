@@ -14,7 +14,8 @@ use crate::demo::{demo_exit_text, demo_text, demo_text_2};
 use crate::{
     pages::{
         account::AccountPage, address_book::AddressBookPage, assets::AssetsPage,
-        complete_setup::CompleteSetupPage, config::ConfigPage, deploy_popup::DeployPopup,
+        complete_setup::CompleteSetupPage, config::ConfigPage,
+        deploy_popup::{DeployEvent, DeployPopup},
         dev_key_capture::DevKeyCapturePage, footer::Footer, invite_popup::InvitePopup,
         network::NetworkPage, send_message::SendMessagePage, shell::ShellPage,
         sign_message::SignMessagePage, title::Title, trade::TradePage,
@@ -710,8 +711,19 @@ impl App {
             self.invite_popup
                 .handle_event(&event, tr, &self.shared_state, &mut actions)?
         } else if is_deploy_popup_open {
-            self.deploy_popup
-                .handle_event(&event, areas.popup, &mut actions)?;
+            if let Some(deploy_event) = self
+                .deploy_popup
+                .handle_event(&event, areas.popup, &mut actions)?
+            {
+                // Exit the app when deploy completes if launched via CLI subcommand
+                if self.hide_main_menu {
+                    match deploy_event {
+                        DeployEvent::Done | DeployEvent::Cancelled => {
+                            self.exit = true;
+                        }
+                    }
+                }
+            }
         } else if demo_popup_shown {
             #[cfg(not(feature = "demo"))]
             unreachable!();

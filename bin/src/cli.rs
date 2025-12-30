@@ -33,7 +33,8 @@ pub enum Commands {
     Deploy {
         /// Path to the contract artifact JSON file
         path: PathBuf,
-        /// Network name (optional, shows network picker if not provided)
+        /// Network name(s), comma-separated for multiple (e.g., mainnet,sepolia,arbitrum)
+        /// Shows network picker if not provided
         #[arg(long, short)]
         network: Option<String>,
     },

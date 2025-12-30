@@ -58,12 +58,19 @@ async fn main() -> gm_tui::Result<()> {
             }
 
             Commands::Deploy { path, network } => {
-                let network = network.map(|n| Network::from_name(&n)).transpose()?;
+                // Parse comma-separated networks
+                let networks: Vec<Network> = match network {
+                    Some(names) => names
+                        .split(',')
+                        .map(|n| Network::from_name(n.trim()))
+                        .collect::<Result<Vec<_>, _>>()?,
+                    None => vec![],
+                };
                 let account = gm_utils::config::Config::load()?.get_current_account()?;
 
                 tui_app.deploy_popup = DeployPopup::from_artifact_path(
                     &path,
-                    network,
+                    networks,
                     account,
                     &tui_app.shared_state().networks,
                 )?;
