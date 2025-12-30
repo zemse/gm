@@ -3,7 +3,10 @@ use std::{
     time::Duration,
 };
 
-use alloy::primitives::{map::HashMap, utils::format_units, Address, U256};
+use alloy::{
+    primitives::{map::HashMap, utils::format_units, Address, U256},
+    providers::Provider,
+};
 
 use crate::{
     alchemy::Alchemy, config::Config, disk_storage::DiskStorageInterface, network::NetworkStore,
@@ -267,37 +270,76 @@ pub async fn get_all_assets(wait_for: Option<Duration>) -> crate::Result<(Addres
     }
     networks.save()?;
 
-    // Native balances are also fetched through Alchemy above
-    // for network in networks.get_iter(config.testnet_mode) {
-    //     let provider = network.get_provider()?;
+    // Fetch native balances via eth_getBalance RPC (more reliable than Alchemy API for new networks)
+    for network in networks.get_iter(config.get_testnet_mode()) {
+        let provider = match network.get_provider() {
+            Ok(p) => p,
+            Err(_) => continue, // Skip networks without working RPC
+        };
 
-    //     let balance = provider.get_balance(wallet_address).await?;
-    //     if !balance.is_zero() {
-    //         let price = if let Some(price_ticker) = &network.price_ticker {
-    //             if price_ticker == "ETH" {
-    //                 Price::InETH(1f64)
-    //             } else {
-    //                 let (price, _) = Alchemy::get_price(price_ticker).await.expect("api failed");
-    //                 Price::InUSD(price)
-    //             }
-    //         } else {
-    //             Price::Unknown
-    //         };
+        let balance = match provider.get_balance(wallet_address).await {
+            Ok(b) => b,
+            Err(_) => continue, // Skip on RPC errors
+        };
 
-    //         balances.push(Asset {
-    //             wallet_address,
-    //             r#type: AssetType {
-    //                 token_address: TokenAddress::Native,
-    //                 network: network.name.clone(),
-    //                 symbol: network.symbol.clone().unwrap_or("ETH".to_string()),
-    //                 name: network.name.clone(),
-    //                 decimals: 18,
-    //                 price,
-    //             },
-    //             value: balance,
-    //         });
-    //     }
-    // }
+        if balance.is_zero() {
+            continue;
+        }
+
+        // Check if we already have a native balance entry from Alchemy for this network
+        if let Some(existing) = balances
+            .iter_mut()
+            .find(|a| a.r#type.token_address.is_native() && a.r#type.network == network.name)
+        {
+            // TODO: Show discrepancy in the UI when Alchemy balance differs from RPC balance
+            // This can help users understand why balances might appear different across sources
+            // if existing.value != balance {
+            //     log::warn!(
+            //         "Balance discrepancy for {} on {}: Alchemy={}, RPC={}",
+            //         network.symbol.as_deref().unwrap_or("ETH"),
+            //         network.name,
+            //         existing.value,
+            //         balance
+            //     );
+            // }
+
+            // Prioritize RPC balance over Alchemy (more up-to-date)
+            existing.value = balance;
+        } else {
+            // No Alchemy entry, create a new one
+            let price = if let Some(price_ticker) = &network.price_ticker {
+                if price_ticker == "ETH" {
+                    Price::InETH(1f64)
+                } else {
+                    match Alchemy::get_price(price_ticker).await {
+                        Ok((price, _)) => Price::InUSD(price),
+                        Err(_) => Price::Unknown,
+                    }
+                }
+            } else {
+                Price::Unknown
+            };
+
+            let asset = Asset {
+                wallet_address,
+                r#type: AssetType {
+                    token_address: TokenAddress::Native,
+                    network: network.name.clone(),
+                    symbol: network.symbol.clone().unwrap_or("ETH".to_string()),
+                    name: network.name.clone(),
+                    decimals: network.native_decimals.unwrap_or(18),
+                    price,
+                },
+                value: balance,
+                light_client_verification: LightClientVerification::Pending,
+            };
+
+            // Apply testnet mode filter
+            if config.get_testnet_mode() || asset.usd_value().map(|v| v > 0.0).unwrap_or_default() {
+                balances.push(asset);
+            }
+        }
+    }
 
     balances.sort_by(|a, b| {
         a.usd_value()
