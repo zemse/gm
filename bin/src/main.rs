@@ -1,3 +1,4 @@
+use alloy::primitives::FixedBytes;
 use clap::Parser;
 use gm_ratatui_extra::widgets::popup::PopupWidget;
 use gm_tui::{
@@ -57,7 +58,11 @@ async fn main() -> gm_tui::Result<()> {
                 tui_app.invite_popup.open();
             }
 
-            Commands::Deploy { path, network } => {
+            Commands::Deploy {
+                path,
+                network,
+                salt,
+            } => {
                 // Parse comma-separated networks
                 let networks: Vec<Network> = match network {
                     Some(names) => names
@@ -68,10 +73,17 @@ async fn main() -> gm_tui::Result<()> {
                 };
                 let account = gm_utils::config::Config::load()?.get_current_account()?;
 
+                // Parse salt for CREATE2 deployment
+                let salt: Option<FixedBytes<32>> = match salt {
+                    Some(s) => Some(s.parse().map_err(gm_tui::Error::FromHexError)?),
+                    None => None,
+                };
+
                 tui_app.deploy_popup = DeployPopup::from_artifact_path(
                     &path,
                     networks,
                     account,
+                    salt,
                     &tui_app.shared_state().networks,
                 )?;
                 tui_app.hide_main_menu = true;

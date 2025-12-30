@@ -2,7 +2,7 @@ use std::path::Path;
 
 use alloy::{
     hex,
-    primitives::{Address, Bytes},
+    primitives::{Address, Bytes, FixedBytes, TxKind},
     rpc::types::{TransactionInput, TransactionRequest},
 };
 use gm_ratatui_extra::{extensions::ThemedWidget, popup::PopupWidget, thematize::Thematize};
@@ -18,6 +18,14 @@ use crate::{
 };
 
 use super::sign_tx_popup::{SignTxEvent, SignTxPopup};
+
+/// Nick's Factory address for deterministic CREATE2 deployments
+/// https://github.com/Arachnid/deterministic-deployment-proxy
+fn deterministic_deployment_proxy() -> Address {
+    "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+        .parse()
+        .unwrap()
+}
 
 /// Foundry contract artifact structure
 #[derive(Deserialize)]
@@ -50,6 +58,8 @@ pub enum DeployPopup {
         bytecode: Bytes,
         contract_name: String,
         account: Address,
+        /// Salt for CREATE2 deployment (None = regular CREATE)
+        salt: Option<FixedBytes<32>>,
         networks_popup: Box<NetworksPopup>,
     },
     /// Deploying to one or more networks
@@ -59,6 +69,8 @@ pub enum DeployPopup {
         bytecode: Bytes,
         /// Account for signing
         account: Address,
+        /// Salt for CREATE2 deployment (None = regular CREATE)
+        salt: Option<FixedBytes<32>>,
         /// Remaining networks to deploy to after current one completes
         pending_networks: Vec<Network>,
         /// Number of completed deployments
@@ -75,11 +87,38 @@ impl Default for DeployPopup {
 }
 
 impl DeployPopup {
+    /// Build transaction request for deployment
+    /// If salt is provided, uses CREATE2 via Nick's Factory
+    /// Otherwise, uses regular CREATE (contract creation tx)
+    fn build_tx_request(bytecode: &Bytes, salt: Option<FixedBytes<32>>) -> TransactionRequest {
+        match salt {
+            Some(salt) => {
+                // CREATE2: send to Nick's Factory with salt + bytecode as calldata
+                let mut calldata = Vec::with_capacity(32 + bytecode.len());
+                calldata.extend_from_slice(salt.as_slice());
+                calldata.extend_from_slice(bytecode);
+                TransactionRequest {
+                    to: Some(TxKind::Call(deterministic_deployment_proxy())),
+                    input: TransactionInput::new(Bytes::from(calldata)),
+                    ..Default::default()
+                }
+            }
+            None => {
+                // Regular CREATE: contract creation tx
+                TransactionRequest {
+                    input: TransactionInput::new(bytecode.clone()),
+                    ..Default::default()
+                }
+            }
+        }
+    }
+
     /// Start deploy flow from a Foundry artifact JSON file
     pub fn from_artifact_path(
         path: &Path,
         networks_to_deploy: Vec<Network>,
         account: Address,
+        salt: Option<FixedBytes<32>>,
         network_store: &NetworkStore,
     ) -> crate::Result<Self> {
         let content = std::fs::read_to_string(path)?;
@@ -100,6 +139,7 @@ impl DeployPopup {
             contract_name,
             networks_to_deploy,
             account,
+            salt,
             network_store,
         ))
     }
@@ -112,6 +152,7 @@ impl DeployPopup {
         contract_name: String,
         mut networks: Vec<Network>,
         account: Address,
+        salt: Option<FixedBytes<32>>,
         network_store: &NetworkStore,
     ) -> Self {
         if networks.is_empty() {
@@ -123,20 +164,19 @@ impl DeployPopup {
                 bytecode,
                 contract_name,
                 account,
+                salt,
                 networks_popup: Box::new(popup),
             }
         } else {
             // Deploy to the first network, queue the rest
             let total_count = networks.len();
             let network = networks.remove(0);
-            let tx_request = TransactionRequest {
-                input: TransactionInput::new(bytecode.clone()),
-                ..Default::default()
-            };
+            let tx_request = Self::build_tx_request(&bytecode, salt);
             Self::Transaction {
                 tx_popup: Box::new(SignTxPopup::new(account, network, tx_request)),
                 bytecode,
                 account,
+                salt,
                 pending_networks: networks,
                 completed_count: 0,
                 total_count,
@@ -149,6 +189,7 @@ impl DeployPopup {
         if let DeployPopup::Transaction {
             bytecode,
             account,
+            salt,
             pending_networks,
             completed_count,
             total_count,
@@ -157,14 +198,12 @@ impl DeployPopup {
         {
             if !pending_networks.is_empty() {
                 let network = pending_networks.remove(0);
-                let tx_request = TransactionRequest {
-                    input: TransactionInput::new(bytecode.clone()),
-                    ..Default::default()
-                };
+                let tx_request = Self::build_tx_request(bytecode, *salt);
                 *self = DeployPopup::Transaction {
                     tx_popup: Box::new(SignTxPopup::new(*account, network, tx_request)),
                     bytecode: bytecode.clone(),
                     account: *account,
+                    salt: *salt,
                     pending_networks: std::mem::take(pending_networks),
                     completed_count: *completed_count + 1,
                     total_count: *total_count,
@@ -197,20 +236,19 @@ impl DeployPopup {
                 bytecode,
                 contract_name: _,
                 account,
+                salt,
                 networks_popup,
             } => {
                 if let Some(selected_network) =
                     networks_popup.handle_event(event.input_event(), popup_area, actions)?
                 {
                     let network = (**selected_network).clone();
-                    let tx_request = TransactionRequest {
-                        input: TransactionInput::new(bytecode.clone()),
-                        ..Default::default()
-                    };
+                    let tx_request = Self::build_tx_request(bytecode, *salt);
                     *self = DeployPopup::Transaction {
                         tx_popup: Box::new(SignTxPopup::new(*account, network, tx_request)),
                         bytecode: bytecode.clone(),
                         account: *account,
+                        salt: *salt,
                         pending_networks: vec![],
                         completed_count: 0,
                         total_count: 1,

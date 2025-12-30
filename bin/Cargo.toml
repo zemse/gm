@@ -20,3 +20,4 @@ tokio = { workspace = true }
 walletconnect-sdk = { workspace = true }
 console = { workspace = true }
 ratatui = { workspace = true }
+alloy = { workspace = true }

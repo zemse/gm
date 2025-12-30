@@ -3426,6 +3426,7 @@ dependencies = [
 name = "gm-bin"
 version = "0.0.2-alpha"
 dependencies = [
+ "alloy",
  "clap",
  "console",
  "gm-ratatui-extra",

@@ -37,6 +37,10 @@ pub enum Commands {
         /// Shows network picker if not provided
         #[arg(long, short)]
         network: Option<String>,
+        /// Salt for CREATE2 deterministic deployment (32 bytes hex)
+        /// Uses Nick's Factory (0x4e59b44847b379578588920cA78FbF26c0B4956C)
+        #[arg(long)]
+        salt: Option<String>,
     },
 
     #[command(external_subcommand)]

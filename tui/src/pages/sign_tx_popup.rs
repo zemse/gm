@@ -3,7 +3,7 @@ use std::{mem, time::Duration};
 use alloy::{
     consensus::{Signed, TxEip1559},
     hex::{self, ToHexExt},
-    primitives::{Address, FixedBytes},
+    primitives::{Address, FixedBytes, B256},
     providers::Provider,
     rpc::types::TransactionRequest,
 };
@@ -744,17 +744,42 @@ impl SignTxPopup {
     }
 }
 
+/// Nick's Factory address for deterministic CREATE2 deployments
+const DETERMINISTIC_DEPLOYMENT_PROXY: Address =
+    Address::new(*b"\x4e\x59\xb4\x48\x47\xb3\x79\x57\x85\x88\x92\x0c\xa7\x8f\xbf\x26\xc0\xb4\x95\x6c");
+
 fn fmt_tx_request(
     network: &Network,
     tx_req: &TransactionRequest,
     deployer_and_nonce: Option<(Address, u64)>,
 ) -> String {
     let to_str = if tx_req.to.is_none() || tx_req.to == Some(alloy::primitives::TxKind::Create) {
+        // Regular CREATE deployment
         if let Some((deployer, nonce)) = deployer_and_nonce {
             let predicted_addr = deployer.create(nonce);
-            format!("Contract Deploy → {predicted_addr}")
+            format!("Contract Deploy (CREATE) → {predicted_addr}")
         } else {
-            "Contract Deploy".to_string()
+            "Contract Deploy (CREATE)".to_string()
+        }
+    } else if tx_req
+        .to
+        .and_then(|to| to.to().copied())
+        .map(|to| to == DETERMINISTIC_DEPLOYMENT_PROXY)
+        .unwrap_or(false)
+    {
+        // CREATE2 deployment via Nick's Factory
+        if let Some(input) = tx_req.input.input() {
+            if input.len() >= 32 {
+                let salt: B256 = B256::from_slice(&input[..32]);
+                let bytecode = &input[32..];
+                let predicted_addr =
+                    DETERMINISTIC_DEPLOYMENT_PROXY.create2_from_code(salt, bytecode);
+                format!("Contract Deploy (CREATE2) → {predicted_addr}")
+            } else {
+                "Contract Deploy (CREATE2)".to_string()
+            }
+        } else {
+            "Contract Deploy (CREATE2)".to_string()
         }
     } else {
         format!("{:?}", tx_req.to.unwrap_or_default())
